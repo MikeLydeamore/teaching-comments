@@ -17,6 +17,8 @@ The current slice includes:
 - recent-submission filtering
 - star, flag, and hide controls
 - simple word-frequency summary
+- column and pie charts for short poll-style responses
+- response-time plotting from the latest prompt update
 - local JSON storage for development
 - optional Supabase storage for hosting
 
@@ -64,6 +66,9 @@ commit it to the repo.
 
 If you already ran the first schema before drawing support was added, run
 `supabase/add-drawing-data.sql` in the Supabase SQL editor.
+
+If you already ran the schema before response-time plotting was added, run
+`supabase/add-prompt-timing.sql` in the Supabase SQL editor.
 
 ## Sessions
 

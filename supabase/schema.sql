@@ -5,7 +5,8 @@ create table if not exists public.qwt_sessions (
   title text not null check (char_length(title) between 1 and 120),
   prompt text not null check (char_length(prompt) between 5 and 1200),
   is_open boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  prompt_updated_at timestamptz not null default now()
 );
 
 create table if not exists public.qwt_submissions (

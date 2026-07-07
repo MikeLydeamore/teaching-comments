@@ -35,6 +35,7 @@ function defaultStore(): StoreData {
         prompt: DEFAULT_PROMPT,
         isOpen: true,
         createdAt,
+        promptUpdatedAt: createdAt,
       },
     ],
     submissions: [
@@ -83,6 +84,10 @@ async function readStore(): Promise<StoreData> {
 
   return {
     ...data,
+    sessions: data.sessions.map((session) => ({
+      ...session,
+      promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
+    })),
     submissions: data.submissions.map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
@@ -116,12 +121,14 @@ export const localStore: QwtStore = {
       return existing;
     }
 
+    const timestamp = now();
     const session: Session = {
       code: sessionCode,
       title: titleFromCode(sessionCode) || "Quick Write",
       prompt: DEFAULT_PROMPT,
       isOpen: true,
-      createdAt: now(),
+      createdAt: timestamp,
+      promptUpdatedAt: timestamp,
     };
 
     data.sessions.push(session);

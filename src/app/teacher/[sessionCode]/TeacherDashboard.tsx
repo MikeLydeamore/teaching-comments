@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
-import { ResultsChart } from "@/components/ResultsChart";
+import { ResponseTimePlot } from "@/components/ResponseTimePlot";
+import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { responseCounts } from "@/lib/poll-results";
 import type { DrawingData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
@@ -12,6 +13,7 @@ type Session = {
   code: string;
   title: string;
   prompt: string;
+  promptUpdatedAt: string;
 };
 
 type Submission = {
@@ -99,6 +101,7 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showResultsChart, setShowResultsChart] = useState(false);
+  const [chartType, setChartType] = useState<ChartType>("column");
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState("");
@@ -213,6 +216,7 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const maxPollCount = Math.max(1, ...pollResults.map(([, count]) => count));
   const pollResponseTotal = pollResults.reduce((sum, [, count]) => sum + count, 0);
   const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
+    chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
   }).toString()}`;
@@ -402,6 +406,25 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div
+                    aria-label="Chart type"
+                    className="flex rounded-md border border-slate-300 bg-slate-50 p-1"
+                  >
+                    {(["column", "pie"] as const).map((type) => (
+                      <button
+                        className={`h-8 rounded px-3 text-sm font-semibold transition ${
+                          chartType === type
+                            ? "bg-white text-slate-950 shadow-sm"
+                            : "text-slate-600 hover:text-teal-800"
+                        }`}
+                        key={type}
+                        type="button"
+                        onClick={() => setChartType(type)}
+                      >
+                        {type === "column" ? "Column" : "Pie"}
+                      </button>
+                    ))}
+                  </div>
                   <p className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
                     {pollResponseTotal} typed
                   </p>
@@ -420,9 +443,14 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                 </div>
               </div>
               <ResultsChart
+                chartType={chartType}
                 maxCount={maxPollCount}
                 results={pollResults}
                 total={pollResponseTotal}
+              />
+              <ResponseTimePlot
+                promptUpdatedAt={sessionDetails.promptUpdatedAt}
+                submissions={submissions}
               />
             </section>
           ) : null}

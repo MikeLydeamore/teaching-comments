@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ResultsChart } from "@/components/ResultsChart";
+import { ResponseTimePlot } from "@/components/ResponseTimePlot";
+import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { responseCounts } from "@/lib/poll-results";
 import { getOrCreateSession, listSubmissions } from "@/lib/qwt-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
@@ -15,18 +16,29 @@ function parseMinutes(value: string | undefined) {
   return Math.min(500, Math.max(1, minutes));
 }
 
+function parseChartType(value: string | undefined): ChartType {
+  return value === "pie" ? "pie" : "column";
+}
+
 export default async function TeacherResultsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ sessionCode: string }>;
-  searchParams: Promise<{ auth?: string; includeHidden?: string; minutes?: string }>;
+  searchParams: Promise<{
+    auth?: string;
+    chartType?: string;
+    includeHidden?: string;
+    minutes?: string;
+  }>;
 }) {
   const { sessionCode } = await params;
   const query = await searchParams;
   const minutes = parseMinutes(query.minutes);
+  const chartType = parseChartType(query.chartType);
   const includeHidden = query.includeHidden === "true";
   const search = new URLSearchParams({
+    chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
   });
@@ -67,7 +79,27 @@ export default async function TeacherResultsPage({
             {includeHidden ? ", including hidden responses" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-md border border-slate-300 bg-slate-50 p-1">
+            {(["column", "pie"] as const).map((type) => {
+              const typeSearch = new URLSearchParams(search);
+              typeSearch.set("chartType", type);
+
+              return (
+                <Link
+                  className={`rounded px-4 py-2 text-base font-semibold transition ${
+                    chartType === type
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "text-slate-600 hover:text-teal-800"
+                  }`}
+                  href={`/teacher/${session.code}/results?${typeSearch.toString()}`}
+                  key={type}
+                >
+                  {type === "column" ? "Column" : "Pie"}
+                </Link>
+              );
+            })}
+          </div>
           <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
             {total} typed
           </p>
@@ -81,9 +113,15 @@ export default async function TeacherResultsPage({
       </header>
 
       <ResultsChart
+        chartType={chartType}
         maxCount={maxCount}
         results={results}
         total={total}
+        variant="screen"
+      />
+      <ResponseTimePlot
+        promptUpdatedAt={session.promptUpdatedAt}
+        submissions={submissions}
         variant="screen"
       />
     </main>

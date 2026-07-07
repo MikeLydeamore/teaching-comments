@@ -24,6 +24,7 @@ export type Session = {
   prompt: string;
   isOpen: boolean;
   createdAt: string;
+  promptUpdatedAt: string;
 };
 
 export type Submission = {
@@ -224,6 +225,7 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
     typeof patch.prompt === "string" ? patch.prompt.trim() : current.prompt;
   const nextTitle =
     typeof patch.title === "string" ? patch.title.trim() : current.title;
+  const promptChanged = nextPrompt !== current.prompt;
 
   if (nextPrompt.length < 5) {
     throw new Error("Prompt must be at least 5 characters.");
@@ -236,6 +238,7 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
   return {
     ...current,
     prompt: nextPrompt,
+    promptUpdatedAt: promptChanged ? now() : current.promptUpdatedAt,
     title: nextTitle || current.title,
     isOpen: typeof patch.isOpen === "boolean" ? patch.isOpen : current.isOpen,
   };

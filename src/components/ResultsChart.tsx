@@ -1,13 +1,16 @@
 import type { PollResult } from "@/lib/poll-results";
 
+export type ChartType = "column" | "pie";
+
 type ResultsChartProps = {
+  chartType?: ChartType;
   maxCount: number;
   results: PollResult[];
   total: number;
   variant?: "inline" | "large" | "screen";
 };
 
-const chartColors = [
+export const chartColors = [
   "#0f766e",
   "#2563eb",
   "#b45309",
@@ -19,6 +22,7 @@ const chartColors = [
 ];
 
 export function ResultsChart({
+  chartType = "column",
   maxCount,
   results,
   total,
@@ -33,6 +37,10 @@ export function ResultsChart({
         No typed responses in the current view.
       </p>
     );
+  }
+
+  if (chartType === "pie") {
+    return <PieChart results={results} total={total} variant={variant} />;
   }
 
   return (
@@ -85,6 +93,70 @@ export function ResultsChart({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function PieChart({
+  results,
+  total,
+  variant = "inline",
+}: Pick<ResultsChartProps, "results" | "total" | "variant">) {
+  const isScreen = variant === "screen";
+  const isLarge = variant === "large" || isScreen;
+  const segments = results.map(([, count], index) => {
+    const previousTotal = results
+      .slice(0, index)
+      .reduce((sum, [, previousCount]) => sum + previousCount, 0);
+    const start = (previousTotal / total) * 360;
+    const end = ((previousTotal + count) / total) * 360;
+
+    return `${chartColors[index % chartColors.length]} ${start}deg ${end}deg`;
+  });
+
+  return (
+    <div
+      className={`mt-5 grid items-center gap-5 ${
+        isScreen
+          ? "lg:grid-cols-[minmax(320px,420px)_1fr]"
+          : "md:grid-cols-[minmax(220px,280px)_1fr]"
+      }`}
+    >
+      <div
+        aria-label="Pie chart"
+        className={`mx-auto rounded-full border border-slate-200 shadow-inner ${
+          isScreen ? "size-96" : isLarge ? "size-72" : "size-56"
+        }`}
+        role="img"
+        style={{
+          background: `conic-gradient(${segments.join(", ")})`,
+        }}
+      />
+      <div className={`${isScreen ? "space-y-4" : "space-y-3"}`}>
+        {results.map(([response, count], index) => {
+          const percentage = total ? Math.round((count / total) * 100) : 0;
+
+          return (
+            <div
+              className={`grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-3 ${
+                isScreen ? "text-xl" : "text-sm"
+              }`}
+              key={response}
+            >
+              <span
+                className="size-4 rounded-sm"
+                style={{ backgroundColor: chartColors[index % chartColors.length] }}
+              />
+              <span className="truncate font-medium text-slate-800" title={response}>
+                {response}
+              </span>
+              <span className="font-semibold text-slate-700">
+                {count} / {percentage}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

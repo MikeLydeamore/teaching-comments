@@ -20,6 +20,7 @@ type SupabaseSessionRow = {
   prompt: string;
   is_open: boolean;
   created_at: string;
+  prompt_updated_at: string;
 };
 
 type SupabaseSubmissionRow = {
@@ -98,7 +99,7 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "code,title,prompt,is_open,created_at";
+  return "code,title,prompt,is_open,created_at,prompt_updated_at";
 }
 
 function submissionSelect() {
@@ -112,6 +113,7 @@ function sessionFromRow(row: SupabaseSessionRow): Session {
     prompt: row.prompt,
     isOpen: row.is_open,
     createdAt: row.created_at,
+    promptUpdatedAt: row.prompt_updated_at ?? row.created_at,
   };
 }
 
@@ -166,6 +168,7 @@ export const supabaseStore: QwtStore = {
           prompt: DEFAULT_PROMPT,
           is_open: true,
           created_at: timestamp,
+          prompt_updated_at: timestamp,
         }),
         prefer: "return=representation",
       },
@@ -180,6 +183,7 @@ export const supabaseStore: QwtStore = {
               prompt: session.prompt,
               is_open: session.isOpen,
               created_at: session.createdAt,
+              prompt_updated_at: session.promptUpdatedAt,
             },
           ];
         }
@@ -214,6 +218,7 @@ export const supabaseStore: QwtStore = {
         body: JSON.stringify({
           title: next.title,
           prompt: next.prompt,
+          prompt_updated_at: next.promptUpdatedAt,
           is_open: next.isOpen,
         }),
         prefer: "return=representation",
