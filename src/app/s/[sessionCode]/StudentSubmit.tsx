@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DrawingPad } from "@/components/DrawingPad";
+import type { DrawingData } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
   sessionCode: string;
@@ -11,6 +13,7 @@ type StudentSubmitProps = {
 type SavedSubmission = {
   id: string;
   text: string;
+  drawingData: DrawingData | null;
   createdAt: string;
 };
 
@@ -19,6 +22,8 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
   const [promptUpdatedAt, setPromptUpdatedAt] = useState<Date | null>(null);
   const [text, setText] = useState("");
+  const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
+  const [drawingResetSignal, setDrawingResetSignal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -26,6 +31,7 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
 
   const remaining = useMemo(() => 2000 - text.length, [text]);
+  const hasSubmissionContent = text.trim().length >= 2 || drawingData !== null;
 
   const refreshSession = useCallback(async () => {
     const response = await fetch(`/api/sessions/${sessionCode}/student`);
@@ -75,7 +81,7 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
     const response = await fetch(`/api/sessions/${sessionCode}/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ privacyAccepted, text, website }),
+      body: JSON.stringify({ drawingData, privacyAccepted, text, website }),
     });
 
     const payload = await response.json();
@@ -88,6 +94,8 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
 
     setSaved(payload.submission);
     setText("");
+    setDrawingData(null);
+    setDrawingResetSignal((currentSignal) => currentSignal + 1);
   }
 
   return (
@@ -142,11 +150,16 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
         />
         <textarea
           id="quick-write"
-          className="mt-3 min-h-52 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          className="mt-3 min-h-40 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
           maxLength={2000}
           placeholder="Type your response here..."
           value={text}
           onChange={(event) => setText(event.target.value)}
+        />
+        <DrawingPad
+          disabled={!sessionIsOpen || isSaving}
+          key={drawingResetSignal}
+          onChange={setDrawingData}
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p className={`text-sm ${remaining < 100 ? "text-amber-700" : "text-slate-500"}`}>
@@ -154,7 +167,7 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
           </p>
           <button
             className="inline-flex h-11 items-center justify-center rounded-md bg-amber-300 px-5 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSaving || !sessionIsOpen}
+            disabled={isSaving || !sessionIsOpen || !hasSubmissionContent}
             type="submit"
           >
             {isSaving ? "Submitting..." : "Submit writing"}
@@ -168,9 +181,9 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
             onChange={(event) => setPrivacyAccepted(event.target.checked)}
           />
           <span>
-            I understand my writing, timestamp, and session code will be stored
-            for this teaching activity. I will avoid including names, student
-            IDs, or other identifying details.{" "}
+            I understand my writing or drawing, timestamp, and session code
+            will be stored for this teaching activity. I will avoid including
+            names, student IDs, or other identifying details.{" "}
             <Link className="font-semibold text-teal-700 underline" href="/privacy">
               Read the privacy notice
             </Link>

@@ -9,7 +9,7 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
-  validateSubmissionText,
+  validateSubmissionContent,
   type QwtStore,
   type Session,
   type Submission,
@@ -41,6 +41,7 @@ function defaultStore(): StoreData {
         id: randomUUID(),
         sessionCode: "demo-lecture",
         text: "There is no evidence against the null model, so the observed difference could be due to random variation.",
+        drawingData: null,
         status: "visible",
         starred: false,
         flagged: false,
@@ -52,6 +53,7 @@ function defaultStore(): StoreData {
         id: randomUUID(),
         sessionCode: "demo-lecture",
         text: "The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.",
+        drawingData: null,
         status: "visible",
         starred: true,
         flagged: false,
@@ -76,7 +78,15 @@ async function ensureStore() {
 async function readStore(): Promise<StoreData> {
   await ensureStore();
   const raw = await readFile(STORE_PATH, "utf8");
-  return JSON.parse(raw) as StoreData;
+  const data = JSON.parse(raw) as StoreData;
+
+  return {
+    ...data,
+    submissions: data.submissions.map((submission) => ({
+      ...submission,
+      drawingData: submission.drawingData ?? null,
+    })),
+  };
 }
 
 async function writeStore(data: StoreData) {
@@ -155,8 +165,8 @@ export const localStore: QwtStore = {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
-  async addSubmission(code, text) {
-    const trimmed = validateSubmissionText(text);
+  async addSubmission(code, text, drawingData) {
+    const submissionContent = validateSubmissionContent(text, drawingData);
     const session = await this.getSession(code);
 
     if (!session) {
@@ -172,7 +182,8 @@ export const localStore: QwtStore = {
     const submission: Submission = {
       id: randomUUID(),
       sessionCode: session.code,
-      text: trimmed,
+      text: submissionContent.text,
+      drawingData: submissionContent.drawingData,
       status: "visible",
       starred: false,
       flagged: false,

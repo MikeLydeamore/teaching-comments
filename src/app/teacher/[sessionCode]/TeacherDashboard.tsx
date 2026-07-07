@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { DrawingPreview } from "@/components/DrawingPreview";
+import type { DrawingData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -13,6 +15,7 @@ type Session = {
 type Submission = {
   id: string;
   text: string;
+  drawingData: DrawingData | null;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -368,9 +371,18 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                       </button>
                     </div>
                   </div>
-                  <p className="min-h-32 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-base leading-7 text-slate-950">
-                    {submission.text}
-                  </p>
+                  {submission.text ? (
+                    <p className="min-h-28 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-base leading-7 text-slate-950">
+                      {submission.text}
+                    </p>
+                  ) : (
+                    <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600">
+                      Drawing-only response
+                    </p>
+                  )}
+                  {submission.drawingData ? (
+                    <DrawingPreview drawingData={submission.drawingData} />
+                  ) : null}
                   <button
                     className="mt-3 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                     onClick={() =>

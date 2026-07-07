@@ -12,6 +12,7 @@ The current slice includes:
 - in-session prompt editing from the teacher dashboard
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
+- typed and drawn student responses
 - anonymous submission cards
 - recent-submission filtering
 - star, flag, and hide controls
@@ -60,6 +61,9 @@ TEACHER_PIN=replace-with-a-private-pin-before-deploying
 
 Keep the service role key server-side only. Do not put it in browser code or
 commit it to the repo.
+
+If you already ran the first schema before drawing support was added, run
+`supabase/add-drawing-data.sql` in the Supabase SQL editor.
 
 ## Sessions
 

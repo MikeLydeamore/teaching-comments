@@ -28,6 +28,7 @@ export async function POST(
 ) {
   const { sessionCode } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as {
+    drawingData?: unknown;
     privacyAccepted?: boolean;
     text?: string;
     website?: string;
@@ -45,7 +46,7 @@ export async function POST(
       );
     }
 
-    const submission = await addSubmission(sessionCode, body.text ?? "");
+    const submission = await addSubmission(sessionCode, body.text ?? "", body.drawingData);
     return Response.json({ submission }, { status: 201 });
   } catch (error) {
     return Response.json(

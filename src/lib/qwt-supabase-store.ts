@@ -6,7 +6,8 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
-  validateSubmissionText,
+  validateSubmissionContent,
+  type DrawingData,
   type QwtStore,
   type Session,
   type Submission,
@@ -24,6 +25,7 @@ type SupabaseSubmissionRow = {
   id: string;
   session_code: string;
   text: string;
+  drawing_data: DrawingData | null;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -99,7 +101,7 @@ function sessionSelect() {
 }
 
 function submissionSelect() {
-  return "id,session_code,text,status,starred,flagged,version,created_at,updated_at";
+  return "id,session_code,text,drawing_data,status,starred,flagged,version,created_at,updated_at";
 }
 
 function sessionFromRow(row: SupabaseSessionRow): Session {
@@ -117,6 +119,7 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
     id: row.id,
     sessionCode: row.session_code,
     text: row.text,
+    drawingData: row.drawing_data ?? null,
     status: row.status,
     starred: row.starred,
     flagged: row.flagged,
@@ -245,8 +248,8 @@ export const supabaseStore: QwtStore = {
     return rows.map(submissionFromRow);
   },
 
-  async addSubmission(code, text) {
-    const trimmed = validateSubmissionText(text);
+  async addSubmission(code, text, drawingData) {
+    const submissionContent = validateSubmissionContent(text, drawingData);
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -264,7 +267,8 @@ export const supabaseStore: QwtStore = {
         method: "POST",
         body: JSON.stringify({
           session_code: session.code,
-          text: trimmed,
+          text: submissionContent.text,
+          drawing_data: submissionContent.drawingData,
           status: "visible",
           starred: false,
           flagged: false,
@@ -313,7 +317,7 @@ export const supabaseStore: QwtStore = {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const params = new URLSearchParams({
       session_code: `eq.${sessionCode}`,
-      select: "id,session_code,text,status,starred,flagged,version,created_at,updated_at",
+      select: submissionSelect(),
     });
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?${params.toString()}`,

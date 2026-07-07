@@ -11,19 +11,20 @@ export default function PrivacyPage() {
           Quick Write Tool prototype
         </h1>
         <p className="mt-4 leading-7 text-slate-700">
-          This prototype collects short pieces of student writing so teaching
-          staff can understand what the class is thinking during a learning
-          activity. It is designed to avoid collecting names or student IDs.
+          This prototype collects short pieces of student writing and optional
+          drawings so teaching staff can understand what the class is thinking
+          during a learning activity. It is designed to avoid collecting names
+          or student IDs.
         </p>
 
         <section className="mt-6 space-y-5 text-sm leading-6 text-slate-700">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">What is collected</h2>
             <p className="mt-2">
-              We store the writing you submit, the session code, a timestamp,
-              and teacher moderation markers such as starred, flagged, or
-              hidden. The prototype may also create ordinary technical logs
-              through its hosting provider.
+              We store the writing or drawing you submit, the session code, a
+              timestamp, and teacher moderation markers such as starred,
+              flagged, or hidden. The prototype may also create ordinary
+              technical logs through its hosting provider.
             </p>
           </div>
 
@@ -32,7 +33,8 @@ export default function PrivacyPage() {
             <p className="mt-2">
               The student form does not ask for your name, student ID, email
               address, or login details. Please avoid including identifying
-              information about yourself or other people in your response.
+              information about yourself or other people in your response or
+              drawing.
             </p>
           </div>
 
@@ -68,9 +70,9 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-950">No AI processing</h2>
             <p className="mt-2">
-              This version does not send writing to an AI service. If AI
-              feedback is added later, this notice should be updated before it
-              is used with students.
+              This version does not send writing or drawings to an AI service.
+              If AI feedback is added later, this notice should be updated
+              before it is used with students.
             </p>
           </div>
         </section>

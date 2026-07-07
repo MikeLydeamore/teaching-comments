@@ -11,13 +11,18 @@ create table if not exists public.qwt_sessions (
 create table if not exists public.qwt_submissions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
-  text text not null check (char_length(text) between 2 and 2000),
+  text text not null default '' check (char_length(text) <= 2000),
+  drawing_data jsonb,
   status text not null default 'visible' check (status in ('visible', 'hidden')),
   starred boolean not null default false,
   flagged boolean not null default false,
   version integer not null default 1 check (version >= 1),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint qwt_submissions_text_or_drawing_check
+    check (char_length(text) >= 2 or drawing_data is not null),
+  constraint qwt_submissions_drawing_data_check
+    check (drawing_data is null or jsonb_typeof(drawing_data) = 'object')
 );
 
 create index if not exists qwt_submissions_session_created_idx

@@ -10,6 +10,9 @@ import {
 export { normalizeSessionCode };
 export type {
   QwtStore,
+  DrawingData,
+  DrawingPoint,
+  DrawingStroke,
   Session,
   SessionPatch,
   SessionStats,
@@ -59,8 +62,8 @@ export async function listSubmissions(
   return getStore().listSubmissions(code, options);
 }
 
-export async function addSubmission(code: string, text: string) {
-  return getStore().addSubmission(code, text);
+export async function addSubmission(code: string, text: string, drawingData?: unknown) {
+  return getStore().addSubmission(code, text, drawingData);
 }
 
 export async function updateSubmission(id: string, patch: SubmissionPatch) {

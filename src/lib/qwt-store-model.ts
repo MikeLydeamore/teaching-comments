@@ -1,5 +1,23 @@
 export type SubmissionStatus = "visible" | "hidden";
 
+export type DrawingPoint = {
+  x: number;
+  y: number;
+};
+
+export type DrawingStroke = {
+  color: string;
+  size: number;
+  points: DrawingPoint[];
+};
+
+export type DrawingData = {
+  version: 1;
+  width: number;
+  height: number;
+  strokes: DrawingStroke[];
+};
+
 export type Session = {
   code: string;
   title: string;
@@ -12,6 +30,7 @@ export type Submission = {
   id: string;
   sessionCode: string;
   text: string;
+  drawingData: DrawingData | null;
   status: SubmissionStatus;
   starred: boolean;
   flagged: boolean;
@@ -44,7 +63,7 @@ export type QwtStore = {
     code: string,
     options?: { minutes?: number; includeHidden?: boolean },
   ): Promise<Submission[]>;
-  addSubmission(code: string, text: string): Promise<Submission>;
+  addSubmission(code: string, text: string, drawingData?: unknown): Promise<Submission>;
   updateSubmission(id: string, patch: SubmissionPatch): Promise<Submission | null>;
   getSessionStats(code: string): Promise<SessionStats>;
 };
@@ -73,18 +92,127 @@ export function titleFromCode(code: string) {
     .join(" ");
 }
 
+const DRAWING_COLORS = new Set(["#0f172a", "#2563eb", "#dc2626", "#0f766e"]);
+const MAX_DRAWING_STROKES = 120;
+const MAX_DRAWING_POINTS = 12000;
+const MAX_DRAWING_PAYLOAD_CHARS = 180000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function boundedNumber(value: unknown, min: number, max: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.min(max, Math.max(min, value));
+}
+
+export function normalizeDrawingData(value: unknown): DrawingData | null {
+  if (!value) {
+    return null;
+  }
+
+  if (!isRecord(value) || !Array.isArray(value.strokes)) {
+    throw new Error("The drawing data could not be read.");
+  }
+
+  const width = boundedNumber(value.width, 100, 2000);
+  const height = boundedNumber(value.height, 100, 2000);
+
+  if (!width || !height) {
+    throw new Error("The drawing data could not be read.");
+  }
+
+  const strokes: DrawingStroke[] = [];
+  let pointCount = 0;
+
+  if (value.strokes.length > MAX_DRAWING_STROKES) {
+    throw new Error("Please keep drawings a little simpler for this prototype.");
+  }
+
+  for (const rawStroke of value.strokes) {
+    if (!isRecord(rawStroke) || !Array.isArray(rawStroke.points)) {
+      continue;
+    }
+
+    const color = typeof rawStroke.color === "string" ? rawStroke.color : "#0f172a";
+    const size = boundedNumber(rawStroke.size, 1, 18) ?? 3;
+    const points: DrawingPoint[] = [];
+
+    for (const rawPoint of rawStroke.points) {
+      if (!isRecord(rawPoint)) {
+        continue;
+      }
+
+      const x = boundedNumber(rawPoint.x, 0, width);
+      const y = boundedNumber(rawPoint.y, 0, height);
+
+      if (x === null || y === null) {
+        continue;
+      }
+
+      points.push({
+        x: Math.round(x * 10) / 10,
+        y: Math.round(y * 10) / 10,
+      });
+      pointCount += 1;
+
+      if (pointCount > MAX_DRAWING_POINTS) {
+        throw new Error("Please keep drawings a little simpler for this prototype.");
+      }
+    }
+
+    if (points.length > 0) {
+      strokes.push({
+        color: DRAWING_COLORS.has(color) ? color : "#0f172a",
+        size,
+        points,
+      });
+    }
+  }
+
+  if (!strokes.length) {
+    return null;
+  }
+
+  const drawingData: DrawingData = {
+    version: 1,
+    width,
+    height,
+    strokes,
+  };
+
+  if (JSON.stringify(drawingData).length > MAX_DRAWING_PAYLOAD_CHARS) {
+    throw new Error("Please keep drawings a little simpler for this prototype.");
+  }
+
+  return drawingData;
+}
+
 export function validateSubmissionText(text: string) {
   const trimmed = text.trim();
-
-  if (trimmed.length < 2) {
-    throw new Error("Please enter a little more before submitting.");
-  }
 
   if (trimmed.length > 2000) {
     throw new Error("Please keep submissions under 2000 characters for the prototype.");
   }
 
   return trimmed;
+}
+
+export function validateSubmissionContent(text: string, drawingData: unknown) {
+  const trimmed = validateSubmissionText(text);
+  const normalizedDrawingData = normalizeDrawingData(drawingData);
+
+  if (trimmed.length < 2 && !normalizedDrawingData) {
+    throw new Error("Please type a response or add a drawing before submitting.");
+  }
+
+  return {
+    text: trimmed,
+    drawingData: normalizedDrawingData,
+  };
 }
 
 export function applySessionPatch(current: Session, patch: SessionPatch) {
