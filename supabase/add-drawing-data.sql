@@ -14,7 +14,7 @@ alter table public.qwt_submissions
   add constraint qwt_submissions_text_or_drawing_check
   check (
     char_length(text) <= 2000
-    and (char_length(text) >= 2 or drawing_data is not null)
+    and (char_length(text) >= 1 or drawing_data is not null)
   );
 
 alter table public.qwt_submissions

@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   DEFAULT_PROMPT,
   applySessionPatch,
+  assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
   normalizeSubmissionPatch,
@@ -212,6 +213,8 @@ export const localStore: QwtStore = {
       version: current.version + 1,
       updatedAt: now(),
     };
+
+    assertSubmissionHasContent(next.text, next.drawingData);
 
     data.submissions[index] = next;
     await writeStore(data);

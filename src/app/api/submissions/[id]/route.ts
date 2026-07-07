@@ -8,11 +8,19 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/submission
 
   const { id } = await ctx.params;
   const patch = await request.json().catch(() => ({}));
-  const submission = await updateSubmission(id, patch);
 
-  if (!submission) {
-    return Response.json({ error: "Submission not found." }, { status: 404 });
+  try {
+    const submission = await updateSubmission(id, patch);
+
+    if (!submission) {
+      return Response.json({ error: "Submission not found." }, { status: 404 });
+    }
+
+    return Response.json({ submission });
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Could not update submission." },
+      { status: 400 },
+    );
   }
-
-  return Response.json({ submission });
 }

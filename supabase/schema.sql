@@ -20,7 +20,7 @@ create table if not exists public.qwt_submissions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint qwt_submissions_text_or_drawing_check
-    check (char_length(text) >= 2 or drawing_data is not null),
+    check (char_length(text) >= 1 or drawing_data is not null),
   constraint qwt_submissions_drawing_data_check
     check (drawing_data is null or jsonb_typeof(drawing_data) = 'object')
 );

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
+import { ResultsChart } from "@/components/ResultsChart";
+import { responseCounts } from "@/lib/poll-results";
 import type { DrawingData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
@@ -96,6 +98,11 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const [stats, setStats] = useState(initialStats);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [showResultsChart, setShowResultsChart] = useState(false);
+  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editError, setEditError] = useState("");
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const query = new URLSearchParams({
@@ -146,10 +153,44 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
+    const payload = await response.json().catch(() => ({}));
 
-    if (response.ok) {
-      await refresh();
+    if (!response.ok) {
+      return {
+        error: payload.error ?? "Could not update submission.",
+        ok: false,
+      };
     }
+
+    await refresh();
+
+    return { ok: true };
+  }
+
+  function startEditingSubmission(submission: Submission) {
+    setEditingSubmissionId(submission.id);
+    setEditDraft(submission.text);
+    setEditError("");
+  }
+
+  function cancelEditingSubmission() {
+    setEditingSubmissionId(null);
+    setEditDraft("");
+    setEditError("");
+  }
+
+  async function saveEditedSubmission(id: string) {
+    setSavingEditId(id);
+    setEditError("");
+    const result = await patchSubmission(id, { text: editDraft });
+    setSavingEditId(null);
+
+    if (!result.ok) {
+      setEditError(result.error);
+      return;
+    }
+
+    cancelEditingSubmission();
   }
 
   useEffect(() => {
@@ -168,6 +209,13 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
 
   const wordCounts = useMemo(() => topWords(submissions), [submissions]);
   const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
+  const pollResults = useMemo(() => responseCounts(submissions), [submissions]);
+  const maxPollCount = Math.max(1, ...pollResults.map(([, count]) => count));
+  const pollResponseTotal = pollResults.reduce((sum, [, count]) => sum + count, 0);
+  const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
+    includeHidden: String(includeHidden),
+    minutes: String(minutes),
+  }).toString()}`;
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -324,14 +372,60 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
         </aside>
 
         <section>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-950">
               Live writing stream
             </h2>
-            <p className="text-sm text-slate-500">
-              {isLoading ? "Loading..." : `${submissions.length} shown`}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-slate-500">
+                {isLoading ? "Loading..." : `${submissions.length} shown`}
+              </p>
+              <button
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                type="button"
+                onClick={() => setShowResultsChart((isShown) => !isShown)}
+              >
+                {showResultsChart ? "Hide results" : "Visualise results"}
+              </button>
+            </div>
           </div>
+
+          {showResultsChart ? (
+            <section className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-950">
+                    Response chart
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Current view
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                    {pollResponseTotal} typed
+                  </p>
+                  <Link
+                    className={`rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold transition hover:border-teal-500 hover:text-teal-800 ${
+                      pollResults.length
+                        ? "text-slate-700"
+                        : "pointer-events-none cursor-not-allowed text-slate-400 opacity-50"
+                    }`}
+                    href={resultsUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Pop out
+                  </Link>
+                </div>
+              </div>
+              <ResultsChart
+                maxCount={maxPollCount}
+                results={pollResults}
+                total={pollResponseTotal}
+              />
+            </section>
+          ) : null}
 
           {submissions.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -371,7 +465,51 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                       </button>
                     </div>
                   </div>
-                  {submission.text ? (
+                  {editingSubmissionId === submission.id ? (
+                    <div>
+                      <label className="sr-only" htmlFor={`edit-${submission.id}`}>
+                        Edit response
+                      </label>
+                      <textarea
+                        className="min-h-32 w-full resize-y rounded-md border border-slate-300 bg-white p-3 text-base leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                        id={`edit-${submission.id}`}
+                        maxLength={2000}
+                        value={editDraft}
+                        onChange={(event) => {
+                          setEditDraft(event.target.value);
+                          setEditError("");
+                        }}
+                      />
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500">
+                          {2000 - editDraft.length} characters remaining
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={savingEditId === submission.id}
+                            type="button"
+                            onClick={cancelEditingSubmission}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={savingEditId === submission.id}
+                            type="button"
+                            onClick={() => saveEditedSubmission(submission.id)}
+                          >
+                            {savingEditId === submission.id ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </div>
+                      {editError ? (
+                        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+                          {editError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : submission.text ? (
                     <p className="min-h-28 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-base leading-7 text-slate-950">
                       {submission.text}
                     </p>
@@ -383,17 +521,26 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                   {submission.drawingData ? (
                     <DrawingPreview drawingData={submission.drawingData} />
                   ) : null}
-                  <button
-                    className="mt-3 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                    onClick={() =>
-                      patchSubmission(submission.id, {
-                        status: submission.status === "hidden" ? "visible" : "hidden",
-                      })
-                    }
-                    type="button"
-                  >
-                    {submission.status === "hidden" ? "Show response" : "Hide response"}
-                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                      type="button"
+                      onClick={() => startEditingSubmission(submission)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                      onClick={() =>
+                        patchSubmission(submission.id, {
+                          status: submission.status === "hidden" ? "visible" : "hidden",
+                        })
+                      }
+                      type="button"
+                    >
+                      {submission.status === "hidden" ? "Show response" : "Hide response"}
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

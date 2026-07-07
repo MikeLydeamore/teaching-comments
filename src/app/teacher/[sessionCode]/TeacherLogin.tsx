@@ -2,16 +2,18 @@ import { loginTeacher } from "../actions";
 
 type TeacherLoginProps = {
   authFailed: boolean;
+  nextPath?: string;
   sessionCode: string;
   usesDefaultPin: boolean;
 };
 
 export function TeacherLogin({
   authFailed,
+  nextPath,
   sessionCode,
   usesDefaultPin,
 }: TeacherLoginProps) {
-  const next = `/teacher/${sessionCode}`;
+  const next = nextPath ?? `/teacher/${sessionCode}`;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">

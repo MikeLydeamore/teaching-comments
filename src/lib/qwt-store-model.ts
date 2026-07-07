@@ -205,14 +205,18 @@ export function validateSubmissionContent(text: string, drawingData: unknown) {
   const trimmed = validateSubmissionText(text);
   const normalizedDrawingData = normalizeDrawingData(drawingData);
 
-  if (trimmed.length < 2 && !normalizedDrawingData) {
-    throw new Error("Please type a response or add a drawing before submitting.");
-  }
+  assertSubmissionHasContent(trimmed, normalizedDrawingData);
 
   return {
     text: trimmed,
     drawingData: normalizedDrawingData,
   };
+}
+
+export function assertSubmissionHasContent(text: string, drawingData: DrawingData | null) {
+  if (text.trim().length < 1 && !drawingData) {
+    throw new Error("A submission needs text or a drawing.");
+  }
 }
 
 export function applySessionPatch(current: Session, patch: SessionPatch) {

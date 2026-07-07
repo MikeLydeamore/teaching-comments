@@ -31,7 +31,7 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
 
   const remaining = useMemo(() => 2000 - text.length, [text]);
-  const hasSubmissionContent = text.trim().length >= 2 || drawingData !== null;
+  const hasSubmissionContent = text.trim().length >= 1 || drawingData !== null;
 
   const refreshSession = useCallback(async () => {
     const response = await fetch(`/api/sessions/${sessionCode}/student`);

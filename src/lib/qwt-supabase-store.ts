@@ -1,6 +1,7 @@
 import {
   DEFAULT_PROMPT,
   applySessionPatch,
+  assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
   normalizeSubmissionPatch,
@@ -294,12 +295,17 @@ export const supabaseStore: QwtStore = {
     }
 
     const nextPatch = normalizeSubmissionPatch(patch);
+    const hasTextPatch = "text" in nextPatch;
+    const nextText = hasTextPatch ? nextPatch.text ?? "" : current.text;
+
+    assertSubmissionHasContent(nextText, current.drawing_data ?? null);
+
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?id=eq.${encodeFilterValue(id)}&select=${submissionSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({
-          ...(nextPatch.text ? { text: nextPatch.text } : {}),
+          ...(hasTextPatch ? { text: nextText } : {}),
           ...(nextPatch.status ? { status: nextPatch.status } : {}),
           ...(typeof nextPatch.starred === "boolean" ? { starred: nextPatch.starred } : {}),
           ...(typeof nextPatch.flagged === "boolean" ? { flagged: nextPatch.flagged } : {}),
