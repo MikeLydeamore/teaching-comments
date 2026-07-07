@@ -30,6 +30,7 @@ export default async function TeacherResultsPage({
     chartType?: string;
     includeHidden?: string;
     minutes?: string;
+    starredOnly?: string;
   }>;
 }) {
   const { sessionCode } = await params;
@@ -37,10 +38,12 @@ export default async function TeacherResultsPage({
   const minutes = parseMinutes(query.minutes);
   const chartType = parseChartType(query.chartType);
   const includeHidden = query.includeHidden === "true";
+  const starredOnly = query.starredOnly === "true";
   const search = new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
+    starredOnly: String(starredOnly),
   });
   const nextPath = `/teacher/${sessionCode}/results?${search.toString()}`;
 
@@ -60,7 +63,10 @@ export default async function TeacherResultsPage({
     includeHidden,
     minutes,
   });
-  const results = responseCounts(submissions);
+  const displayedSubmissions = starredOnly
+    ? submissions.filter((submission) => submission.starred)
+    : submissions;
+  const results = responseCounts(displayedSubmissions);
   const total = results.reduce((sum, [, count]) => sum + count, 0);
   const maxCount = Math.max(1, ...results.map(([, count]) => count));
 
@@ -77,6 +83,7 @@ export default async function TeacherResultsPage({
           <p className="mt-2 text-base text-slate-600">
             Last {minutes} minute{minutes === 1 ? "" : "s"}
             {includeHidden ? ", including hidden responses" : ""}
+            {starredOnly ? ", starred responses only" : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -121,7 +128,7 @@ export default async function TeacherResultsPage({
       />
       <ResponseTimePlot
         promptUpdatedAt={session.promptUpdatedAt}
-        submissions={submissions}
+        submissions={displayedSubmissions}
         variant="screen"
       />
     </main>

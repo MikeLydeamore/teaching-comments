@@ -41,6 +41,8 @@ type TeacherDashboardProps = {
   initialStats: Stats;
 };
 
+type SubmissionSortOrder = "newest" | "oldest";
+
 const stopWords = new Set([
   "a",
   "an",
@@ -64,6 +66,11 @@ const stopWords = new Set([
   "to",
   "with",
 ]);
+
+const submissionSortOptions: { label: string; value: SubmissionSortOrder }[] = [
+  { label: "Newest first", value: "newest" },
+  { label: "Oldest first", value: "oldest" },
+];
 
 function minutesAgo(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -90,13 +97,78 @@ function topWords(submissions: Submission[]) {
     .slice(0, 8);
 }
 
+function sortSubmissionsForOrder(
+  submissions: Submission[],
+  submissionSortOrder: SubmissionSortOrder,
+) {
+  return [...submissions].sort((a, b) => {
+    const aTime = new Date(a.createdAt).getTime();
+    const bTime = new Date(b.createdAt).getTime();
+
+    return submissionSortOrder === "newest" ? bTime - aTime : aTime - bTime;
+  });
+}
+
+function submissionIdsForOrder(
+  submissions: Submission[],
+  submissionSortOrder: SubmissionSortOrder,
+) {
+  return sortSubmissionsForOrder(submissions, submissionSortOrder).map(
+    (submission) => submission.id,
+  );
+}
+
+function mergeSubmissionOrder(
+  currentOrder: string[],
+  nextSubmissions: Submission[],
+  submissionSortOrder: SubmissionSortOrder,
+) {
+  const nextIds = submissionIdsForOrder(nextSubmissions, submissionSortOrder);
+  const nextIdSet = new Set(nextIds);
+  const keptIds = currentOrder.filter((id) => nextIdSet.has(id));
+  const keptIdSet = new Set(keptIds);
+  const newIds = nextIds.filter((id) => !keptIdSet.has(id));
+
+  return submissionSortOrder === "newest"
+    ? [...newIds, ...keptIds]
+    : [...keptIds, ...newIds];
+}
+
+function reorderSubmissionIds(order: string[], draggedId: string, targetId: string) {
+  if (draggedId === targetId) {
+    return order;
+  }
+
+  const currentIndex = order.indexOf(draggedId);
+  const targetIndex = order.indexOf(targetId);
+
+  if (currentIndex === -1 || targetIndex === -1) {
+    return order;
+  }
+
+  const nextOrder = order.filter((id) => id !== draggedId);
+  const insertIndex = nextOrder.indexOf(targetId) + (currentIndex < targetIndex ? 1 : 0);
+
+  if (insertIndex === -1) {
+    return order;
+  }
+
+  nextOrder.splice(insertIndex, 0, draggedId);
+  return nextOrder;
+}
+
 export function TeacherDashboard({ session, initialStats }: TeacherDashboardProps) {
   const [sessionDetails, setSessionDetails] = useState(session);
   const [promptDraft, setPromptDraft] = useState(session.prompt);
   const [promptStatus, setPromptStatus] = useState("");
   const [minutes, setMinutes] = useState(3);
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [submissionSortOrder, setSubmissionSortOrder] =
+    useState<SubmissionSortOrder>("newest");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [orderedSubmissionIds, setOrderedSubmissionIds] = useState<string[]>([]);
+  const [draggedSubmissionId, setDraggedSubmissionId] = useState<string | null>(null);
   const [stats, setStats] = useState(initialStats);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -121,14 +193,19 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     const submissionsPayload = await submissionsResponse.json();
     const sessionPayload = await sessionResponse.json();
 
-    setSubmissions(submissionsPayload.submissions ?? []);
+    const nextSubmissions = submissionsPayload.submissions ?? [];
+
+    setSubmissions(nextSubmissions);
+    setOrderedSubmissionIds((currentOrder) =>
+      mergeSubmissionOrder(currentOrder, nextSubmissions, submissionSortOrder),
+    );
     if (sessionPayload.session) {
       setSessionDetails(sessionPayload.session);
     }
     setStats(sessionPayload.stats ?? initialStats);
     setLastRefresh(new Date());
     setIsLoading(false);
-  }, [includeHidden, initialStats, minutes, session.code]);
+  }, [includeHidden, initialStats, minutes, session.code, submissionSortOrder]);
 
   async function savePrompt() {
     setPromptStatus("Saving...");
@@ -182,6 +259,11 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     setEditError("");
   }
 
+  function changeSubmissionSortOrder(nextSortOrder: SubmissionSortOrder) {
+    setSubmissionSortOrder(nextSortOrder);
+    setOrderedSubmissionIds(submissionIdsForOrder(submissions, nextSortOrder));
+  }
+
   async function saveEditedSubmission(id: string) {
     setSavingEditId(id);
     setEditError("");
@@ -210,15 +292,43 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     };
   }, [refresh]);
 
-  const wordCounts = useMemo(() => topWords(submissions), [submissions]);
+  const orderedSubmissions = useMemo(() => {
+    const submissionsById = new Map(
+      submissions.map((submission) => [submission.id, submission]),
+    );
+    const ordered = orderedSubmissionIds
+      .map((id) => submissionsById.get(id))
+      .filter((submission): submission is Submission => Boolean(submission));
+    const orderedIds = new Set(ordered.map((submission) => submission.id));
+
+    return [
+      ...ordered,
+      ...sortSubmissionsForOrder(
+        submissions.filter((submission) => !orderedIds.has(submission.id)),
+        submissionSortOrder,
+      ),
+    ];
+  }, [orderedSubmissionIds, submissions, submissionSortOrder]);
+  const displayedSubmissions = useMemo(
+    () =>
+      starredOnly
+        ? orderedSubmissions.filter((submission) => submission.starred)
+        : orderedSubmissions,
+    [orderedSubmissions, starredOnly],
+  );
+  const wordCounts = useMemo(() => topWords(displayedSubmissions), [displayedSubmissions]);
   const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
-  const pollResults = useMemo(() => responseCounts(submissions), [submissions]);
+  const pollResults = useMemo(
+    () => responseCounts(displayedSubmissions),
+    [displayedSubmissions],
+  );
   const maxPollCount = Math.max(1, ...pollResults.map(([, count]) => count));
   const pollResponseTotal = pollResults.reduce((sum, [, count]) => sum + count, 0);
   const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
+    starredOnly: String(starredOnly),
   }).toString()}`;
 
   return (
@@ -328,6 +438,39 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               />
               Include hidden
             </label>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-slate-700">Card order</p>
+              <div
+                aria-label="Card order"
+                className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1"
+              >
+                {submissionSortOptions.map((option) => (
+                  <button
+                    className={`h-9 rounded px-2 text-sm font-semibold transition ${
+                      submissionSortOrder === option.value
+                        ? "bg-white text-slate-950 shadow-sm"
+                        : "text-slate-600 hover:text-teal-800"
+                    }`}
+                    key={option.value}
+                    type="button"
+                    onClick={() => changeSubmissionSortOrder(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              className={`mt-4 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
+                starredOnly
+                  ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
+              }`}
+              type="button"
+              onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}
+            >
+              {starredOnly ? "Showing starred only" : "Show starred only"}
+            </button>
             <p className="mt-3 text-xs text-slate-500">
               {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : "Waiting for first refresh"}
             </p>
@@ -382,7 +525,7 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
             </h2>
             <div className="flex items-center gap-3">
               <p className="text-sm text-slate-500">
-                {isLoading ? "Loading..." : `${submissions.length} shown`}
+                {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>
               <button
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
@@ -450,25 +593,71 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               />
               <ResponseTimePlot
                 promptUpdatedAt={sessionDetails.promptUpdatedAt}
-                submissions={submissions}
+                submissions={displayedSubmissions}
               />
             </section>
           ) : null}
 
-          {submissions.length ? (
+          {displayedSubmissions.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {submissions.map((submission) => (
+              {displayedSubmissions.map((submission) => (
                 <article
                   className={`rounded-md border bg-white p-4 shadow-sm ${
-                    submission.status === "hidden" ? "border-slate-200 opacity-60" : "border-slate-300"
+                    draggedSubmissionId === submission.id
+                      ? "border-teal-400 opacity-60 ring-4 ring-teal-100"
+                      : submission.status === "hidden"
+                        ? "border-slate-200 opacity-60"
+                        : "border-slate-300"
                   }`}
                   key={submission.id}
+                  onDragOver={(event) => {
+                    if (draggedSubmissionId && draggedSubmissionId !== submission.id) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }
+                  }}
+                  onDrop={(event) => {
+                    const draggedId =
+                      event.dataTransfer.getData("text/plain") || draggedSubmissionId;
+
+                    if (!draggedId || draggedId === submission.id) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    setOrderedSubmissionIds((currentOrder) =>
+                      reorderSubmissionIds(
+                        mergeSubmissionOrder(
+                          currentOrder,
+                          submissions,
+                          submissionSortOrder,
+                        ),
+                        draggedId,
+                        submission.id,
+                      ),
+                    );
+                    setDraggedSubmissionId(null);
+                  }}
                 >
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
                       {minutesAgo(submission.createdAt)}
                     </p>
                     <div className="flex gap-1">
+                      <button
+                        aria-label="Drag to reorder response"
+                        className="cursor-grab rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:border-teal-300 hover:text-teal-800 active:cursor-grabbing"
+                        draggable
+                        type="button"
+                        onDragEnd={() => setDraggedSubmissionId(null)}
+                        onDragStart={(event) => {
+                          setDraggedSubmissionId(submission.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", submission.id);
+                        }}
+                      >
+                        Move
+                      </button>
                       <button
                         className={`rounded-md border px-2 py-1 text-xs font-semibold ${
                           submission.starred
@@ -574,7 +763,9 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-              No submissions in this time window yet.
+              {starredOnly
+                ? "No starred submissions in this time window yet."
+                : "No submissions in this time window yet."}
             </div>
           )}
         </section>

@@ -16,6 +16,8 @@ The current slice includes:
 - anonymous submission cards
 - recent-submission filtering
 - star, flag, and hide controls
+- starred-only view filtering
+- newest/oldest sorting and drag-and-drop card ordering in the teacher dashboard
 - simple word-frequency summary
 - column and pie charts for short poll-style responses
 - response-time plotting from the latest prompt update
