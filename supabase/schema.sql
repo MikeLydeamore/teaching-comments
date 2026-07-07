@@ -1,0 +1,69 @@
+create extension if not exists pgcrypto;
+
+create table if not exists public.qwt_sessions (
+  code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  title text not null check (char_length(title) between 1 and 120),
+  prompt text not null check (char_length(prompt) between 5 and 1200),
+  is_open boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.qwt_submissions (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  text text not null check (char_length(text) between 2 and 2000),
+  status text not null default 'visible' check (status in ('visible', 'hidden')),
+  starred boolean not null default false,
+  flagged boolean not null default false,
+  version integer not null default 1 check (version >= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists qwt_submissions_session_created_idx
+  on public.qwt_submissions (session_code, created_at desc);
+
+create index if not exists qwt_submissions_session_status_idx
+  on public.qwt_submissions (session_code, status);
+
+alter table public.qwt_sessions enable row level security;
+alter table public.qwt_submissions enable row level security;
+
+insert into public.qwt_sessions (code, title, prompt, is_open)
+values (
+  'demo-lecture',
+  'Demo Lecture',
+  'In one or two sentences, explain what the p-value tells us in this setting.',
+  true
+)
+on conflict (code) do nothing;
+
+insert into public.qwt_submissions (
+  id,
+  session_code,
+  text,
+  status,
+  starred,
+  flagged,
+  version
+)
+values
+  (
+    '11111111-1111-4111-8111-111111111111',
+    'demo-lecture',
+    'There is no evidence against the null model, so the observed difference could be due to random variation.',
+    'visible',
+    false,
+    false,
+    1
+  ),
+  (
+    '22222222-2222-4222-8222-222222222222',
+    'demo-lecture',
+    'The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.',
+    'visible',
+    true,
+    false,
+    1
+  )
+on conflict (id) do nothing;

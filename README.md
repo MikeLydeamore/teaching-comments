@@ -1,0 +1,86 @@
+# Quick Write Tool prototype
+
+A zero-cost first prototype of a live formative writing tool for large classes.
+
+The current slice includes:
+
+- a student writing page at `/s/demo-lecture`
+- a student join page at `/join`
+- a teacher dashboard at `/teacher/demo-lecture`
+- a teacher session selector at `/teacher`
+- a prototype teacher PIN gate
+- in-session prompt editing from the teacher dashboard
+- a student privacy notice checkbox
+- a privacy notice page at `/privacy`
+- anonymous submission cards
+- recent-submission filtering
+- star, flag, and hide controls
+- simple word-frequency summary
+- local JSON storage for development
+- optional Supabase storage for hosting
+
+## Run locally
+
+```bash
+npm run dev
+```
+
+Open:
+
+- `http://localhost:3000`
+- `http://localhost:3000/join`
+- `http://localhost:3000/s/demo-lecture`
+- `http://localhost:3000/teacher/demo-lecture`
+
+## Verify
+
+```bash
+npm run lint
+npm run build
+```
+
+## Storage
+
+For the first local prototype, submissions are stored in `.data/qwt-store.json`.
+This keeps the first step free and fast to iterate on.
+
+For a hosted prototype, use Supabase Postgres so data survives Vercel server
+restarts and can be managed outside the app:
+
+1. Create a free Supabase project.
+2. Open the Supabase SQL editor and run `supabase/schema.sql`.
+3. Set these environment variables locally and in Vercel:
+
+```text
+QWT_STORAGE_BACKEND=supabase
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+TEACHER_PIN=replace-with-a-private-pin-before-deploying
+```
+
+Keep the service role key server-side only. Do not put it in browser code or
+commit it to the repo.
+
+## Sessions
+
+Students join with a session code on `/join` or by opening `/s/<session-code>`.
+Student routes and submission APIs only accept existing open sessions. Teachers
+create sessions by opening a session from `/teacher` after entering the PIN.
+
+## Teacher PIN
+
+The local prototype defaults to this teacher PIN:
+
+```text
+teach123
+```
+
+Set `TEACHER_PIN` before deploying anywhere public.
+
+## Next steps
+
+1. Add basic rate limiting for student submissions.
+2. Deploy the app to Vercel with the Supabase environment variables.
+3. Add CSV export.
+4. Add response editing/version history.
+5. Add peer comparison and ranking views.
