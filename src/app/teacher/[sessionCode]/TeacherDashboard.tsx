@@ -81,6 +81,76 @@ function minutesAgo(value: string) {
   return `${minutes} min ago`;
 }
 
+function CopyStatusIcon({ isCopied }: { isCopied: boolean }) {
+  if (isCopied) {
+    return (
+      <svg
+        aria-hidden="true"
+        className="size-4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <path d="m5 12 4 4L19 6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <rect height="14" rx="2" width="14" x="8" y="8" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
+function StarIcon({ isActive }: { isActive: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      fill={isActive ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M11.5 2.8a.6.6 0 0 1 1 0l2.7 5.5 6.1.9a.6.6 0 0 1 .3 1l-4.4 4.3 1 6.1a.6.6 0 0 1-.9.6L12 18.3l-5.4 2.9a.6.6 0 0 1-.9-.6l1-6.1-4.4-4.3a.6.6 0 0 1 .3-1l6.1-.9 2.8-5.5Z" />
+    </svg>
+  );
+}
+
+function FlagIcon({ isActive }: { isActive: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      fill={isActive ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M5 21V4" />
+      <path d="M5 4h12l-1.5 4L17 12H5" />
+    </svg>
+  );
+}
+
 function topWords(submissions: Submission[]) {
   const counts = new Map<string, number>();
 
@@ -95,6 +165,40 @@ function topWords(submissions: Submission[]) {
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
+}
+
+function shouldSkipCardDrag(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    Boolean(
+      target.closest(
+        "button, a, input, textarea, select, [data-no-card-drag='true']",
+      ),
+    )
+  );
+}
+
+async function writeTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.left = "-9999px";
+  textArea.style.position = "fixed";
+  textArea.style.top = "0";
+  document.body.appendChild(textArea);
+  textArea.select();
+
+  const didCopy = document.execCommand("copy");
+  document.body.removeChild(textArea);
+
+  if (!didCopy) {
+    throw new Error("Could not copy response.");
+  }
 }
 
 function sortSubmissionsForOrder(
@@ -174,6 +278,7 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showResultsChart, setShowResultsChart] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
+  const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState("");
@@ -257,6 +362,25 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     setEditingSubmissionId(null);
     setEditDraft("");
     setEditError("");
+  }
+
+  async function copySubmissionText(submission: Submission) {
+    if (!submission.text) {
+      return;
+    }
+
+    try {
+      await writeTextToClipboard(submission.text);
+    } catch {
+      return;
+    }
+
+    setCopiedSubmissionId(submission.id);
+    window.setTimeout(() => {
+      setCopiedSubmissionId((currentId) =>
+        currentId === submission.id ? null : currentId,
+      );
+    }, 1400);
   }
 
   function changeSubmissionSortOrder(nextSortOrder: SubmissionSortOrder) {
@@ -602,19 +726,33 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {displayedSubmissions.map((submission) => (
                 <article
-                  className={`rounded-md border bg-white p-4 shadow-sm ${
+                  className={`cursor-grab rounded-md border bg-white p-4 shadow-sm active:cursor-grabbing ${
                     draggedSubmissionId === submission.id
                       ? "border-teal-400 opacity-60 ring-4 ring-teal-100"
                       : submission.status === "hidden"
                         ? "border-slate-200 opacity-60"
                         : "border-slate-300"
                   }`}
+                  draggable
                   key={submission.id}
+                  title="Drag the card edge to reorder"
+                  onDragEnd={() => setDraggedSubmissionId(null)}
                   onDragOver={(event) => {
                     if (draggedSubmissionId && draggedSubmissionId !== submission.id) {
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }
+                  }}
+                  onDragStart={(event) => {
+                    if (shouldSkipCardDrag(event.target)) {
+                      event.preventDefault();
+                      setDraggedSubmissionId(null);
+                      return;
+                    }
+
+                    setDraggedSubmissionId(submission.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", submission.id);
                   }}
                   onDrop={(event) => {
                     const draggedId =
@@ -643,47 +781,41 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                     <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
                       {minutesAgo(submission.createdAt)}
                     </p>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1" data-no-card-drag="true">
                       <button
-                        aria-label="Drag to reorder response"
-                        className="cursor-grab rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:border-teal-300 hover:text-teal-800 active:cursor-grabbing"
-                        draggable
-                        type="button"
-                        onDragEnd={() => setDraggedSubmissionId(null)}
-                        onDragStart={(event) => {
-                          setDraggedSubmissionId(submission.id);
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", submission.id);
-                        }}
-                      >
-                        Move
-                      </button>
-                      <button
-                        className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                        aria-label={
+                          submission.starred ? "Remove star from response" : "Star response"
+                        }
+                        className={`flex size-8 items-center justify-center rounded-md border transition ${
                           submission.starred
                             ? "border-amber-300 bg-amber-100 text-amber-900"
                             : "border-slate-200 text-slate-600 hover:border-amber-300"
                         }`}
+                        title={submission.starred ? "Remove star" : "Star"}
                         onClick={() => patchSubmission(submission.id, { starred: !submission.starred })}
                         type="button"
                       >
-                        Star
+                        <StarIcon isActive={submission.starred} />
                       </button>
                       <button
-                        className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                        aria-label={
+                          submission.flagged ? "Remove flag from response" : "Flag response"
+                        }
+                        className={`flex size-8 items-center justify-center rounded-md border transition ${
                           submission.flagged
                             ? "border-red-300 bg-red-100 text-red-900"
                             : "border-slate-200 text-slate-600 hover:border-red-300"
                         }`}
+                        title={submission.flagged ? "Remove flag" : "Flag"}
                         onClick={() => patchSubmission(submission.id, { flagged: !submission.flagged })}
                         type="button"
                       >
-                        Flag
+                        <FlagIcon isActive={submission.flagged} />
                       </button>
                     </div>
                   </div>
                   {editingSubmissionId === submission.id ? (
-                    <div>
+                    <div data-no-card-drag="true">
                       <label className="sr-only" htmlFor={`edit-${submission.id}`}>
                         Edit response
                       </label>
@@ -727,18 +859,45 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                       ) : null}
                     </div>
                   ) : submission.text ? (
-                    <p className="min-h-28 whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-base leading-7 text-slate-950">
-                      {submission.text}
-                    </p>
+                    <div
+                      className="relative min-h-28 cursor-auto rounded-md border border-slate-200 bg-slate-50 p-3 pr-12 text-base leading-7 text-slate-950"
+                      data-no-card-drag="true"
+                    >
+                      <button
+                        aria-label="Copy response to clipboard"
+                        className={`absolute right-2 top-2 flex size-8 items-center justify-center rounded-md border text-slate-600 transition ${
+                          copiedSubmissionId === submission.id
+                            ? "border-teal-300 bg-teal-50 text-teal-800"
+                            : "border-slate-200 bg-white hover:border-teal-300 hover:text-teal-800"
+                        }`}
+                        title={
+                          copiedSubmissionId === submission.id
+                            ? "Copied"
+                            : "Copy to clipboard"
+                        }
+                        type="button"
+                        onClick={() => {
+                          void copySubmissionText(submission);
+                        }}
+                      >
+                        <CopyStatusIcon isCopied={copiedSubmissionId === submission.id} />
+                      </button>
+                      <p className="whitespace-pre-wrap">{submission.text}</p>
+                    </div>
                   ) : (
-                    <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600">
+                    <p
+                      className="cursor-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600"
+                      data-no-card-drag="true"
+                    >
                       Drawing-only response
                     </p>
                   )}
                   {submission.drawingData ? (
-                    <DrawingPreview drawingData={submission.drawingData} />
+                    <div className="cursor-auto" data-no-card-drag="true">
+                      <DrawingPreview drawingData={submission.drawingData} />
+                    </div>
                   ) : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2" data-no-card-drag="true">
                     <button
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                       type="button"
