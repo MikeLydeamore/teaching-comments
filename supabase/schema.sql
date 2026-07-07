@@ -12,6 +12,7 @@ create table if not exists public.qwt_sessions (
 create table if not exists public.qwt_submissions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
+  student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null default '' check (char_length(text) <= 2000),
   drawing_data jsonb,
   status text not null default 'visible' check (status in ('visible', 'hidden')),
@@ -47,6 +48,7 @@ on conflict (code) do nothing;
 insert into public.qwt_submissions (
   id,
   session_code,
+  student_name,
   text,
   status,
   starred,
@@ -57,6 +59,7 @@ values
   (
     '11111111-1111-4111-8111-111111111111',
     'demo-lecture',
+    'Anonymous',
     'There is no evidence against the null model, so the observed difference could be due to random variation.',
     'visible',
     false,
@@ -66,6 +69,7 @@ values
   (
     '22222222-2222-4222-8222-222222222222',
     'demo-lecture',
+    'Anonymous',
     'The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.',
     'visible',
     true,

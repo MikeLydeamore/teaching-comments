@@ -2,12 +2,13 @@ import { localStore } from "./qwt-local-store";
 import { supabaseStore } from "./qwt-supabase-store";
 import {
   normalizeSessionCode,
+  normalizeStudentName,
   type QwtStore,
   type SessionPatch,
   type SubmissionPatch,
 } from "./qwt-store-model";
 
-export { normalizeSessionCode };
+export { normalizeSessionCode, normalizeStudentName };
 export type {
   QwtStore,
   DrawingData,
@@ -62,8 +63,13 @@ export async function listSubmissions(
   return getStore().listSubmissions(code, options);
 }
 
-export async function addSubmission(code: string, text: string, drawingData?: unknown) {
-  return getStore().addSubmission(code, text, drawingData);
+export async function addSubmission(
+  code: string,
+  text: string,
+  drawingData?: unknown,
+  studentName?: string,
+) {
+  return getStore().addSubmission(code, text, drawingData, studentName);
 }
 
 export async function updateSubmission(id: string, patch: SubmissionPatch) {

@@ -4,6 +4,7 @@ import { joinSession } from "./actions";
 const messages = {
   closed: "That quick write session is closed.",
   missing: "Enter the session code from your teacher.",
+  "name-too-long": "Names must be 80 characters or fewer.",
   "not-found": "We could not find that quick write session.",
 };
 
@@ -43,6 +44,20 @@ export default async function JoinPage({
             name="sessionCode"
             placeholder="demo-lecture"
           />
+          <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="studentName">
+            Name
+          </label>
+          <input
+            autoComplete="name"
+            className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+            id="studentName"
+            maxLength={80}
+            name="studentName"
+            placeholder="Anonymous"
+          />
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Optional. Leave blank to submit as Anonymous.
+          </p>
           <button
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
             type="submit"

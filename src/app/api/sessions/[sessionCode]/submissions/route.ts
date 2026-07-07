@@ -30,6 +30,7 @@ export async function POST(
   const body = (await request.json().catch(() => ({}))) as {
     drawingData?: unknown;
     privacyAccepted?: boolean;
+    studentName?: string;
     text?: string;
     website?: string;
   };
@@ -46,7 +47,12 @@ export async function POST(
       );
     }
 
-    const submission = await addSubmission(sessionCode, body.text ?? "", body.drawingData);
+    const submission = await addSubmission(
+      sessionCode,
+      body.text ?? "",
+      body.drawingData,
+      body.studentName,
+    );
     return Response.json({ submission }, { status: 201 });
   } catch (error) {
     return Response.json(

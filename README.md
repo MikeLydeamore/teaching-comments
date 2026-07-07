@@ -13,7 +13,8 @@ The current slice includes:
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
 - typed and drawn student responses
-- anonymous submission cards
+- optional student display names, defaulting to Anonymous
+- teacher-facing submission cards
 - recent-submission filtering
 - star, flag, and hide controls
 - starred-only view filtering
@@ -71,6 +72,9 @@ If you already ran the first schema before drawing support was added, run
 
 If you already ran the schema before response-time plotting was added, run
 `supabase/add-prompt-timing.sql` in the Supabase SQL editor.
+
+If you already ran the schema before student display names were added, run
+`supabase/add-student-name.sql` in the Supabase SQL editor.
 
 ## Sessions
 

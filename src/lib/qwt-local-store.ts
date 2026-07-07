@@ -7,6 +7,7 @@ import {
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
+  normalizeStudentName,
   normalizeSubmissionPatch,
   now,
   titleFromCode,
@@ -42,6 +43,7 @@ function defaultStore(): StoreData {
       {
         id: randomUUID(),
         sessionCode: "demo-lecture",
+        studentName: "Anonymous",
         text: "There is no evidence against the null model, so the observed difference could be due to random variation.",
         drawingData: null,
         status: "visible",
@@ -54,6 +56,7 @@ function defaultStore(): StoreData {
       {
         id: randomUUID(),
         sessionCode: "demo-lecture",
+        studentName: "Anonymous",
         text: "The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.",
         drawingData: null,
         status: "visible",
@@ -91,6 +94,7 @@ async function readStore(): Promise<StoreData> {
     submissions: data.submissions.map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
+      studentName: submission.studentName ?? "Anonymous",
     })),
   };
 }
@@ -173,7 +177,7 @@ export const localStore: QwtStore = {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
-  async addSubmission(code, text, drawingData) {
+  async addSubmission(code, text, drawingData, studentName) {
     const submissionContent = validateSubmissionContent(text, drawingData);
     const session = await this.getSession(code);
 
@@ -190,6 +194,7 @@ export const localStore: QwtStore = {
     const submission: Submission = {
       id: randomUUID(),
       sessionCode: session.code,
+      studentName: normalizeStudentName(studentName ?? ""),
       text: submissionContent.text,
       drawingData: submissionContent.drawingData,
       status: "visible",

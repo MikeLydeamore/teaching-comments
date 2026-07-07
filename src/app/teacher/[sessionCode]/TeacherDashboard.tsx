@@ -18,6 +18,7 @@ type Session = {
 
 type Submission = {
   id: string;
+  studentName: string;
   text: string;
   drawingData: DrawingData | null;
   status: "visible" | "hidden";
@@ -725,14 +726,8 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
           {displayedSubmissions.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {displayedSubmissions.map((submission) => (
-                <article
-                  className={`cursor-grab rounded-md border bg-white p-4 shadow-sm active:cursor-grabbing ${
-                    draggedSubmissionId === submission.id
-                      ? "border-teal-400 opacity-60 ring-4 ring-teal-100"
-                      : submission.status === "hidden"
-                        ? "border-slate-200 opacity-60"
-                        : "border-slate-300"
-                  }`}
+                <div
+                  className="cursor-grab active:cursor-grabbing"
                   draggable
                   key={submission.id}
                   title="Drag the card edge to reorder"
@@ -777,7 +772,19 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                     setDraggedSubmissionId(null);
                   }}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-2">
+                  <p className="mb-1 truncate px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {submission.studentName || "Anonymous"}
+                  </p>
+                  <article
+                    className={`rounded-md border bg-white p-4 shadow-sm ${
+                      draggedSubmissionId === submission.id
+                        ? "border-teal-400 opacity-60 ring-4 ring-teal-100"
+                        : submission.status === "hidden"
+                          ? "border-slate-200 opacity-60"
+                          : "border-slate-300"
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-2">
                     <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
                       {minutesAgo(submission.createdAt)}
                     </p>
@@ -917,7 +924,8 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                       {submission.status === "hidden" ? "Show response" : "Hide response"}
                     </button>
                   </div>
-                </article>
+                  </article>
+                </div>
               ))}
             </div>
           ) : (

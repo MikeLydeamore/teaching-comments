@@ -6,6 +6,7 @@ import { DrawingPad } from "@/components/DrawingPad";
 import type { DrawingData } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
+  initialStudentName: string;
   sessionCode: string;
   prompt: string;
 };
@@ -17,10 +18,15 @@ type SavedSubmission = {
   createdAt: string;
 };
 
-export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
+export function StudentSubmit({
+  initialStudentName,
+  sessionCode,
+  prompt,
+}: StudentSubmitProps) {
   const [currentPrompt, setCurrentPrompt] = useState(prompt);
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
   const [promptUpdatedAt, setPromptUpdatedAt] = useState<Date | null>(null);
+  const [studentName, setStudentName] = useState(initialStudentName);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
   const [drawingResetSignal, setDrawingResetSignal] = useState(0);
@@ -81,7 +87,13 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
     const response = await fetch(`/api/sessions/${sessionCode}/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ drawingData, privacyAccepted, text, website }),
+      body: JSON.stringify({
+        drawingData,
+        privacyAccepted,
+        studentName,
+        text,
+        website,
+      }),
     });
 
     const payload = await response.json();
@@ -136,7 +148,22 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
       </section>
 
       <form className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
-        <label className="text-sm font-semibold text-slate-700" htmlFor="quick-write">
+        <label className="text-sm font-semibold text-slate-700" htmlFor="student-name">
+          Name
+        </label>
+        <input
+          autoComplete="name"
+          className="mt-3 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          id="student-name"
+          maxLength={80}
+          placeholder="Anonymous"
+          value={studentName}
+          onChange={(event) => setStudentName(event.target.value)}
+        />
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Optional. Leave blank to submit as Anonymous.
+        </p>
+        <label className="mt-5 block text-sm font-semibold text-slate-700" htmlFor="quick-write">
           Your writing
         </label>
         <input
@@ -182,8 +209,9 @@ export function StudentSubmit({ sessionCode, prompt }: StudentSubmitProps) {
           />
           <span>
             I understand my writing or drawing, timestamp, and session code
-            will be stored for this teaching activity. I will avoid including
-            names, student IDs, or other identifying details.{" "}
+            will be stored for this teaching activity. If I provide a name,
+            that name will also be stored and visible to teaching staff. I will
+            avoid including student IDs or other identifying details.{" "}
             <Link className="font-semibold text-teal-700 underline" href="/privacy">
               Read the privacy notice
             </Link>

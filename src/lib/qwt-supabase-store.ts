@@ -4,6 +4,7 @@ import {
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
+  normalizeStudentName,
   normalizeSubmissionPatch,
   now,
   titleFromCode,
@@ -26,6 +27,7 @@ type SupabaseSessionRow = {
 type SupabaseSubmissionRow = {
   id: string;
   session_code: string;
+  student_name: string;
   text: string;
   drawing_data: DrawingData | null;
   status: "visible" | "hidden";
@@ -103,7 +105,7 @@ function sessionSelect() {
 }
 
 function submissionSelect() {
-  return "id,session_code,text,drawing_data,status,starred,flagged,version,created_at,updated_at";
+  return "id,session_code,student_name,text,drawing_data,status,starred,flagged,version,created_at,updated_at";
 }
 
 function sessionFromRow(row: SupabaseSessionRow): Session {
@@ -121,6 +123,7 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
   return {
     id: row.id,
     sessionCode: row.session_code,
+    studentName: row.student_name ?? "Anonymous",
     text: row.text,
     drawingData: row.drawing_data ?? null,
     status: row.status,
@@ -254,7 +257,7 @@ export const supabaseStore: QwtStore = {
     return rows.map(submissionFromRow);
   },
 
-  async addSubmission(code, text, drawingData) {
+  async addSubmission(code, text, drawingData, studentName) {
     const submissionContent = validateSubmissionContent(text, drawingData);
     const session = await getSessionFromSupabase(code);
 
@@ -273,6 +276,7 @@ export const supabaseStore: QwtStore = {
         method: "POST",
         body: JSON.stringify({
           session_code: session.code,
+          student_name: normalizeStudentName(studentName ?? ""),
           text: submissionContent.text,
           drawing_data: submissionContent.drawingData,
           status: "visible",

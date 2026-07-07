@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { getSession } from "@/lib/qwt-store";
+import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "./StudentSubmit";
 
 export default async function StudentPage({
@@ -30,7 +32,17 @@ export default async function StudentPage({
     );
   }
 
-  return <StudentSubmit prompt={session.prompt} sessionCode={session.code} />;
+  const cookieStore = await cookies();
+  const studentName =
+    cookieStore.get(studentNameCookieName(session.code))?.value ?? "";
+
+  return (
+    <StudentSubmit
+      initialStudentName={studentName}
+      prompt={session.prompt}
+      sessionCode={session.code}
+    />
+  );
 }
 
 function StudentSessionUnavailable({

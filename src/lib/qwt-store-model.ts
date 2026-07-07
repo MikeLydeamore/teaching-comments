@@ -30,6 +30,7 @@ export type Session = {
 export type Submission = {
   id: string;
   sessionCode: string;
+  studentName: string;
   text: string;
   drawingData: DrawingData | null;
   status: SubmissionStatus;
@@ -64,7 +65,12 @@ export type QwtStore = {
     code: string,
     options?: { minutes?: number; includeHidden?: boolean },
   ): Promise<Submission[]>;
-  addSubmission(code: string, text: string, drawingData?: unknown): Promise<Submission>;
+  addSubmission(
+    code: string,
+    text: string,
+    drawingData?: unknown,
+    studentName?: string,
+  ): Promise<Submission>;
   updateSubmission(id: string, patch: SubmissionPatch): Promise<Submission | null>;
   getSessionStats(code: string): Promise<SessionStats>;
 };
@@ -91,6 +97,20 @@ export function titleFromCode(code: string) {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+export function normalizeStudentName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ");
+
+  if (!normalized) {
+    return "Anonymous";
+  }
+
+  if (normalized.length > 80) {
+    throw new Error("Name must be 80 characters or fewer.");
+  }
+
+  return normalized;
 }
 
 const DRAWING_COLORS = new Set(["#0f172a", "#2563eb", "#dc2626", "#0f766e"]);
