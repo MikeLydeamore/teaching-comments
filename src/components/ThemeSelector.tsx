@@ -10,6 +10,10 @@ const themes = [
   { label: "Minty", value: "minty" },
   { label: "Cerulean", value: "cerulean" },
   { label: "Pulse", value: "pulse" },
+  { label: "Solar", value: "solar" },
+  { label: "Amethyst", value: "amethyst" },
+  { label: "Midnight", value: "midnight" },
+  { label: "Blush", value: "blush" },
   { label: "Darkly", value: "darkly" },
 ] as const;
 
@@ -34,7 +38,8 @@ function applyTheme(theme: ThemeName) {
     document.documentElement.style.colorScheme = "light";
   } else {
     document.documentElement.dataset.qwtTheme = theme;
-    document.documentElement.style.colorScheme = theme === "darkly" ? "dark" : "light";
+    document.documentElement.style.colorScheme =
+      theme === "darkly" || theme === "midnight" ? "dark" : "light";
   }
 }
 

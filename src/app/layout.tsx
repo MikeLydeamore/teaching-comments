@@ -25,7 +25,8 @@ try {
   var theme = window.localStorage.getItem("qwt_theme");
   if (theme && theme !== "default") {
     document.documentElement.dataset.qwtTheme = theme;
-    document.documentElement.style.colorScheme = theme === "darkly" ? "dark" : "light";
+    document.documentElement.style.colorScheme =
+      theme === "darkly" || theme === "midnight" ? "dark" : "light";
   }
 } catch {}
             `.trim(),

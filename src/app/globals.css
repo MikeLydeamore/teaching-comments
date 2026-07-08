@@ -116,6 +116,83 @@ html[data-qwt-theme="pulse"] {
   --qwt-action-text: #ffffff;
 }
 
+html[data-qwt-theme="solar"] {
+  --background: #fff8df;
+  --foreground: #2b2514;
+  --qwt-page: #fff8df;
+  --qwt-surface: #fffdf4;
+  --qwt-muted: #fff3bf;
+  --qwt-border: #efd98c;
+  --qwt-border-strong: #d5ad3f;
+  --qwt-text: #2b2514;
+  --qwt-text-soft: #5d4a1a;
+  --qwt-text-muted: #8a7330;
+  --qwt-accent: #e4a11b;
+  --qwt-accent-strong: #9a6510;
+  --qwt-accent-soft: #fff1bf;
+  --qwt-accent-border: #efc763;
+  --qwt-action: #6f4d09;
+  --qwt-action-text: #fff8e1;
+}
+
+html[data-qwt-theme="amethyst"] {
+  --background: #f4f0fb;
+  --foreground: #21172f;
+  --qwt-page: #f4f0fb;
+  --qwt-surface: #fffdff;
+  --qwt-muted: #faf6ff;
+  --qwt-border: #dccff0;
+  --qwt-border-strong: #a88bd2;
+  --qwt-text: #21172f;
+  --qwt-text-soft: #4d3b66;
+  --qwt-text-muted: #786996;
+  --qwt-accent: #7c3aed;
+  --qwt-accent-strong: #5b21b6;
+  --qwt-accent-soft: #eee7ff;
+  --qwt-accent-border: #b89bf3;
+  --qwt-action: #4c1d95;
+  --qwt-action-text: #ffffff;
+}
+
+html[data-qwt-theme="midnight"] {
+  --background: #08172b;
+  --foreground: #eef6ff;
+  --qwt-page: #08172b;
+  --qwt-surface: #10223a;
+  --qwt-muted: #0c1b2f;
+  --qwt-border: #27405e;
+  --qwt-border-strong: #3d5f85;
+  --qwt-text: #eef6ff;
+  --qwt-text-soft: #c5d9ee;
+  --qwt-text-muted: #91abc4;
+  --qwt-accent: #38bdf8;
+  --qwt-accent-strong: #7dd3fc;
+  --qwt-accent-soft: #0e3349;
+  --qwt-accent-border: #256b91;
+  --qwt-action: #38bdf8;
+  --qwt-action-text: #06101d;
+  --qwt-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+}
+
+html[data-qwt-theme="blush"] {
+  --background: #fff1f4;
+  --foreground: #32151f;
+  --qwt-page: #fff1f4;
+  --qwt-surface: #fffafb;
+  --qwt-muted: #fff5f7;
+  --qwt-border: #f4cbd4;
+  --qwt-border-strong: #df8fa4;
+  --qwt-text: #32151f;
+  --qwt-text-soft: #653243;
+  --qwt-text-muted: #996576;
+  --qwt-accent: #e83e8c;
+  --qwt-accent-strong: #b51f66;
+  --qwt-accent-soft: #ffe5ef;
+  --qwt-accent-border: #f2a1c5;
+  --qwt-action: #9f1d57;
+  --qwt-action-text: #ffffff;
+}
+
 html[data-qwt-theme="darkly"] {
   --background: #1d2228;
   --foreground: #f8f9fa;
