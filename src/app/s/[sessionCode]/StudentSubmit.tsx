@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
-import { SessionTimer } from "@/components/SessionTimer";
+import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import type { DrawingData, GifData } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
@@ -170,7 +170,7 @@ export function StudentSubmit({
         <p className="mt-2 text-lg leading-7 text-slate-900">{currentPrompt}</p>
         {currentTimerDurationSeconds > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
-            Timer length: {currentTimerDurationSeconds}s
+            Timer length: {formatTimerSeconds(currentTimerDurationSeconds)}
           </p>
         ) : null}
         {!sessionIsOpen ? (

@@ -6,7 +6,7 @@ import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
-import { SessionTimer } from "@/components/SessionTimer";
+import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import type { DrawingData, GifData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
@@ -60,7 +60,8 @@ const chartTypeOptions: { label: string; value: ChartType }[] = [
   { label: "Word cloud", value: "wordCloud" },
 ];
 
-const timerQuickBlocks = [5, 15, 30];
+const TIMER_MIN_SECONDS = 1;
+const timerQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 
 function minutesAgo(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -157,7 +158,41 @@ function clampTimerSeconds(seconds: number) {
     return 30;
   }
 
-  return Math.min(3600, Math.max(1, Math.round(seconds)));
+  return Math.min(3600, Math.max(TIMER_MIN_SECONDS, Math.round(seconds)));
+}
+
+function parseTimerDurationInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!trimmed.includes(":")) {
+    const seconds = Number(trimmed);
+    return Number.isFinite(seconds) ? seconds : null;
+  }
+
+  const parts = trimmed.split(":");
+
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const minutes = Number(parts[0] || "0");
+  const seconds = Number(parts[1]);
+
+  if (
+    !Number.isFinite(minutes) ||
+    !Number.isFinite(seconds) ||
+    minutes < 0 ||
+    seconds < 0 ||
+    seconds >= 60
+  ) {
+    return null;
+  }
+
+  return minutes * 60 + seconds;
 }
 
 async function writeTextToClipboard(text: string) {
@@ -261,6 +296,8 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const [showResultsChart, setShowResultsChart] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
+  const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
+  const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
@@ -336,14 +373,44 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   }
 
   async function startTimer() {
+    const parsedSeconds = parseTimerDurationInput(timerDraftValue);
+
+    if (parsedSeconds === null) {
+      setTimerStatus("Use minutes:seconds, like 1:30.");
+      return;
+    }
+
+    const nextSeconds = clampTimerSeconds(parsedSeconds);
+    setTimerDraftSeconds(nextSeconds);
+    setTimerDraftValue(formatTimerSeconds(nextSeconds));
+    setTimerDraftWasMinClamped(false);
+
     await patchSession(
-      { timerDurationSeconds: clampTimerSeconds(timerDraftSeconds) },
+      { timerDurationSeconds: nextSeconds },
       "Starting timer...",
     );
   }
 
   async function clearTimer() {
     await patchSession({ clearTimer: true }, "Clearing timer...");
+  }
+
+  function setTimerDraftDuration(seconds: number) {
+    const nextSeconds = clampTimerSeconds(seconds);
+    setTimerDraftSeconds(nextSeconds);
+    setTimerDraftValue(formatTimerSeconds(nextSeconds));
+    setTimerDraftWasMinClamped(seconds < TIMER_MIN_SECONDS);
+    setTimerStatus("");
+  }
+
+  function normalizeTimerDraftValue() {
+    const parsedSeconds = parseTimerDurationInput(timerDraftValue);
+
+    if (parsedSeconds === null) {
+      return;
+    }
+
+    setTimerDraftDuration(parsedSeconds);
   }
 
   async function patchSubmission(id: string, patch: Partial<Submission>) {
@@ -562,20 +629,28 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                 timerEndsAt={sessionDetails.timerEndsAt}
               />
             </div>
-            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="timer-seconds">
-              Seconds
+            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="timer-duration">
+              Current timer
             </label>
             <div className="mt-2 flex items-center gap-2">
               <input
-                id="timer-seconds"
-                className="h-10 w-24 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                min={1}
-                max={3600}
-                type="number"
-                value={timerDraftSeconds}
-                onChange={(event) =>
-                  setTimerDraftSeconds(clampTimerSeconds(Number(event.target.value)))
-                }
+                id="timer-duration"
+                className="h-10 w-24 rounded-md border border-slate-300 px-3 font-mono tabular-nums text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                inputMode="numeric"
+                placeholder="0:30"
+                value={timerDraftValue}
+                onBlur={normalizeTimerDraftValue}
+                onChange={(event) => {
+                  setTimerDraftValue(event.target.value);
+                  setTimerDraftWasMinClamped(false);
+                  setTimerStatus("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void startTimer();
+                  }
+                }}
               />
               <button
                 className="h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
@@ -597,18 +672,22 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               </button>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              {timerQuickBlocks.map((seconds) => (
+              {timerQuickAdjustments.map((seconds) => (
                 <button
                   className="h-9 rounded-md border border-slate-300 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                   key={seconds}
                   type="button"
-                  onClick={() =>
-                    setTimerDraftSeconds((currentSeconds) =>
-                      clampTimerSeconds(currentSeconds + seconds),
-                    )
-                  }
+                  onClick={() => {
+                    const parsedSeconds =
+                      parseTimerDurationInput(timerDraftValue) ?? timerDraftSeconds;
+                    const baseSeconds =
+                      seconds > 0 && timerDraftWasMinClamped ? 0 : parsedSeconds;
+
+                    setTimerDraftDuration(baseSeconds + seconds);
+                  }}
                 >
-                  +{seconds}s
+                  {seconds > 0 ? "+" : ""}
+                  {seconds}s
                 </button>
               ))}
             </div>
