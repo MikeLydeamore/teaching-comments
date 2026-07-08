@@ -3,6 +3,21 @@
 :root {
   --background: #f1f5f9;
   --foreground: #0f172a;
+  --qwt-page: #f1f5f9;
+  --qwt-surface: #ffffff;
+  --qwt-muted: #f8fafc;
+  --qwt-border: #e2e8f0;
+  --qwt-border-strong: #cbd5e1;
+  --qwt-text: #0f172a;
+  --qwt-text-soft: #334155;
+  --qwt-text-muted: #64748b;
+  --qwt-accent: #0f766e;
+  --qwt-accent-strong: #115e59;
+  --qwt-accent-soft: #f0fdfa;
+  --qwt-accent-border: #5eead4;
+  --qwt-action: #0f172a;
+  --qwt-action-text: #ffffff;
+  --qwt-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.08);
 }
 
 @theme inline {
@@ -23,4 +38,223 @@ a,
 input,
 textarea {
   letter-spacing: 0;
+}
+
+html[data-qwt-theme="flatly"] {
+  --background: #eef6f2;
+  --foreground: #172521;
+  --qwt-page: #eef6f2;
+  --qwt-surface: #ffffff;
+  --qwt-muted: #f6fbf8;
+  --qwt-border: #cfe1d9;
+  --qwt-border-strong: #9bbeb1;
+  --qwt-text: #172521;
+  --qwt-text-soft: #34524a;
+  --qwt-text-muted: #668177;
+  --qwt-accent: #18bc9c;
+  --qwt-accent-strong: #12826e;
+  --qwt-accent-soft: #e7f8f4;
+  --qwt-accent-border: #82dccb;
+  --qwt-action: #2c3e50;
+  --qwt-action-text: #ffffff;
+}
+
+html[data-qwt-theme="minty"] {
+  --background: #f0fbf7;
+  --foreground: #17302a;
+  --qwt-page: #f0fbf7;
+  --qwt-surface: #ffffff;
+  --qwt-muted: #f7fdfb;
+  --qwt-border: #d1ebe2;
+  --qwt-border-strong: #9bd7c4;
+  --qwt-text: #17302a;
+  --qwt-text-soft: #365f55;
+  --qwt-text-muted: #6a897f;
+  --qwt-accent: #78c2ad;
+  --qwt-accent-strong: #3f9f86;
+  --qwt-accent-soft: #eaf8f3;
+  --qwt-accent-border: #a9dcca;
+  --qwt-action: #234a43;
+  --qwt-action-text: #ffffff;
+}
+
+html[data-qwt-theme="cerulean"] {
+  --background: #edf6fd;
+  --foreground: #12263a;
+  --qwt-page: #edf6fd;
+  --qwt-surface: #ffffff;
+  --qwt-muted: #f6fbff;
+  --qwt-border: #c9deef;
+  --qwt-border-strong: #91bddc;
+  --qwt-text: #12263a;
+  --qwt-text-soft: #31516f;
+  --qwt-text-muted: #668199;
+  --qwt-accent: #2fa4e7;
+  --qwt-accent-strong: #176fa6;
+  --qwt-accent-soft: #e7f4fd;
+  --qwt-accent-border: #8acbf2;
+  --qwt-action: #1f5d88;
+  --qwt-action-text: #ffffff;
+}
+
+html[data-qwt-theme="pulse"] {
+  --background: #f8f2fb;
+  --foreground: #241a32;
+  --qwt-page: #f8f2fb;
+  --qwt-surface: #ffffff;
+  --qwt-muted: #fbf8fd;
+  --qwt-border: #e1d2eb;
+  --qwt-border-strong: #b899cf;
+  --qwt-text: #241a32;
+  --qwt-text-soft: #514166;
+  --qwt-text-muted: #7b6c8f;
+  --qwt-accent: #593196;
+  --qwt-accent-strong: #432672;
+  --qwt-accent-soft: #f0e8f8;
+  --qwt-accent-border: #b89add;
+  --qwt-action: #3f2a5f;
+  --qwt-action-text: #ffffff;
+}
+
+html[data-qwt-theme="darkly"] {
+  --background: #1d2228;
+  --foreground: #f8f9fa;
+  --qwt-page: #1d2228;
+  --qwt-surface: #2f343b;
+  --qwt-muted: #252b32;
+  --qwt-border: #46515e;
+  --qwt-border-strong: #5f6d7d;
+  --qwt-text: #f8f9fa;
+  --qwt-text-soft: #d7dde4;
+  --qwt-text-muted: #aeb8c4;
+  --qwt-accent: #00bc8c;
+  --qwt-accent-strong: #41d7af;
+  --qwt-accent-soft: #173b35;
+  --qwt-accent-border: #178f72;
+  --qwt-action: #00bc8c;
+  --qwt-action-text: #071a16;
+  --qwt-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+}
+
+html[data-qwt-theme] body,
+html[data-qwt-theme] .bg-slate-100 {
+  background: var(--qwt-page) !important;
+  color: var(--qwt-text);
+}
+
+html[data-qwt-theme] .bg-white {
+  background-color: var(--qwt-surface) !important;
+}
+
+html[data-qwt-theme] .bg-slate-50,
+html[data-qwt-theme] .bg-slate-100 {
+  background-color: var(--qwt-muted) !important;
+}
+
+html[data-qwt-theme] .bg-slate-900 {
+  background-color: var(--qwt-action) !important;
+  color: var(--qwt-action-text) !important;
+}
+
+html[data-qwt-theme] .text-white {
+  color: var(--qwt-action-text) !important;
+}
+
+html[data-qwt-theme] .text-slate-950,
+html[data-qwt-theme] .text-slate-900,
+html[data-qwt-theme] .text-slate-800 {
+  color: var(--qwt-text) !important;
+}
+
+html[data-qwt-theme] .text-slate-700,
+html[data-qwt-theme] .text-slate-600 {
+  color: var(--qwt-text-soft) !important;
+}
+
+html[data-qwt-theme] .text-slate-500,
+html[data-qwt-theme] .text-slate-400 {
+  color: var(--qwt-text-muted) !important;
+}
+
+html[data-qwt-theme] .border-slate-200 {
+  border-color: var(--qwt-border) !important;
+}
+
+html[data-qwt-theme] .border-slate-300,
+html[data-qwt-theme] .border-slate-400 {
+  border-color: var(--qwt-border-strong) !important;
+}
+
+html[data-qwt-theme] .shadow-sm {
+  box-shadow: var(--qwt-shadow) !important;
+}
+
+html[data-qwt-theme] input,
+html[data-qwt-theme] select,
+html[data-qwt-theme] textarea {
+  background-color: var(--qwt-surface);
+  border-color: var(--qwt-border-strong);
+  color: var(--qwt-text);
+}
+
+html[data-qwt-theme] input::placeholder,
+html[data-qwt-theme] textarea::placeholder {
+  color: var(--qwt-text-muted);
+}
+
+html[data-qwt-theme] .text-teal-700,
+html[data-qwt-theme] .text-teal-800,
+html[data-qwt-theme] .text-teal-900,
+html[data-qwt-theme] .text-teal-950 {
+  color: var(--qwt-accent-strong) !important;
+}
+
+html[data-qwt-theme] .bg-teal-50,
+html[data-qwt-theme] .bg-teal-100 {
+  background-color: var(--qwt-accent-soft) !important;
+}
+
+html[data-qwt-theme] .border-teal-200,
+html[data-qwt-theme] .border-teal-300,
+html[data-qwt-theme] .border-teal-400,
+html[data-qwt-theme] .border-teal-500,
+html[data-qwt-theme] .border-teal-600 {
+  border-color: var(--qwt-accent-border) !important;
+}
+
+html[data-qwt-theme] .bg-teal-600,
+html[data-qwt-theme] .bg-teal-700 {
+  background-color: var(--qwt-accent) !important;
+}
+
+html[data-qwt-theme] .focus\:border-teal-600:focus,
+html[data-qwt-theme] .hover\:border-teal-500:hover {
+  border-color: var(--qwt-accent) !important;
+}
+
+html[data-qwt-theme] .hover\:text-teal-800:hover,
+html[data-qwt-theme] .group:hover .group-hover\:text-teal-800 {
+  color: var(--qwt-accent-strong) !important;
+}
+
+html[data-qwt-theme] .focus\:ring-teal-100:focus {
+  --tw-ring-color: color-mix(in srgb, var(--qwt-accent) 22%, transparent) !important;
+}
+
+html[data-qwt-theme] .hover\:bg-slate-700:hover {
+  background-color: var(--qwt-accent-strong) !important;
+}
+
+html[data-qwt-theme] .qwt-theme-selector {
+  background-color: color-mix(in srgb, var(--qwt-surface) 94%, transparent) !important;
+  border-color: var(--qwt-border) !important;
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 640px) {
+  .qwt-theme-selector {
+    left: 0.75rem;
+    right: 0.75rem;
+    justify-content: space-between;
+  }
 }
