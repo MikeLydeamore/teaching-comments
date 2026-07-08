@@ -11,13 +11,17 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
+  validateQuestionTitle,
   validateSubmissionContent,
+  validateQuestionText,
+  type QuestionBankItem,
   type QwtStore,
   type Session,
   type Submission,
 } from "./qwt-store-model";
 
 type StoreData = {
+  questionBank: QuestionBankItem[];
   sessions: Session[];
   submissions: Submission[];
 };
@@ -29,6 +33,7 @@ function defaultStore(): StoreData {
   const createdAt = now();
 
   return {
+    questionBank: [],
     sessions: [
       {
         code: "demo-lecture",
@@ -87,17 +92,22 @@ async function ensureStore() {
 async function readStore(): Promise<StoreData> {
   await ensureStore();
   const raw = await readFile(STORE_PATH, "utf8");
-  const data = JSON.parse(raw) as StoreData;
+  const data = JSON.parse(raw) as Partial<StoreData>;
 
   return {
     ...data,
-    sessions: data.sessions.map((session) => ({
+    questionBank: (data.questionBank ?? []).map((question) => ({
+      ...question,
+      title: question.title ?? question.text,
+      updatedAt: question.updatedAt ?? question.createdAt,
+    })),
+    sessions: (data.sessions ?? []).map((session) => ({
       ...session,
       promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
       timerDurationSeconds: session.timerDurationSeconds ?? 0,
       timerEndsAt: session.timerEndsAt ?? null,
     })),
-    submissions: data.submissions.map((submission) => ({
+    submissions: (data.submissions ?? []).map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
       gifData: submission.gifData ?? null,
@@ -251,5 +261,52 @@ export const localStore: QwtStore = {
     );
 
     return calculateStats(submissions);
+  },
+
+  async listQuestionBank(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+
+    return data.questionBank
+      .filter((question) => question.sessionCode === sessionCode)
+      .sort((a, b) => a.title.localeCompare(b.title));
+  },
+
+  async addQuestionToBank(code, text, title) {
+    const session = await this.getSession(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const questionText = validateQuestionText(text);
+    const questionTitle = validateQuestionTitle(title, questionText);
+    const data = await readStore();
+    const timestamp = now();
+    const question: QuestionBankItem = {
+      id: randomUUID(),
+      sessionCode: session.code,
+      title: questionTitle,
+      text: questionText,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    data.questionBank.push(question);
+    await writeStore(data);
+    return question;
+  },
+
+  async deleteQuestionFromBank(id) {
+    const data = await readStore();
+    const nextQuestionBank = data.questionBank.filter((question) => question.id !== id);
+
+    if (nextQuestionBank.length === data.questionBank.length) {
+      return false;
+    }
+
+    data.questionBank = nextQuestionBank;
+    await writeStore(data);
+    return true;
   },
 };

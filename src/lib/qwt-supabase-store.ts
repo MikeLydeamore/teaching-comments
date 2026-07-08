@@ -8,9 +8,12 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
+  validateQuestionTitle,
+  validateQuestionText,
   validateSubmissionContent,
   type DrawingData,
   type GifData,
+  type QuestionBankItem,
   type QwtStore,
   type Session,
   type Submission,
@@ -38,6 +41,15 @@ type SupabaseSubmissionRow = {
   starred: boolean;
   flagged: boolean;
   version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupabaseQuestionBankRow = {
+  id: string;
+  session_code: string;
+  title: string;
+  text: string;
   created_at: string;
   updated_at: string;
 };
@@ -112,6 +124,10 @@ function submissionSelect() {
   return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,created_at,updated_at";
 }
 
+function questionBankSelect() {
+  return "id,session_code,title,text,created_at,updated_at";
+}
+
 function sessionFromRow(row: SupabaseSessionRow): Session {
   return {
     code: row.code,
@@ -137,6 +153,17 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
     starred: row.starred,
     flagged: row.flagged,
     version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function questionBankItemFromRow(row: SupabaseQuestionBankRow): QuestionBankItem {
+  return {
+    id: row.id,
+    sessionCode: row.session_code,
+    title: row.title ?? row.text,
+    text: row.text,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -353,5 +380,57 @@ export const supabaseStore: QwtStore = {
     );
 
     return calculateStats(rows.map(submissionFromRow));
+  },
+
+  async listQuestionBank(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const params = new URLSearchParams({
+      session_code: `eq.${sessionCode}`,
+      select: questionBankSelect(),
+      order: "title.asc",
+    });
+    const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
+      `/qwt_question_bank?${params.toString()}`,
+    );
+
+    return rows.map(questionBankItemFromRow);
+  },
+
+  async addQuestionToBank(code, text, title) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
+      `/qwt_question_bank?select=${questionBankSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          session_code: session.code,
+          title: validateQuestionTitle(title, text),
+          text: validateQuestionText(text),
+          created_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? questionBankItemFromRow(rows[0]) : null;
+  },
+
+  async deleteQuestionFromBank(id) {
+    const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
+      `/qwt_question_bank?id=eq.${encodeFilterValue(id)}&select=${questionBankSelect()}`,
+      {
+        method: "DELETE",
+        prefer: "return=representation",
+      },
+    );
+
+    return rows.length > 0;
   },
 };

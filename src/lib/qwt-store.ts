@@ -15,6 +15,7 @@ export type {
   DrawingPoint,
   DrawingStroke,
   GifData,
+  QuestionBankItem,
   Session,
   SessionPatch,
   SessionStats,
@@ -80,4 +81,16 @@ export async function updateSubmission(id: string, patch: SubmissionPatch) {
 
 export async function getSessionStats(code: string) {
   return getStore().getSessionStats(code);
+}
+
+export async function listQuestionBank(code: string) {
+  return getStore().listQuestionBank(code);
+}
+
+export async function addQuestionToBank(code: string, text: string, title?: string) {
+  return getStore().addQuestionToBank(code, text, title);
+}
+
+export async function deleteQuestionFromBank(id: string) {
+  return getStore().deleteQuestionFromBank(id);
 }

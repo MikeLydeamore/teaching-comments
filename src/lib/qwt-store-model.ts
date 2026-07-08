@@ -54,6 +54,15 @@ export type Submission = {
   updatedAt: string;
 };
 
+export type QuestionBankItem = {
+  id: string;
+  sessionCode: string;
+  title: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SubmissionPatch = Partial<
   Pick<Submission, "text" | "status" | "starred" | "flagged">
 >;
@@ -92,6 +101,13 @@ export type QwtStore = {
   ): Promise<Submission>;
   updateSubmission(id: string, patch: SubmissionPatch): Promise<Submission | null>;
   getSessionStats(code: string): Promise<SessionStats>;
+  listQuestionBank(code: string): Promise<QuestionBankItem[]>;
+  addQuestionToBank(
+    code: string,
+    text: string,
+    title?: string,
+  ): Promise<QuestionBankItem | null>;
+  deleteQuestionFromBank(id: string): Promise<boolean>;
 };
 
 export const DEFAULT_PROMPT =
@@ -303,6 +319,34 @@ export function validateSubmissionText(text: string) {
 
   if (trimmed.length > 2000) {
     throw new Error("Please keep submissions under 2000 characters for the prototype.");
+  }
+
+  return trimmed;
+}
+
+export function validateQuestionText(text: string) {
+  const trimmed = text.trim();
+
+  if (trimmed.length < 5) {
+    throw new Error("Question must be at least 5 characters.");
+  }
+
+  if (trimmed.length > 1200) {
+    throw new Error("Question must be 1200 characters or fewer.");
+  }
+
+  return trimmed;
+}
+
+export function validateQuestionTitle(title: string | undefined, fallbackText: string) {
+  const trimmed = title?.trim() || fallbackText.trim();
+
+  if (trimmed.length < 1) {
+    throw new Error("Question title is required.");
+  }
+
+  if (trimmed.length > 1200) {
+    throw new Error("Question title must be 1200 characters or fewer.");
   }
 
   return trimmed;

@@ -8,7 +8,7 @@ import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
-import type { DrawingData, GifData } from "@/lib/qwt-store";
+import type { DrawingData, GifData, QuestionBankItem } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -43,6 +43,7 @@ type Stats = {
 };
 
 type TeacherDashboardProps = {
+  initialQuestionBank: QuestionBankItem[];
   session: Session;
   initialStats: Stats;
 };
@@ -278,10 +279,26 @@ function reorderSubmissionIds(order: string[], draggedId: string, targetId: stri
   return nextOrder;
 }
 
-export function TeacherDashboard({ session, initialStats }: TeacherDashboardProps) {
+function sortQuestionBank(questionBank: QuestionBankItem[]) {
+  return [...questionBank].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export function TeacherDashboard({
+  initialQuestionBank,
+  session,
+  initialStats,
+}: TeacherDashboardProps) {
   const [sessionDetails, setSessionDetails] = useState(session);
   const [promptDraft, setPromptDraft] = useState(session.prompt);
   const [promptStatus, setPromptStatus] = useState("");
+  const [questionBank, setQuestionBank] = useState(() =>
+    sortQuestionBank(initialQuestionBank),
+  );
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [questionBankStatus, setQuestionBankStatus] = useState("");
+  const [isQuestionTitleDialogOpen, setIsQuestionTitleDialogOpen] =
+    useState(false);
+  const [questionTitleDraft, setQuestionTitleDraft] = useState("");
   const [minutes, setMinutes] = useState(3);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
@@ -351,6 +368,87 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     setPromptDraft(payload.session.prompt);
     setStats(payload.stats ?? stats);
     setPromptStatus("Prompt saved.");
+  }
+
+  function openQuestionTitleDialog() {
+    const promptText = promptDraft.trim();
+
+    if (questionBank.some((question) => question.text === promptText)) {
+      setQuestionBankStatus("That question is already in the bank.");
+      return;
+    }
+
+    setQuestionTitleDraft(promptText);
+    setQuestionBankStatus("");
+    setIsQuestionTitleDialogOpen(true);
+  }
+
+  async function addPromptToBank() {
+    const promptText = promptDraft.trim();
+    const questionTitle = questionTitleDraft.trim() || promptText;
+
+    setQuestionBankStatus("Adding question...");
+    const response = await fetch(`/api/sessions/${session.code}/questions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: promptText, title: questionTitle }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setQuestionBankStatus(payload.error ?? "Could not add question.");
+      return;
+    }
+
+    const nextQuestion = payload.question as QuestionBankItem;
+    setQuestionBank((currentQuestionBank) =>
+      sortQuestionBank([...currentQuestionBank, nextQuestion]),
+    );
+    setSelectedQuestionId(nextQuestion.id);
+    setIsQuestionTitleDialogOpen(false);
+    setQuestionTitleDraft("");
+    setQuestionBankStatus("Question added to bank.");
+  }
+
+  function selectQuestionFromBank(questionId: string) {
+    setSelectedQuestionId(questionId);
+    setQuestionBankStatus("");
+
+    const question = questionBank.find((bankQuestion) => bankQuestion.id === questionId);
+
+    if (!question) {
+      return;
+    }
+
+    setPromptDraft(question.text);
+    setPromptStatus("Question loaded. Save prompt to show students.");
+  }
+
+  async function deleteSelectedQuestionFromBank() {
+    const question = questionBank.find(
+      (bankQuestion) => bankQuestion.id === selectedQuestionId,
+    );
+
+    if (!question) {
+      return;
+    }
+
+    setQuestionBankStatus("Deleting question...");
+    const response = await fetch(`/api/questions/${encodeURIComponent(question.id)}`, {
+      method: "DELETE",
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setQuestionBankStatus(payload.error ?? "Could not delete question.");
+      return;
+    }
+
+    setQuestionBank((currentQuestionBank) =>
+      currentQuestionBank.filter((bankQuestion) => bankQuestion.id !== question.id),
+    );
+    setSelectedQuestionId("");
+    setQuestionBankStatus("Question deleted from bank.");
   }
 
   async function patchSession(patch: Record<string, unknown>, loadingMessage: string) {
@@ -537,6 +635,21 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const chartResults = chartType === "wordCloud" ? wordCloudResults : pollResults;
   const maxPollCount = Math.max(1, ...chartResults.map(([, count]) => count));
   const pollResponseTotal = chartResults.reduce((sum, [, count]) => sum + count, 0);
+  const selectedQuestion = questionBank.find(
+    (question) => question.id === selectedQuestionId,
+  );
+  const promptDraftText = promptDraft.trim();
+  const promptIsAlreadyInBank = questionBank.some(
+    (question) => question.text === promptDraftText,
+  );
+  const canAddPromptToBank =
+    promptDraftText.length >= 5 &&
+    promptDraftText.length <= 1200 &&
+    !promptIsAlreadyInBank;
+  const questionTitleDraftText = questionTitleDraft.trim();
+  const canConfirmQuestionTitle =
+    questionTitleDraftText.length >= 1 && questionTitleDraftText.length <= 1200;
+  const isAddingQuestion = questionBankStatus === "Adding question...";
   const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
@@ -587,6 +700,36 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               <p className="text-sm font-semibold text-slate-500">Prompt</p>
               <p className="text-xs text-slate-500">Shown to students</p>
             </div>
+            <label className="mt-3 block text-sm font-medium text-slate-700" htmlFor="question-bank">
+              Question bank
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <select
+                className="h-10 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                id="question-bank"
+                value={selectedQuestionId}
+                onChange={(event) => selectQuestionFromBank(event.target.value)}
+              >
+                <option value="">
+                  {questionBank.length ? "Select a saved question" : "No saved questions"}
+                </option>
+                {questionBank.map((question) => (
+                  <option key={question.id} value={question.id}>
+                    {question.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!selectedQuestion}
+                type="button"
+                onClick={() => {
+                  void deleteSelectedQuestionFromBank();
+                }}
+              >
+                Delete
+              </button>
+            </div>
             <label className="sr-only" htmlFor="prompt">
               Session prompt
             </label>
@@ -596,7 +739,15 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               maxLength={1200}
               value={promptDraft}
               onChange={(event) => {
-                setPromptDraft(event.target.value);
+                const nextPromptDraft = event.target.value;
+                setPromptDraft(nextPromptDraft);
+                if (
+                  selectedQuestion &&
+                  nextPromptDraft.trim() !== selectedQuestion.text
+                ) {
+                  setSelectedQuestionId("");
+                }
+                setQuestionBankStatus("");
                 setPromptStatus("");
               }}
             />
@@ -604,15 +755,30 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               <p className="text-xs text-slate-500">
                 {promptDraft.length}/1200
               </p>
-              <button
-                className="h-9 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={promptDraft.trim() === sessionDetails.prompt}
-                onClick={savePrompt}
-                type="button"
-              >
-                Save prompt
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!canAddPromptToBank}
+                  type="button"
+                  onClick={openQuestionTitleDialog}
+                >
+                  Add to bank
+                </button>
+                <button
+                  className="h-9 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={promptDraft.trim() === sessionDetails.prompt}
+                  onClick={savePrompt}
+                  type="button"
+                >
+                  Show
+                </button>
+              </div>
             </div>
+            {questionBankStatus ? (
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                {questionBankStatus}
+              </p>
+            ) : null}
             {promptStatus ? (
               <p className="mt-3 text-sm font-medium text-slate-600">{promptStatus}</p>
             ) : null}
@@ -1108,6 +1274,84 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
           )}
         </section>
       </div>
+      {isQuestionTitleDialogOpen ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-5"
+          role="dialog"
+        >
+          <div className="w-full max-w-lg rounded-md bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">
+                  Save question
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  This title appears in the question bank selector.
+                </p>
+              </div>
+              <button
+                aria-label="Close"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
+                disabled={isAddingQuestion}
+                type="button"
+                onClick={() => {
+                  setIsQuestionTitleDialogOpen(false);
+                  setQuestionTitleDraft("");
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="question-title">
+              Title
+            </label>
+            <textarea
+              className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              id="question-title"
+              maxLength={1200}
+              value={questionTitleDraft}
+              onChange={(event) => {
+                setQuestionTitleDraft(event.target.value);
+                setQuestionBankStatus("");
+              }}
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">
+                {questionTitleDraft.length}/1200
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isAddingQuestion}
+                  type="button"
+                  onClick={() => {
+                    setIsQuestionTitleDialogOpen(false);
+                    setQuestionTitleDraft("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="h-9 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!canConfirmQuestionTitle || isAddingQuestion}
+                  type="button"
+                  onClick={() => {
+                    void addPromptToBank();
+                  }}
+                >
+                  {isAddingQuestion ? "Adding..." : "Add question"}
+                </button>
+              </div>
+            </div>
+            {questionBankStatus && questionBankStatus !== "Adding question..." ? (
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                {questionBankStatus}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -10,6 +10,7 @@ The current slice includes:
 - a teacher session selector at `/teacher`
 - a prototype teacher PIN gate
 - in-session prompt editing from the teacher dashboard
+- per-session teacher question banks for saved prompts
 - teacher-controlled countdown timer shown to students
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
@@ -93,6 +94,9 @@ If you already ran the schema before the classroom timer was added, run
 
 If you already ran the schema before GIF support was added, run
 `supabase/add-gif-data.sql` in the Supabase SQL editor.
+
+If you already ran the schema before question banks were added, run
+`supabase/add-question-bank.sql` in the Supabase SQL editor.
 
 ## Sessions
 

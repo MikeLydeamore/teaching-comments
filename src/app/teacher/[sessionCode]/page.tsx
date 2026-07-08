@@ -1,5 +1,5 @@
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
-import { getOrCreateSession, getSessionStats } from "@/lib/qwt-store";
+import { getOrCreateSession, getSessionStats, listQuestionBank } from "@/lib/qwt-store";
 import { TeacherDashboard } from "./TeacherDashboard";
 import { TeacherLogin } from "./TeacherLogin";
 
@@ -26,6 +26,13 @@ export default async function TeacherPage({
 
   const session = await getOrCreateSession(sessionCode);
   const stats = await getSessionStats(session.code);
+  const questionBank = await listQuestionBank(session.code);
 
-  return <TeacherDashboard initialStats={stats} session={session} />;
+  return (
+    <TeacherDashboard
+      initialQuestionBank={questionBank}
+      initialStats={stats}
+      session={session}
+    />
+  );
 }

@@ -11,6 +11,15 @@ create table if not exists public.qwt_sessions (
   timer_ends_at timestamptz
 );
 
+create table if not exists public.qwt_question_bank (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  title text not null check (char_length(title) between 1 and 1200),
+  text text not null check (char_length(text) between 5 and 1200),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.qwt_submissions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
@@ -38,8 +47,12 @@ create index if not exists qwt_submissions_session_created_idx
 create index if not exists qwt_submissions_session_status_idx
   on public.qwt_submissions (session_code, status);
 
+create index if not exists qwt_question_bank_session_title_idx
+  on public.qwt_question_bank (session_code, title);
+
 alter table public.qwt_sessions enable row level security;
 alter table public.qwt_submissions enable row level security;
+alter table public.qwt_question_bank enable row level security;
 
 insert into public.qwt_sessions (code, title, prompt, is_open)
 values (
@@ -49,6 +62,20 @@ values (
   true
 )
 on conflict (code) do nothing;
+
+insert into public.qwt_question_bank (
+  id,
+  session_code,
+  title,
+  text
+)
+values (
+  '33333333-3333-4333-8333-333333333333',
+  'demo-lecture',
+  'Explain p-values',
+  'In one or two sentences, explain what the p-value tells us in this setting.'
+)
+on conflict (id) do nothing;
 
 insert into public.qwt_submissions (
   id,
