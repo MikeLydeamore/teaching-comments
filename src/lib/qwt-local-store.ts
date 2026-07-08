@@ -48,6 +48,7 @@ function defaultStore(): StoreData {
         studentName: "Anonymous",
         text: "There is no evidence against the null model, so the observed difference could be due to random variation.",
         drawingData: null,
+        gifData: null,
         status: "visible",
         starred: false,
         flagged: false,
@@ -61,6 +62,7 @@ function defaultStore(): StoreData {
         studentName: "Anonymous",
         text: "The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.",
         drawingData: null,
+        gifData: null,
         status: "visible",
         starred: true,
         flagged: false,
@@ -98,6 +100,7 @@ async function readStore(): Promise<StoreData> {
     submissions: data.submissions.map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
+      gifData: submission.gifData ?? null,
       studentName: submission.studentName ?? "Anonymous",
     })),
   };
@@ -183,8 +186,8 @@ export const localStore: QwtStore = {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
-  async addSubmission(code, text, drawingData, studentName) {
-    const submissionContent = validateSubmissionContent(text, drawingData);
+  async addSubmission(code, text, drawingData, gifData, studentName) {
+    const submissionContent = validateSubmissionContent(text, drawingData, gifData);
     const session = await this.getSession(code);
 
     if (!session) {
@@ -203,6 +206,7 @@ export const localStore: QwtStore = {
       studentName: normalizeStudentName(studentName ?? ""),
       text: submissionContent.text,
       drawingData: submissionContent.drawingData,
+      gifData: submissionContent.gifData,
       status: "visible",
       starred: false,
       flagged: false,
@@ -232,7 +236,7 @@ export const localStore: QwtStore = {
       updatedAt: now(),
     };
 
-    assertSubmissionHasContent(next.text, next.drawingData);
+    assertSubmissionHasContent(next.text, next.drawingData, next.gifData);
 
     data.submissions[index] = next;
     await writeStore(data);

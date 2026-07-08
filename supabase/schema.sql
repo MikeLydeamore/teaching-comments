@@ -17,16 +17,19 @@ create table if not exists public.qwt_submissions (
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null default '' check (char_length(text) <= 2000),
   drawing_data jsonb,
+  gif_data jsonb,
   status text not null default 'visible' check (status in ('visible', 'hidden')),
   starred boolean not null default false,
   flagged boolean not null default false,
   version integer not null default 1 check (version >= 1),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint qwt_submissions_text_or_drawing_check
-    check (char_length(text) >= 1 or drawing_data is not null),
+  constraint qwt_submissions_text_or_media_check
+    check (char_length(text) >= 1 or drawing_data is not null or gif_data is not null),
   constraint qwt_submissions_drawing_data_check
-    check (drawing_data is null or jsonb_typeof(drawing_data) = 'object')
+    check (drawing_data is null or jsonb_typeof(drawing_data) = 'object'),
+  constraint qwt_submissions_gif_data_check
+    check (gif_data is null or jsonb_typeof(gif_data) = 'object')
 );
 
 create index if not exists qwt_submissions_session_created_idx

@@ -12,9 +12,10 @@ export default function PrivacyPage() {
         </h1>
         <p className="mt-4 leading-7 text-slate-700">
           This prototype collects short pieces of student writing, optional
-          drawings, and an optional display name so teaching staff can
-          understand what the class is thinking during a learning activity.
-          Students can leave the name field blank and submit as Anonymous.
+          drawings, optional GIF selections, and an optional display name so
+          teaching staff can understand what the class is thinking during a
+          learning activity. Students can leave the name field blank and submit
+          as Anonymous.
         </p>
 
         <section className="mt-6 space-y-5 text-sm leading-6 text-slate-700">
@@ -22,9 +23,10 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-slate-950">What is collected</h2>
             <p className="mt-2">
               We store the writing or drawing you submit, the session code, an
-              optional display name, a timestamp, and teacher moderation markers
-              such as starred, flagged, or hidden. The prototype may also
-              create ordinary technical logs through its hosting provider.
+              optional selected GIF, the session code, an optional display
+              name, a timestamp, and teacher moderation markers such as
+              starred, flagged, or hidden. The prototype may also create
+              ordinary technical logs through its hosting provider.
             </p>
           </div>
 
@@ -34,7 +36,17 @@ export default function PrivacyPage() {
               The student form does not ask for your student ID, email address,
               or login details. Please avoid including student IDs or sensitive
               identifying information about yourself or other people in your
-              response or drawing.
+              response, drawing, or GIF search terms.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Third-party GIF search</h2>
+            <p className="mt-2">
+              If GIF search is enabled, searches are sent from the browser to
+              GIPHY and selected GIFs are loaded from GIPHY&apos;s media service.
+              Search terms should not include student IDs, names, or sensitive
+              personal information.
             </p>
           </div>
 
@@ -70,9 +82,9 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-950">No AI processing</h2>
             <p className="mt-2">
-              This version does not send writing or drawings to an AI service.
-              If AI feedback is added later, this notice should be updated
-              before it is used with students.
+              This version does not send writing, drawings, or GIF selections
+              to an AI service. If AI feedback is added later, this notice
+              should be updated before it is used with students.
             </p>
           </div>
         </section>

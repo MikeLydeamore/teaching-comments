@@ -18,6 +18,16 @@ export type DrawingData = {
   strokes: DrawingStroke[];
 };
 
+export type GifData = {
+  id: string;
+  title: string;
+  url: string;
+  previewUrl: string;
+  giphyUrl: string;
+  width: number;
+  height: number;
+};
+
 export type Session = {
   code: string;
   title: string;
@@ -35,6 +45,7 @@ export type Submission = {
   studentName: string;
   text: string;
   drawingData: DrawingData | null;
+  gifData: GifData | null;
   status: SubmissionStatus;
   starred: boolean;
   flagged: boolean;
@@ -76,6 +87,7 @@ export type QwtStore = {
     code: string,
     text: string,
     drawingData?: unknown,
+    gifData?: unknown,
     studentName?: string,
   ): Promise<Submission>;
   updateSubmission(id: string, patch: SubmissionPatch): Promise<Submission | null>;
@@ -124,6 +136,7 @@ const DRAWING_COLORS = new Set(["#0f172a", "#2563eb", "#dc2626", "#0f766e"]);
 const MAX_DRAWING_STROKES = 120;
 const MAX_DRAWING_POINTS = 12000;
 const MAX_DRAWING_PAYLOAD_CHARS = 180000;
+const MAX_GIPHY_URL_CHARS = 1000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -219,6 +232,72 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
   return drawingData;
 }
 
+function normalizeGiphyUrl(value: unknown, label: string) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${label} could not be read.`);
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed.length > MAX_GIPHY_URL_CHARS) {
+    throw new Error(`${label} is too long.`);
+  }
+
+  try {
+    const url = new URL(trimmed);
+    const hostname = url.hostname.toLowerCase();
+
+    if (
+      url.protocol !== "https:" ||
+      (hostname !== "giphy.com" && !hostname.endsWith(".giphy.com"))
+    ) {
+      throw new Error();
+    }
+
+    return url.toString();
+  } catch {
+    throw new Error(`${label} must be a GIPHY URL.`);
+  }
+}
+
+export function normalizeGifData(value: unknown): GifData | null {
+  if (!value) {
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    throw new Error("The GIF data could not be read.");
+  }
+
+  const rawId = typeof value.id === "string" ? value.id.trim() : "";
+
+  if (!/^[a-zA-Z0-9_-]{1,120}$/.test(rawId)) {
+    throw new Error("The GIF data could not be read.");
+  }
+
+  const title =
+    typeof value.title === "string" && value.title.trim()
+      ? value.title.trim().replace(/\s+/g, " ").slice(0, 160)
+      : "GIPHY GIF";
+  const url = normalizeGiphyUrl(value.url, "GIF URL");
+  const previewUrl = value.previewUrl
+    ? normalizeGiphyUrl(value.previewUrl, "GIF preview URL")
+    : url;
+  const giphyUrl = value.giphyUrl
+    ? normalizeGiphyUrl(value.giphyUrl, "GIPHY page URL")
+    : `https://giphy.com/gifs/${rawId}`;
+
+  return {
+    id: rawId,
+    title,
+    url,
+    previewUrl,
+    giphyUrl,
+    width: boundedNumber(value.width, 1, 2000) ?? 320,
+    height: boundedNumber(value.height, 1, 2000) ?? 180,
+  };
+}
+
 export function validateSubmissionText(text: string) {
   const trimmed = text.trim();
 
@@ -229,21 +308,31 @@ export function validateSubmissionText(text: string) {
   return trimmed;
 }
 
-export function validateSubmissionContent(text: string, drawingData: unknown) {
+export function validateSubmissionContent(
+  text: string,
+  drawingData: unknown,
+  gifData: unknown,
+) {
   const trimmed = validateSubmissionText(text);
   const normalizedDrawingData = normalizeDrawingData(drawingData);
+  const normalizedGifData = normalizeGifData(gifData);
 
-  assertSubmissionHasContent(trimmed, normalizedDrawingData);
+  assertSubmissionHasContent(trimmed, normalizedDrawingData, normalizedGifData);
 
   return {
     text: trimmed,
     drawingData: normalizedDrawingData,
+    gifData: normalizedGifData,
   };
 }
 
-export function assertSubmissionHasContent(text: string, drawingData: DrawingData | null) {
-  if (text.trim().length < 1 && !drawingData) {
-    throw new Error("A submission needs text or a drawing.");
+export function assertSubmissionHasContent(
+  text: string,
+  drawingData: DrawingData | null,
+  gifData: GifData | null,
+) {
+  if (text.trim().length < 1 && !drawingData && !gifData) {
+    throw new Error("A submission needs text, a drawing, or a GIF.");
   }
 }
 

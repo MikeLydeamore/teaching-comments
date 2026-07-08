@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
+import { GifPreview } from "@/components/GifPreview";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
-import type { DrawingData } from "@/lib/qwt-store";
+import type { DrawingData, GifData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -24,6 +25,7 @@ type Submission = {
   studentName: string;
   text: string;
   drawingData: DrawingData | null;
+  gifData: GifData | null;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -976,14 +978,19 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                       </button>
                       <p className="whitespace-pre-wrap">{submission.text}</p>
                     </div>
-                  ) : (
+                  ) : !submission.drawingData && !submission.gifData ? (
                     <p
                       className="cursor-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600"
                       data-no-card-drag="true"
                     >
-                      Drawing-only response
+                      Media-only response
                     </p>
-                  )}
+                  ) : null}
+                  {submission.gifData ? (
+                    <div className="cursor-auto" data-no-card-drag="true">
+                      <GifPreview gifData={submission.gifData} />
+                    </div>
+                  ) : null}
                   {submission.drawingData ? (
                     <div className="cursor-auto" data-no-card-drag="true">
                       <DrawingPreview drawingData={submission.drawingData} />

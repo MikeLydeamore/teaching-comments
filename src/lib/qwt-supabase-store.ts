@@ -10,6 +10,7 @@ import {
   titleFromCode,
   validateSubmissionContent,
   type DrawingData,
+  type GifData,
   type QwtStore,
   type Session,
   type Submission,
@@ -32,6 +33,7 @@ type SupabaseSubmissionRow = {
   student_name: string;
   text: string;
   drawing_data: DrawingData | null;
+  gif_data: GifData | null;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -107,7 +109,7 @@ function sessionSelect() {
 }
 
 function submissionSelect() {
-  return "id,session_code,student_name,text,drawing_data,status,starred,flagged,version,created_at,updated_at";
+  return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,created_at,updated_at";
 }
 
 function sessionFromRow(row: SupabaseSessionRow): Session {
@@ -130,6 +132,7 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
     studentName: row.student_name ?? "Anonymous",
     text: row.text,
     drawingData: row.drawing_data ?? null,
+    gifData: row.gif_data ?? null,
     status: row.status,
     starred: row.starred,
     flagged: row.flagged,
@@ -267,8 +270,8 @@ export const supabaseStore: QwtStore = {
     return rows.map(submissionFromRow);
   },
 
-  async addSubmission(code, text, drawingData, studentName) {
-    const submissionContent = validateSubmissionContent(text, drawingData);
+  async addSubmission(code, text, drawingData, gifData, studentName) {
+    const submissionContent = validateSubmissionContent(text, drawingData, gifData);
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -289,6 +292,7 @@ export const supabaseStore: QwtStore = {
           student_name: normalizeStudentName(studentName ?? ""),
           text: submissionContent.text,
           drawing_data: submissionContent.drawingData,
+          gif_data: submissionContent.gifData,
           status: "visible",
           starred: false,
           flagged: false,
@@ -317,7 +321,7 @@ export const supabaseStore: QwtStore = {
     const hasTextPatch = "text" in nextPatch;
     const nextText = hasTextPatch ? nextPatch.text ?? "" : current.text;
 
-    assertSubmissionHasContent(nextText, current.drawing_data ?? null);
+    assertSubmissionHasContent(nextText, current.drawing_data ?? null, current.gif_data ?? null);
 
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?id=eq.${encodeFilterValue(id)}&select=${submissionSelect()}`,

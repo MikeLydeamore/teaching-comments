@@ -14,6 +14,7 @@ export type {
   DrawingData,
   DrawingPoint,
   DrawingStroke,
+  GifData,
   Session,
   SessionPatch,
   SessionStats,
@@ -67,9 +68,10 @@ export async function addSubmission(
   code: string,
   text: string,
   drawingData?: unknown,
+  gifData?: unknown,
   studentName?: string,
 ) {
-  return getStore().addSubmission(code, text, drawingData, studentName);
+  return getStore().addSubmission(code, text, drawingData, gifData, studentName);
 }
 
 export async function updateSubmission(id: string, patch: SubmissionPatch) {

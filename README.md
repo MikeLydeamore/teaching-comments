@@ -14,6 +14,7 @@ The current slice includes:
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
 - typed and drawn student responses
+- optional GIF responses through GIPHY search
 - optional student display names, defaulting to Anonymous
 - teacher-facing submission cards
 - recent-submission filtering
@@ -69,6 +70,15 @@ TEACHER_PIN=replace-with-a-private-pin-before-deploying
 Keep the service role key server-side only. Do not put it in browser code or
 commit it to the repo.
 
+GIF search is optional. To enable it, create a GIPHY API key and set:
+
+```text
+NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key
+```
+
+GIPHY's browser API key is public by design, unlike the Supabase service role
+key.
+
 If you already ran the first schema before drawing support was added, run
 `supabase/add-drawing-data.sql` in the Supabase SQL editor.
 
@@ -80,6 +90,9 @@ If you already ran the schema before student display names were added, run
 
 If you already ran the schema before the classroom timer was added, run
 `supabase/add-session-timer.sql` in the Supabase SQL editor.
+
+If you already ran the schema before GIF support was added, run
+`supabase/add-gif-data.sql` in the Supabase SQL editor.
 
 ## Sessions
 

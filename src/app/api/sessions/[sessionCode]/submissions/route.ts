@@ -29,6 +29,7 @@ export async function POST(
   const { sessionCode } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as {
     drawingData?: unknown;
+    gifData?: unknown;
     privacyAccepted?: boolean;
     studentName?: string;
     text?: string;
@@ -51,6 +52,7 @@ export async function POST(
       sessionCode,
       body.text ?? "",
       body.drawingData,
+      body.gifData,
       body.studentName,
     );
     return Response.json({ submission }, { status: 201 });

@@ -3,8 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPad } from "@/components/DrawingPad";
+import { GiphyPicker } from "@/components/GiphyPicker";
 import { SessionTimer } from "@/components/SessionTimer";
-import type { DrawingData } from "@/lib/qwt-store";
+import type { DrawingData, GifData } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
   initialStudentName: string;
@@ -18,6 +19,7 @@ type SavedSubmission = {
   id: string;
   text: string;
   drawingData: DrawingData | null;
+  gifData: GifData | null;
   createdAt: string;
 };
 
@@ -37,6 +39,7 @@ export function StudentSubmit({
   const [studentName, setStudentName] = useState(initialStudentName);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
+  const [gifData, setGifData] = useState<GifData | null>(null);
   const [drawingResetSignal, setDrawingResetSignal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +48,8 @@ export function StudentSubmit({
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
 
   const remaining = useMemo(() => 2000 - text.length, [text]);
-  const hasSubmissionContent = text.trim().length >= 1 || drawingData !== null;
+  const hasSubmissionContent =
+    text.trim().length >= 1 || drawingData !== null || gifData !== null;
 
   const refreshSession = useCallback(async () => {
     const response = await fetch(`/api/sessions/${sessionCode}/student`);
@@ -105,6 +109,7 @@ export function StudentSubmit({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         drawingData,
+        gifData,
         privacyAccepted,
         studentName,
         text,
@@ -123,6 +128,7 @@ export function StudentSubmit({
     setSaved(payload.submission);
     setText("");
     setDrawingData(null);
+    setGifData(null);
     setDrawingResetSignal((currentSignal) => currentSignal + 1);
   }
 
@@ -211,6 +217,11 @@ export function StudentSubmit({
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
+        <GiphyPicker
+          disabled={!sessionIsOpen || isSaving}
+          gifData={gifData}
+          onChange={setGifData}
+        />
         <DrawingPad
           disabled={!sessionIsOpen || isSaving}
           key={drawingResetSignal}
@@ -236,10 +247,11 @@ export function StudentSubmit({
             onChange={(event) => setPrivacyAccepted(event.target.checked)}
           />
           <span>
-            I understand my writing or drawing, timestamp, and session code
-            will be stored for this teaching activity. If I provide a name,
-            that name will also be stored and visible to teaching staff. I will
-            avoid including student IDs or other identifying details.{" "}
+            I understand my writing, drawing, or selected GIF, timestamp, and
+            session code will be stored for this teaching activity. If I
+            provide a name, that name will also be stored and visible to
+            teaching staff. I will avoid including student IDs or other
+            identifying details.{" "}
             <Link className="font-semibold text-teal-700 underline" href="/privacy">
               Read the privacy notice
             </Link>
