@@ -108,6 +108,7 @@ async function readStore(): Promise<StoreData> {
     groupQuestions: (data.groupQuestions ?? []).map((question) => ({
       ...question,
       isAnswered: question.isAnswered ?? false,
+      studentName: question.studentName ?? "Anonymous",
       updatedAt: question.updatedAt ?? question.createdAt,
       voterIds: question.voterIds ?? [],
     })),
@@ -336,6 +337,7 @@ export const localStore: QwtStore = {
       .map((question) => ({
         id: question.id,
         sessionCode: question.sessionCode,
+        studentName: question.studentName,
         text: question.text,
         isAnswered: question.isAnswered,
         voteCount: question.voterIds.length,
@@ -353,7 +355,7 @@ export const localStore: QwtStore = {
       );
   },
 
-  async addGroupQuestion(code, text) {
+  async addGroupQuestion(code, text, studentName) {
     const session = await this.getSession(code);
 
     if (!session) {
@@ -369,6 +371,7 @@ export const localStore: QwtStore = {
     const question: StoredGroupQuestion = {
       id: randomUUID(),
       sessionCode: session.code,
+      studentName: normalizeStudentName(studentName ?? ""),
       text: validateGroupQuestionText(text),
       isAnswered: false,
       voterIds: [],
@@ -407,6 +410,7 @@ export const localStore: QwtStore = {
     return {
       id: question.id,
       sessionCode: question.sessionCode,
+      studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,
@@ -440,6 +444,7 @@ export const localStore: QwtStore = {
     return {
       id: question.id,
       sessionCode: question.sessionCode,
+      studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,
@@ -469,6 +474,7 @@ export const localStore: QwtStore = {
     return {
       id: question.id,
       sessionCode: question.sessionCode,
+      studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,

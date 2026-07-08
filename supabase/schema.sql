@@ -23,6 +23,7 @@ create table if not exists public.qwt_question_bank (
 create table if not exists public.qwt_group_questions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
+  student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null check (char_length(text) between 5 and 500),
   is_answered boolean not null default false,
   created_at timestamptz not null default now(),

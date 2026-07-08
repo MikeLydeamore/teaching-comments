@@ -60,6 +60,7 @@ type SupabaseQuestionBankRow = {
 type SupabaseGroupQuestionRow = {
   id: string;
   session_code: string;
+  student_name: string;
   text: string;
   is_answered: boolean;
   created_at: string;
@@ -147,7 +148,7 @@ function questionBankSelect() {
 }
 
 function groupQuestionSelect() {
-  return "id,session_code,text,is_answered,created_at,updated_at";
+  return "id,session_code,student_name,text,is_answered,created_at,updated_at";
 }
 
 function groupQuestionVoteSelect() {
@@ -205,6 +206,7 @@ function groupQuestionFromRow(
   return {
     id: row.id,
     sessionCode: row.session_code,
+    studentName: row.student_name ?? "Anonymous",
     text: row.text,
     isAnswered: row.is_answered,
     voteCount: questionVotes.length,
@@ -524,7 +526,7 @@ export const supabaseStore: QwtStore = {
       );
   },
 
-  async addGroupQuestion(code, text) {
+  async addGroupQuestion(code, text, studentName) {
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -542,6 +544,7 @@ export const supabaseStore: QwtStore = {
         method: "POST",
         body: JSON.stringify({
           session_code: session.code,
+          student_name: normalizeStudentName(studentName ?? ""),
           text: validateGroupQuestionText(text),
           is_answered: false,
           created_at: timestamp,

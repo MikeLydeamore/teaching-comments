@@ -182,9 +182,7 @@ export function StudentSubmit({
         ) : null}
       </section>
 
-      <GroupQuestionsPanel canAsk={sessionIsOpen} sessionCode={sessionCode} />
-
-      <form className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
+      <section className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
         <label className="text-sm font-semibold text-slate-700" htmlFor="student-name">
           Name
         </label>
@@ -200,7 +198,16 @@ export function StudentSubmit({
         <p className="mt-2 text-xs leading-5 text-slate-500">
           Optional. Leave blank to submit as Anonymous.
         </p>
-        <label className="mt-5 block text-sm font-semibold text-slate-700" htmlFor="quick-write">
+      </section>
+
+      <GroupQuestionsPanel
+        canAsk={sessionIsOpen}
+        sessionCode={sessionCode}
+        studentName={studentName}
+      />
+
+      <form className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
+        <label className="block text-sm font-semibold text-slate-700" htmlFor="quick-write">
           Your writing
         </label>
         <input

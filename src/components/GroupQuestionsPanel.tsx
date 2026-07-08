@@ -6,6 +6,7 @@ import type { GroupQuestion } from "@/lib/qwt-store";
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
   sessionCode: string;
+  studentName?: string;
   variant?: "student" | "teacher";
 };
 
@@ -64,6 +65,7 @@ function ThumbsUpIcon({ isActive = false }: { isActive?: boolean }) {
 export function GroupQuestionsPanel({
   canAsk = false,
   sessionCode,
+  studentName = "",
   variant = "student",
 }: GroupQuestionsPanelProps) {
   const [questions, setQuestions] = useState<GroupQuestion[]>([]);
@@ -134,6 +136,7 @@ export function GroupQuestionsPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        studentName,
         text: questionDraft,
         website,
       }),
@@ -253,7 +256,7 @@ export function GroupQuestionsPanel({
               setStatus("");
             }}
           >
-            {showAnswered ? "Hide answered" : "Show answered"}
+            {showAnswered ? "Showing answered" : "Show answered"}
           </button>
         ) : null}
         {canAsk ? (
@@ -283,6 +286,11 @@ export function GroupQuestionsPanel({
               }`}
               key={question.id}
             >
+              {canMarkAnswered ? (
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {question.studentName || "Anonymous"}
+                </p>
+              ) : null}
               <p className="whitespace-pre-wrap text-sm leading-6 text-slate-900">
                 {question.text}
               </p>

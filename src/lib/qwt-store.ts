@@ -104,8 +104,12 @@ export async function listGroupQuestions(
   return getStore().listGroupQuestions(code, voterId, options);
 }
 
-export async function addGroupQuestion(code: string, text: string) {
-  return getStore().addGroupQuestion(code, text);
+export async function addGroupQuestion(
+  code: string,
+  text: string,
+  studentName?: string,
+) {
+  return getStore().addGroupQuestion(code, text, studentName);
 }
 
 export async function upvoteGroupQuestion(id: string, voterId: string) {

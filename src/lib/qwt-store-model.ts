@@ -66,6 +66,7 @@ export type QuestionBankItem = {
 export type GroupQuestion = {
   id: string;
   sessionCode: string;
+  studentName: string;
   text: string;
   isAnswered: boolean;
   voteCount: number;
@@ -124,7 +125,11 @@ export type QwtStore = {
     voterId?: string,
     options?: { includeAnswered?: boolean },
   ): Promise<GroupQuestion[]>;
-  addGroupQuestion(code: string, text: string): Promise<GroupQuestion | null>;
+  addGroupQuestion(
+    code: string,
+    text: string,
+    studentName?: string,
+  ): Promise<GroupQuestion | null>;
   upvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
   unvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
   setGroupQuestionAnswered(

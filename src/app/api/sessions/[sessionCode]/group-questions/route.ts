@@ -30,6 +30,7 @@ export async function POST(
 ) {
   const { sessionCode } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as {
+    studentName?: string;
     text?: string;
     website?: string;
   };
@@ -39,7 +40,11 @@ export async function POST(
       return Response.json({ error: "Could not save question." }, { status: 400 });
     }
 
-    const question = await addGroupQuestion(sessionCode, body.text ?? "");
+    const question = await addGroupQuestion(
+      sessionCode,
+      body.text ?? "",
+      body.studentName,
+    );
 
     if (!question) {
       return Response.json({ error: "Session not found." }, { status: 404 });

@@ -17,7 +17,7 @@ The current slice includes:
 - typed and drawn student responses
 - optional GIF responses through GIPHY search
 - optional student display names, defaulting to Anonymous
-- student group questions with shared upvoting and teacher answered/re-show controls
+- student group questions with shared upvoting, teacher-visible asker names, and teacher answered/re-show controls
 - teacher-facing submission cards
 - recent-submission filtering
 - star, flag, and hide controls
@@ -104,6 +104,9 @@ If you already ran the schema before group questions were added, run
 
 If you already ran the group-question migration before answered questions were
 added, run `supabase/add-group-question-answered.sql` in the Supabase SQL editor.
+
+If you already ran the group-question migration before asker names were added,
+run `supabase/add-group-question-student-name.sql` in the Supabase SQL editor.
 
 ## Sessions
 
