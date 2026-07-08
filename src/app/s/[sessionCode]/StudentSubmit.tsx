@@ -236,7 +236,7 @@ export function StudentSubmit({
             disabled={isSaving || !sessionIsOpen || !hasSubmissionContent}
             type="submit"
           >
-            {isSaving ? "Submitting..." : "Submit writing"}
+            {isSaving ? "Submitting..." : "Submit"}
           </button>
         </div>
         <label className="mt-4 flex gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
