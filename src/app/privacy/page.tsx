@@ -11,22 +11,24 @@ export default function PrivacyPage() {
           Quick Write Tool prototype
         </h1>
         <p className="mt-4 leading-7 text-slate-700">
-          This prototype collects short pieces of student writing, optional
-          drawings, optional GIF selections, and an optional display name so
-          teaching staff can understand what the class is thinking during a
-          learning activity. Students can leave the name field blank and submit
-          as Anonymous.
+          This prototype collects short pieces of student writing, group
+          questions, optional drawings, optional GIF selections, and an optional
+          display name so teaching staff can understand what the class is
+          thinking during a learning activity. Students can leave the name field
+          blank and submit as Anonymous.
         </p>
 
         <section className="mt-6 space-y-5 text-sm leading-6 text-slate-700">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">What is collected</h2>
             <p className="mt-2">
-              We store the writing or drawing you submit, the session code, an
-              optional selected GIF, the session code, an optional display
-              name, a timestamp, and teacher moderation markers such as
-              starred, flagged, or hidden. The prototype may also create
-              ordinary technical logs through its hosting provider.
+              We store the writing, drawing, or group question you submit, the
+              session code, an optional selected GIF, an optional display name,
+              timestamps, anonymous browser vote markers for group-question
+              upvotes, answered markers for group questions, and teacher
+              moderation markers such as starred, flagged, or hidden. The
+              prototype may also create ordinary technical logs through its
+              hosting provider.
             </p>
           </div>
 
@@ -36,7 +38,7 @@ export default function PrivacyPage() {
               The student form does not ask for your student ID, email address,
               or login details. Please avoid including student IDs or sensitive
               identifying information about yourself or other people in your
-              response, drawing, or GIF search terms.
+              response, drawing, group question, or GIF search terms.
             </p>
           </div>
 
@@ -53,9 +55,10 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Who can see responses</h2>
             <p className="mt-2">
-              Teaching staff with the teacher PIN can see submitted responses.
-              A teacher may choose to discuss or display selected responses
-              during class.
+              Teaching staff with the teacher PIN can see submitted responses
+              and group questions. Students in the same session can see and
+              upvote group questions. A teacher may choose to discuss or display
+              selected responses or questions during class.
             </p>
           </div>
 
@@ -82,9 +85,9 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-950">No AI processing</h2>
             <p className="mt-2">
-              This version does not send writing, drawings, or GIF selections
-              to an AI service. If AI feedback is added later, this notice
-              should be updated before it is used with students.
+              This version does not send writing, drawings, group questions, or
+              GIF selections to an AI service. If AI feedback is added later,
+              this notice should be updated before it is used with students.
             </p>
           </div>
         </section>

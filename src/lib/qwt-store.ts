@@ -15,6 +15,7 @@ export type {
   DrawingPoint,
   DrawingStroke,
   GifData,
+  GroupQuestion,
   QuestionBankItem,
   Session,
   SessionPatch,
@@ -93,4 +94,28 @@ export async function addQuestionToBank(code: string, text: string, title?: stri
 
 export async function deleteQuestionFromBank(id: string) {
   return getStore().deleteQuestionFromBank(id);
+}
+
+export async function listGroupQuestions(
+  code: string,
+  voterId?: string,
+  options: { includeAnswered?: boolean } = {},
+) {
+  return getStore().listGroupQuestions(code, voterId, options);
+}
+
+export async function addGroupQuestion(code: string, text: string) {
+  return getStore().addGroupQuestion(code, text);
+}
+
+export async function upvoteGroupQuestion(id: string, voterId: string) {
+  return getStore().upvoteGroupQuestion(id, voterId);
+}
+
+export async function unvoteGroupQuestion(id: string, voterId: string) {
+  return getStore().unvoteGroupQuestion(id, voterId);
+}
+
+export async function setGroupQuestionAnswered(id: string, isAnswered: boolean) {
+  return getStore().setGroupQuestionAnswered(id, isAnswered);
 }

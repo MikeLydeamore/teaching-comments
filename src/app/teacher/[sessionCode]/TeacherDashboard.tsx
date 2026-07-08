@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
+import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
@@ -992,6 +993,10 @@ export function TeacherDashboard({
                 {showResultsChart ? "Hide results" : "Visualise results"}
               </button>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <GroupQuestionsPanel sessionCode={session.code} variant="teacher" />
           </div>
 
           {showResultsChart ? (

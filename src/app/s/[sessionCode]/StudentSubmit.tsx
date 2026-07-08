@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
+import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import type { DrawingData, GifData } from "@/lib/qwt-store";
 
@@ -180,6 +181,8 @@ export function StudentSubmit({
           </p>
         ) : null}
       </section>
+
+      <GroupQuestionsPanel canAsk={sessionIsOpen} sessionCode={sessionCode} />
 
       <form className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
         <label className="text-sm font-semibold text-slate-700" htmlFor="student-name">

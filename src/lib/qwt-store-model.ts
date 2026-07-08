@@ -63,6 +63,17 @@ export type QuestionBankItem = {
   updatedAt: string;
 };
 
+export type GroupQuestion = {
+  id: string;
+  sessionCode: string;
+  text: string;
+  isAnswered: boolean;
+  voteCount: number;
+  hasVoted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SubmissionPatch = Partial<
   Pick<Submission, "text" | "status" | "starred" | "flagged">
 >;
@@ -108,6 +119,18 @@ export type QwtStore = {
     title?: string,
   ): Promise<QuestionBankItem | null>;
   deleteQuestionFromBank(id: string): Promise<boolean>;
+  listGroupQuestions(
+    code: string,
+    voterId?: string,
+    options?: { includeAnswered?: boolean },
+  ): Promise<GroupQuestion[]>;
+  addGroupQuestion(code: string, text: string): Promise<GroupQuestion | null>;
+  upvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
+  unvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
+  setGroupQuestionAnswered(
+    id: string,
+    isAnswered: boolean,
+  ): Promise<GroupQuestion | null>;
 };
 
 export const DEFAULT_PROMPT =
@@ -347,6 +370,30 @@ export function validateQuestionTitle(title: string | undefined, fallbackText: s
 
   if (trimmed.length > 1200) {
     throw new Error("Question title must be 1200 characters or fewer.");
+  }
+
+  return trimmed;
+}
+
+export function validateGroupQuestionText(text: string) {
+  const trimmed = text.trim();
+
+  if (trimmed.length < 5) {
+    throw new Error("Question must be at least 5 characters.");
+  }
+
+  if (trimmed.length > 500) {
+    throw new Error("Question must be 500 characters or fewer.");
+  }
+
+  return trimmed;
+}
+
+export function validateGroupQuestionVoterId(voterId: string) {
+  const trimmed = voterId.trim();
+
+  if (!/^[a-zA-Z0-9_-]{8,120}$/.test(trimmed)) {
+    throw new Error("Vote could not be saved.");
   }
 
   return trimmed;

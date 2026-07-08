@@ -8,11 +8,14 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
+  validateGroupQuestionText,
+  validateGroupQuestionVoterId,
   validateQuestionTitle,
   validateQuestionText,
   validateSubmissionContent,
   type DrawingData,
   type GifData,
+  type GroupQuestion,
   type QuestionBankItem,
   type QwtStore,
   type Session,
@@ -52,6 +55,21 @@ type SupabaseQuestionBankRow = {
   text: string;
   created_at: string;
   updated_at: string;
+};
+
+type SupabaseGroupQuestionRow = {
+  id: string;
+  session_code: string;
+  text: string;
+  is_answered: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupabaseGroupQuestionVoteRow = {
+  question_id: string;
+  voter_id: string;
+  created_at: string;
 };
 
 class SupabaseStoreError extends Error {
@@ -128,6 +146,14 @@ function questionBankSelect() {
   return "id,session_code,title,text,created_at,updated_at";
 }
 
+function groupQuestionSelect() {
+  return "id,session_code,text,is_answered,created_at,updated_at";
+}
+
+function groupQuestionVoteSelect() {
+  return "question_id,voter_id,created_at";
+}
+
 function sessionFromRow(row: SupabaseSessionRow): Session {
   return {
     code: row.code,
@@ -169,6 +195,27 @@ function questionBankItemFromRow(row: SupabaseQuestionBankRow): QuestionBankItem
   };
 }
 
+function groupQuestionFromRow(
+  row: SupabaseGroupQuestionRow,
+  votes: SupabaseGroupQuestionVoteRow[],
+  voterId = "",
+): GroupQuestion {
+  const questionVotes = votes.filter((vote) => vote.question_id === row.id);
+
+  return {
+    id: row.id,
+    sessionCode: row.session_code,
+    text: row.text,
+    isAnswered: row.is_answered,
+    voteCount: questionVotes.length,
+    hasVoted: voterId
+      ? questionVotes.some((vote) => vote.voter_id === voterId)
+      : false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 async function getSessionFromSupabase(code: string) {
   const sessionCode = normalizeSessionCode(code);
 
@@ -181,6 +228,30 @@ async function getSessionFromSupabase(code: string) {
   );
 
   return rows[0] ? sessionFromRow(rows[0]) : null;
+}
+
+async function listVotesForQuestionIds(questionIds: string[]) {
+  if (!questionIds.length) {
+    return [];
+  }
+
+  return supabaseFetch<SupabaseGroupQuestionVoteRow[]>(
+    `/qwt_group_question_votes?question_id=in.(${questionIds.join(",")})&select=${groupQuestionVoteSelect()}`,
+  );
+}
+
+async function getGroupQuestionFromSupabase(id: string, voterId = "") {
+  const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
+    `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&select=${groupQuestionSelect()}&limit=1`,
+  );
+  const question = rows[0];
+
+  if (!question) {
+    return null;
+  }
+
+  const votes = await listVotesForQuestionIds([question.id]);
+  return groupQuestionFromRow(question, votes, voterId);
 }
 
 export const supabaseStore: QwtStore = {
@@ -432,5 +503,127 @@ export const supabaseStore: QwtStore = {
     );
 
     return rows.length > 0;
+  },
+
+  async listGroupQuestions(code, voterId, options = {}) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const normalizedVoterId = voterId ? validateGroupQuestionVoterId(voterId) : "";
+    const answeredFilter = options.includeAnswered ? "" : "&is_answered=eq.false";
+    const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
+      `/qwt_group_questions?session_code=eq.${encodeFilterValue(sessionCode)}${answeredFilter}&select=${groupQuestionSelect()}&order=created_at.desc`,
+    );
+    const votes = await listVotesForQuestionIds(rows.map((question) => question.id));
+
+    return rows
+      .map((question) => groupQuestionFromRow(question, votes, normalizedVoterId))
+      .sort(
+        (a, b) =>
+          Number(a.isAnswered) - Number(b.isAnswered) ||
+          b.voteCount - a.voteCount ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  },
+
+  async addGroupQuestion(code, text) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    if (!session.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
+      `/qwt_group_questions?select=${groupQuestionSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          session_code: session.code,
+          text: validateGroupQuestionText(text),
+          is_answered: false,
+          created_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
+  },
+
+  async upvoteGroupQuestion(id, voterId) {
+    const normalizedVoterId = validateGroupQuestionVoterId(voterId);
+    const currentQuestion = await getGroupQuestionFromSupabase(id, normalizedVoterId);
+
+    if (!currentQuestion) {
+      return null;
+    }
+
+    if (currentQuestion.hasVoted) {
+      return currentQuestion;
+    }
+
+    await supabaseFetch<SupabaseGroupQuestionVoteRow[]>(
+      `/qwt_group_question_votes?select=${groupQuestionVoteSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          question_id: id,
+          voter_id: normalizedVoterId,
+        }),
+        prefer: "return=representation",
+      },
+    ).catch((error) => {
+      if (error instanceof SupabaseStoreError && error.status === 409) {
+        return [];
+      }
+
+      throw error;
+    });
+
+    return getGroupQuestionFromSupabase(id, normalizedVoterId);
+  },
+
+  async unvoteGroupQuestion(id, voterId) {
+    const normalizedVoterId = validateGroupQuestionVoterId(voterId);
+    const currentQuestion = await getGroupQuestionFromSupabase(id, normalizedVoterId);
+
+    if (!currentQuestion) {
+      return null;
+    }
+
+    if (!currentQuestion.hasVoted) {
+      return currentQuestion;
+    }
+
+    await supabaseFetch<SupabaseGroupQuestionVoteRow[]>(
+      `/qwt_group_question_votes?question_id=eq.${encodeFilterValue(id)}&voter_id=eq.${encodeFilterValue(normalizedVoterId)}&select=${groupQuestionVoteSelect()}`,
+      {
+        method: "DELETE",
+        prefer: "return=representation",
+      },
+    );
+
+    return getGroupQuestionFromSupabase(id, normalizedVoterId);
+  },
+
+  async setGroupQuestionAnswered(id, isAnswered) {
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
+      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&select=${groupQuestionSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          is_answered: isAnswered,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
   },
 };

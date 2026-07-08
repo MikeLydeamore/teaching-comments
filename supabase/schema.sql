@@ -20,6 +20,22 @@ create table if not exists public.qwt_question_bank (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.qwt_group_questions (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  text text not null check (char_length(text) between 5 and 500),
+  is_answered boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.qwt_group_question_votes (
+  question_id uuid not null references public.qwt_group_questions(id) on delete cascade,
+  voter_id text not null check (char_length(voter_id) between 8 and 120),
+  created_at timestamptz not null default now(),
+  primary key (question_id, voter_id)
+);
+
 create table if not exists public.qwt_submissions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
@@ -50,9 +66,20 @@ create index if not exists qwt_submissions_session_status_idx
 create index if not exists qwt_question_bank_session_title_idx
   on public.qwt_question_bank (session_code, title);
 
+create index if not exists qwt_group_questions_session_created_idx
+  on public.qwt_group_questions (session_code, created_at desc);
+
+create index if not exists qwt_group_questions_session_answered_created_idx
+  on public.qwt_group_questions (session_code, is_answered, created_at desc);
+
+create index if not exists qwt_group_question_votes_voter_idx
+  on public.qwt_group_question_votes (voter_id);
+
 alter table public.qwt_sessions enable row level security;
 alter table public.qwt_submissions enable row level security;
 alter table public.qwt_question_bank enable row level security;
+alter table public.qwt_group_questions enable row level security;
+alter table public.qwt_group_question_votes enable row level security;
 
 insert into public.qwt_sessions (code, title, prompt, is_open)
 values (

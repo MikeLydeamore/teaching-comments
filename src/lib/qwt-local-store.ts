@@ -11,9 +11,12 @@ import {
   normalizeSubmissionPatch,
   now,
   titleFromCode,
+  validateGroupQuestionText,
+  validateGroupQuestionVoterId,
   validateQuestionTitle,
   validateSubmissionContent,
   validateQuestionText,
+  type GroupQuestion,
   type QuestionBankItem,
   type QwtStore,
   type Session,
@@ -21,9 +24,14 @@ import {
 } from "./qwt-store-model";
 
 type StoreData = {
+  groupQuestions: StoredGroupQuestion[];
   questionBank: QuestionBankItem[];
   sessions: Session[];
   submissions: Submission[];
+};
+
+type StoredGroupQuestion = Omit<GroupQuestion, "hasVoted" | "voteCount"> & {
+  voterIds: string[];
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
@@ -33,6 +41,7 @@ function defaultStore(): StoreData {
   const createdAt = now();
 
   return {
+    groupQuestions: [],
     questionBank: [],
     sessions: [
       {
@@ -96,6 +105,12 @@ async function readStore(): Promise<StoreData> {
 
   return {
     ...data,
+    groupQuestions: (data.groupQuestions ?? []).map((question) => ({
+      ...question,
+      isAnswered: question.isAnswered ?? false,
+      updatedAt: question.updatedAt ?? question.createdAt,
+      voterIds: question.voterIds ?? [],
+    })),
     questionBank: (data.questionBank ?? []).map((question) => ({
       ...question,
       title: question.title ?? question.text,
@@ -308,5 +323,158 @@ export const localStore: QwtStore = {
     data.questionBank = nextQuestionBank;
     await writeStore(data);
     return true;
+  },
+
+  async listGroupQuestions(code, voterId, options = {}) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const normalizedVoterId = voterId ? validateGroupQuestionVoterId(voterId) : "";
+    const data = await readStore();
+
+    return data.groupQuestions
+      .filter((question) => question.sessionCode === sessionCode)
+      .filter((question) => options.includeAnswered || !question.isAnswered)
+      .map((question) => ({
+        id: question.id,
+        sessionCode: question.sessionCode,
+        text: question.text,
+        isAnswered: question.isAnswered,
+        voteCount: question.voterIds.length,
+        hasVoted: normalizedVoterId
+          ? question.voterIds.includes(normalizedVoterId)
+          : false,
+        createdAt: question.createdAt,
+        updatedAt: question.updatedAt,
+      }))
+      .sort(
+        (a, b) =>
+          Number(a.isAnswered) - Number(b.isAnswered) ||
+          b.voteCount - a.voteCount ||
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  },
+
+  async addGroupQuestion(code, text) {
+    const session = await this.getSession(code);
+
+    if (!session) {
+      return null;
+    }
+
+    if (!session.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
+    const data = await readStore();
+    const timestamp = now();
+    const question: StoredGroupQuestion = {
+      id: randomUUID(),
+      sessionCode: session.code,
+      text: validateGroupQuestionText(text),
+      isAnswered: false,
+      voterIds: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    data.groupQuestions.push(question);
+    await writeStore(data);
+
+    return {
+      ...question,
+      hasVoted: false,
+      voteCount: 0,
+    };
+  },
+
+  async upvoteGroupQuestion(id, voterId) {
+    const normalizedVoterId = validateGroupQuestionVoterId(voterId);
+    const data = await readStore();
+    const index = data.groupQuestions.findIndex((question) => question.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const question = data.groupQuestions[index];
+
+    if (!question.voterIds.includes(normalizedVoterId)) {
+      question.voterIds.push(normalizedVoterId);
+      question.updatedAt = now();
+      data.groupQuestions[index] = question;
+      await writeStore(data);
+    }
+
+    return {
+      id: question.id,
+      sessionCode: question.sessionCode,
+      text: question.text,
+      isAnswered: question.isAnswered,
+      voteCount: question.voterIds.length,
+      hasVoted: true,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
+  },
+
+  async unvoteGroupQuestion(id, voterId) {
+    const normalizedVoterId = validateGroupQuestionVoterId(voterId);
+    const data = await readStore();
+    const index = data.groupQuestions.findIndex((question) => question.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const question = data.groupQuestions[index];
+    const nextVoterIds = question.voterIds.filter(
+      (storedVoterId) => storedVoterId !== normalizedVoterId,
+    );
+
+    if (nextVoterIds.length !== question.voterIds.length) {
+      question.voterIds = nextVoterIds;
+      question.updatedAt = now();
+      data.groupQuestions[index] = question;
+      await writeStore(data);
+    }
+
+    return {
+      id: question.id,
+      sessionCode: question.sessionCode,
+      text: question.text,
+      isAnswered: question.isAnswered,
+      voteCount: question.voterIds.length,
+      hasVoted: false,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
+  },
+
+  async setGroupQuestionAnswered(id, isAnswered) {
+    const data = await readStore();
+    const index = data.groupQuestions.findIndex((question) => question.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const question = data.groupQuestions[index];
+
+    if (question.isAnswered !== isAnswered) {
+      question.isAnswered = isAnswered;
+      question.updatedAt = now();
+      data.groupQuestions[index] = question;
+      await writeStore(data);
+    }
+
+    return {
+      id: question.id,
+      sessionCode: question.sessionCode,
+      text: question.text,
+      isAnswered: question.isAnswered,
+      voteCount: question.voterIds.length,
+      hasVoted: false,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
   },
 };
