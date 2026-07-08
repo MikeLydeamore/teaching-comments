@@ -16,6 +16,8 @@ export async function GET(
       code: session.code,
       isOpen: session.isOpen,
       prompt: session.prompt,
+      timerDurationSeconds: session.timerDurationSeconds,
+      timerEndsAt: session.timerEndsAt,
     },
   });
 }

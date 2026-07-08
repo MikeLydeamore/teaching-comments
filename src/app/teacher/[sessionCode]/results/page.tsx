@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
-import { responseCounts } from "@/lib/poll-results";
+import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { getOrCreateSession, listSubmissions } from "@/lib/qwt-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
@@ -17,8 +17,18 @@ function parseMinutes(value: string | undefined) {
 }
 
 function parseChartType(value: string | undefined): ChartType {
-  return value === "pie" ? "pie" : "column";
+  if (value === "pie" || value === "wordCloud") {
+    return value;
+  }
+
+  return "column";
 }
+
+const chartTypeOptions: { label: string; value: ChartType }[] = [
+  { label: "Column", value: "column" },
+  { label: "Pie", value: "pie" },
+  { label: "Word cloud", value: "wordCloud" },
+];
 
 export default async function TeacherResultsPage({
   params,
@@ -66,7 +76,10 @@ export default async function TeacherResultsPage({
   const displayedSubmissions = starredOnly
     ? submissions.filter((submission) => submission.starred)
     : submissions;
-  const results = responseCounts(displayedSubmissions);
+  const results =
+    chartType === "wordCloud"
+      ? responseWordCounts(displayedSubmissions)
+      : responseCounts(displayedSubmissions);
   const total = results.reduce((sum, [, count]) => sum + count, 0);
   const maxCount = Math.max(1, ...results.map(([, count]) => count));
 
@@ -88,27 +101,27 @@ export default async function TeacherResultsPage({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex rounded-md border border-slate-300 bg-slate-50 p-1">
-            {(["column", "pie"] as const).map((type) => {
+            {chartTypeOptions.map((option) => {
               const typeSearch = new URLSearchParams(search);
-              typeSearch.set("chartType", type);
+              typeSearch.set("chartType", option.value);
 
               return (
                 <Link
                   className={`rounded px-4 py-2 text-base font-semibold transition ${
-                    chartType === type
+                    chartType === option.value
                       ? "bg-white text-slate-950 shadow-sm"
                       : "text-slate-600 hover:text-teal-800"
                   }`}
                   href={`/teacher/${session.code}/results?${typeSearch.toString()}`}
-                  key={type}
+                  key={option.value}
                 >
-                  {type === "column" ? "Column" : "Pie"}
+                  {option.label}
                 </Link>
               );
             })}
           </div>
           <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
-            {total} typed
+            {total} {chartType === "wordCloud" ? "words" : "typed"}
           </p>
           <Link
             className="rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"

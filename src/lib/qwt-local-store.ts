@@ -37,6 +37,8 @@ function defaultStore(): StoreData {
         isOpen: true,
         createdAt,
         promptUpdatedAt: createdAt,
+        timerDurationSeconds: 0,
+        timerEndsAt: null,
       },
     ],
     submissions: [
@@ -90,6 +92,8 @@ async function readStore(): Promise<StoreData> {
     sessions: data.sessions.map((session) => ({
       ...session,
       promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
+      timerDurationSeconds: session.timerDurationSeconds ?? 0,
+      timerEndsAt: session.timerEndsAt ?? null,
     })),
     submissions: data.submissions.map((submission) => ({
       ...submission,
@@ -133,6 +137,8 @@ export const localStore: QwtStore = {
       isOpen: true,
       createdAt: timestamp,
       promptUpdatedAt: timestamp,
+      timerDurationSeconds: 0,
+      timerEndsAt: null,
     };
 
     data.sessions.push(session);

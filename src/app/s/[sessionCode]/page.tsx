@@ -41,6 +41,8 @@ export default async function StudentPage({
       initialStudentName={studentName}
       prompt={session.prompt}
       sessionCode={session.code}
+      timerDurationSeconds={session.timerDurationSeconds}
+      timerEndsAt={session.timerEndsAt}
     />
   );
 }

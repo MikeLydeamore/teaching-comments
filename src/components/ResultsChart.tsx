@@ -1,6 +1,6 @@
 import type { PollResult } from "@/lib/poll-results";
 
-export type ChartType = "column" | "pie";
+export type ChartType = "column" | "pie" | "wordCloud";
 
 type ResultsChartProps = {
   chartType?: ChartType;
@@ -34,13 +34,19 @@ export function ResultsChart({
   if (!results.length) {
     return (
       <p className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
-        No typed responses in the current view.
+        {chartType === "wordCloud"
+          ? "No countable words in the current view."
+          : "No typed responses in the current view."}
       </p>
     );
   }
 
   if (chartType === "pie") {
     return <PieChart results={results} total={total} variant={variant} />;
+  }
+
+  if (chartType === "wordCloud") {
+    return <WordCloud results={results} variant={variant} />;
   }
 
   return (
@@ -91,6 +97,45 @@ export function ResultsChart({
               {percentage}%
             </p>
           </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WordCloud({
+  results,
+  variant = "inline",
+}: Pick<ResultsChartProps, "results" | "variant">) {
+  const isScreen = variant === "screen";
+  const isLarge = variant === "large" || isScreen;
+  const maxCount = Math.max(...results.map(([, count]) => count));
+  const minSize = isScreen ? 24 : isLarge ? 18 : 14;
+  const maxSize = isScreen ? 72 : isLarge ? 48 : 34;
+
+  return (
+    <div
+      aria-label="Word cloud"
+      className={`mt-5 flex flex-wrap items-center justify-center rounded-md border border-slate-200 bg-slate-50 ${
+        isScreen ? "min-h-96 gap-x-8 gap-y-5 p-8" : "min-h-56 gap-x-5 gap-y-3 p-5"
+      }`}
+      role="img"
+    >
+      {results.map(([word, count], index) => {
+        const size = minSize + (count / maxCount) * (maxSize - minSize);
+
+        return (
+          <span
+            className="font-semibold leading-none"
+            key={word}
+            style={{
+              color: chartColors[index % chartColors.length],
+              fontSize: `${size}px`,
+            }}
+            title={`${word}: ${count}`}
+          >
+            {word}
+          </span>
         );
       })}
     </div>

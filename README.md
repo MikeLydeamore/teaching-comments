@@ -10,6 +10,7 @@ The current slice includes:
 - a teacher session selector at `/teacher`
 - a prototype teacher PIN gate
 - in-session prompt editing from the teacher dashboard
+- teacher-controlled countdown timer shown to students
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
 - typed and drawn student responses
@@ -21,6 +22,7 @@ The current slice includes:
 - newest/oldest sorting and drag-and-drop card ordering in the teacher dashboard
 - simple word-frequency summary
 - column and pie charts for short poll-style responses
+- word cloud charts for common words in typed responses
 - response-time plotting from the latest prompt update
 - local JSON storage for development
 - optional Supabase storage for hosting
@@ -75,6 +77,9 @@ If you already ran the schema before response-time plotting was added, run
 
 If you already ran the schema before student display names were added, run
 `supabase/add-student-name.sql` in the Supabase SQL editor.
+
+If you already ran the schema before the classroom timer was added, run
+`supabase/add-session-timer.sql` in the Supabase SQL editor.
 
 ## Sessions
 

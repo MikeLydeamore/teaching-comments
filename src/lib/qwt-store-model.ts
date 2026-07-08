@@ -25,6 +25,8 @@ export type Session = {
   isOpen: boolean;
   createdAt: string;
   promptUpdatedAt: string;
+  timerDurationSeconds: number;
+  timerEndsAt: string | null;
 };
 
 export type Submission = {
@@ -45,7 +47,12 @@ export type SubmissionPatch = Partial<
   Pick<Submission, "text" | "status" | "starred" | "flagged">
 >;
 
-export type SessionPatch = Partial<Pick<Session, "prompt" | "title" | "isOpen">>;
+export type SessionPatch = Partial<
+  Pick<
+    Session,
+    "prompt" | "title" | "isOpen" | "timerDurationSeconds" | "timerEndsAt"
+  >
+>;
 
 export type SessionStats = {
   total: number;
@@ -255,12 +262,47 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
     throw new Error("Prompt must be 1200 characters or fewer.");
   }
 
+  let nextTimerDurationSeconds = current.timerDurationSeconds;
+  let nextTimerEndsAt = current.timerEndsAt;
+
+  if (typeof patch.timerDurationSeconds === "number") {
+    if (
+      !Number.isFinite(patch.timerDurationSeconds) ||
+      patch.timerDurationSeconds < 0 ||
+      patch.timerDurationSeconds > 3600
+    ) {
+      throw new Error("Timer must be between 0 and 3600 seconds.");
+    }
+
+    nextTimerDurationSeconds = Math.round(patch.timerDurationSeconds);
+  }
+
+  if ("timerEndsAt" in patch) {
+    if (patch.timerEndsAt === null || patch.timerEndsAt === undefined) {
+      nextTimerEndsAt = null;
+    } else {
+      const timerDate = new Date(patch.timerEndsAt);
+
+      if (!Number.isFinite(timerDate.getTime())) {
+        throw new Error("Timer end time could not be read.");
+      }
+
+      nextTimerEndsAt = timerDate.toISOString();
+    }
+  }
+
+  if (!nextTimerEndsAt) {
+    nextTimerDurationSeconds = 0;
+  }
+
   return {
     ...current,
     prompt: nextPrompt,
     promptUpdatedAt: promptChanged ? now() : current.promptUpdatedAt,
     title: nextTitle || current.title,
     isOpen: typeof patch.isOpen === "boolean" ? patch.isOpen : current.isOpen,
+    timerDurationSeconds: nextTimerDurationSeconds,
+    timerEndsAt: nextTimerEndsAt,
   };
 }
 

@@ -3,12 +3,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DrawingPad } from "@/components/DrawingPad";
+import { SessionTimer } from "@/components/SessionTimer";
 import type { DrawingData } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
   initialStudentName: string;
   sessionCode: string;
   prompt: string;
+  timerDurationSeconds: number;
+  timerEndsAt: string | null;
 };
 
 type SavedSubmission = {
@@ -22,10 +25,15 @@ export function StudentSubmit({
   initialStudentName,
   sessionCode,
   prompt,
+  timerDurationSeconds,
+  timerEndsAt,
 }: StudentSubmitProps) {
   const [currentPrompt, setCurrentPrompt] = useState(prompt);
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
   const [promptUpdatedAt, setPromptUpdatedAt] = useState<Date | null>(null);
+  const [currentTimerEndsAt, setCurrentTimerEndsAt] = useState(timerEndsAt);
+  const [currentTimerDurationSeconds, setCurrentTimerDurationSeconds] =
+    useState(timerDurationSeconds);
   const [studentName, setStudentName] = useState(initialStudentName);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
@@ -49,6 +57,8 @@ export function StudentSubmit({
     const payload = await response.json();
     const nextPrompt = payload.session?.prompt;
     const nextIsOpen = payload.session?.isOpen;
+    const nextTimerEndsAt = payload.session?.timerEndsAt;
+    const nextTimerDurationSeconds = payload.session?.timerDurationSeconds;
 
     if (typeof nextPrompt === "string") {
       setCurrentPrompt((previousPrompt) => {
@@ -62,6 +72,12 @@ export function StudentSubmit({
 
     if (typeof nextIsOpen === "boolean") {
       setSessionIsOpen(nextIsOpen);
+    }
+
+    setCurrentTimerEndsAt(typeof nextTimerEndsAt === "string" ? nextTimerEndsAt : null);
+
+    if (typeof nextTimerDurationSeconds === "number") {
+      setCurrentTimerDurationSeconds(nextTimerDurationSeconds);
     }
   }, [sessionCode]);
 
@@ -128,17 +144,29 @@ export function StudentSubmit({
       </div>
 
       <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-500">Prompt</p>
-          {promptUpdatedAt ? (
-            <p className="rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-800">
-              Updated {promptUpdatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-500">Updates automatically</p>
-          )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Prompt</p>
+            {promptUpdatedAt ? (
+              <p className="mt-1 rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-800">
+                Updated {promptUpdatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-slate-500">Updates automatically</p>
+            )}
+          </div>
+          <SessionTimer
+            idleText="No active timer"
+            timerEndsAt={currentTimerEndsAt}
+            variant="student"
+          />
         </div>
         <p className="mt-2 text-lg leading-7 text-slate-900">{currentPrompt}</p>
+        {currentTimerDurationSeconds > 0 ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Timer length: {currentTimerDurationSeconds}s
+          </p>
+        ) : null}
         {!sessionIsOpen ? (
           <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
             This session is closed. You can still read the prompt, but new

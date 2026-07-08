@@ -5,7 +5,8 @@ import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
-import { responseCounts } from "@/lib/poll-results";
+import { SessionTimer } from "@/components/SessionTimer";
+import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import type { DrawingData } from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
@@ -14,6 +15,8 @@ type Session = {
   title: string;
   prompt: string;
   promptUpdatedAt: string;
+  timerDurationSeconds: number;
+  timerEndsAt: string | null;
 };
 
 type Submission = {
@@ -44,34 +47,18 @@ type TeacherDashboardProps = {
 
 type SubmissionSortOrder = "newest" | "oldest";
 
-const stopWords = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "as",
-  "be",
-  "for",
-  "in",
-  "is",
-  "it",
-  "no",
-  "not",
-  "of",
-  "or",
-  "so",
-  "that",
-  "the",
-  "there",
-  "this",
-  "to",
-  "with",
-]);
-
 const submissionSortOptions: { label: string; value: SubmissionSortOrder }[] = [
   { label: "Newest first", value: "newest" },
   { label: "Oldest first", value: "oldest" },
 ];
+
+const chartTypeOptions: { label: string; value: ChartType }[] = [
+  { label: "Column", value: "column" },
+  { label: "Pie", value: "pie" },
+  { label: "Word cloud", value: "wordCloud" },
+];
+
+const timerQuickBlocks = [5, 15, 30];
 
 function minutesAgo(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -152,22 +139,6 @@ function FlagIcon({ isActive }: { isActive: boolean }) {
   );
 }
 
-function topWords(submissions: Submission[]) {
-  const counts = new Map<string, number>();
-
-  for (const submission of submissions) {
-    for (const word of submission.text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? []) {
-      if (!stopWords.has(word)) {
-        counts.set(word, (counts.get(word) ?? 0) + 1);
-      }
-    }
-  }
-
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
-}
-
 function shouldSkipCardDrag(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
@@ -177,6 +148,14 @@ function shouldSkipCardDrag(target: EventTarget | null) {
       ),
     )
   );
+}
+
+function clampTimerSeconds(seconds: number) {
+  if (!Number.isFinite(seconds)) {
+    return 30;
+  }
+
+  return Math.min(3600, Math.max(1, Math.round(seconds)));
 }
 
 async function writeTextToClipboard(text: string) {
@@ -279,6 +258,8 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showResultsChart, setShowResultsChart] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
+  const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
+  const [timerStatus, setTimerStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -331,6 +312,36 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
     setPromptDraft(payload.session.prompt);
     setStats(payload.stats ?? stats);
     setPromptStatus("Prompt saved.");
+  }
+
+  async function patchSession(patch: Record<string, unknown>, loadingMessage: string) {
+    setTimerStatus(loadingMessage);
+    const response = await fetch(`/api/sessions/${session.code}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      setTimerStatus(payload.error ?? "Could not update timer.");
+      return;
+    }
+
+    setSessionDetails(payload.session);
+    setStats(payload.stats ?? stats);
+    setTimerStatus("");
+  }
+
+  async function startTimer() {
+    await patchSession(
+      { timerDurationSeconds: clampTimerSeconds(timerDraftSeconds) },
+      "Starting timer...",
+    );
+  }
+
+  async function clearTimer() {
+    await patchSession({ clearTimer: true }, "Clearing timer...");
   }
 
   async function patchSubmission(id: string, patch: Partial<Submission>) {
@@ -441,14 +452,22 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
         : orderedSubmissions,
     [orderedSubmissions, starredOnly],
   );
-  const wordCounts = useMemo(() => topWords(displayedSubmissions), [displayedSubmissions]);
+  const wordCounts = useMemo(
+    () => responseWordCounts(displayedSubmissions, 8),
+    [displayedSubmissions],
+  );
   const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
   const pollResults = useMemo(
     () => responseCounts(displayedSubmissions),
     [displayedSubmissions],
   );
-  const maxPollCount = Math.max(1, ...pollResults.map(([, count]) => count));
-  const pollResponseTotal = pollResults.reduce((sum, [, count]) => sum + count, 0);
+  const wordCloudResults = useMemo(
+    () => responseWordCounts(displayedSubmissions),
+    [displayedSubmissions],
+  );
+  const chartResults = chartType === "wordCloud" ? wordCloudResults : pollResults;
+  const maxPollCount = Math.max(1, ...chartResults.map(([, count]) => count));
+  const pollResponseTotal = chartResults.reduce((sum, [, count]) => sum + count, 0);
   const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
@@ -527,6 +546,72 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
             </div>
             {promptStatus ? (
               <p className="mt-3 text-sm font-medium text-slate-600">{promptStatus}</p>
+            ) : null}
+          </section>
+
+          <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-slate-500">Timer</p>
+              <p className="text-xs text-slate-500">Shown to students</p>
+            </div>
+            <div className="mt-3">
+              <SessionTimer
+                idleText="No active timer"
+                timerEndsAt={sessionDetails.timerEndsAt}
+              />
+            </div>
+            <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="timer-seconds">
+              Seconds
+            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                id="timer-seconds"
+                className="h-10 w-24 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                min={1}
+                max={3600}
+                type="number"
+                value={timerDraftSeconds}
+                onChange={(event) =>
+                  setTimerDraftSeconds(clampTimerSeconds(Number(event.target.value)))
+                }
+              />
+              <button
+                className="h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                type="button"
+                onClick={() => {
+                  void startTimer();
+                }}
+              >
+                Start
+              </button>
+              <button
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
+                type="button"
+                onClick={() => {
+                  void clearTimer();
+                }}
+              >
+                Clear
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {timerQuickBlocks.map((seconds) => (
+                <button
+                  className="h-9 rounded-md border border-slate-300 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                  key={seconds}
+                  type="button"
+                  onClick={() =>
+                    setTimerDraftSeconds((currentSeconds) =>
+                      clampTimerSeconds(currentSeconds + seconds),
+                    )
+                  }
+                >
+                  +{seconds}s
+                </button>
+              ))}
+            </div>
+            {timerStatus ? (
+              <p className="mt-3 text-sm font-medium text-slate-600">{timerStatus}</p>
             ) : null}
           </section>
 
@@ -678,27 +763,27 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
                     aria-label="Chart type"
                     className="flex rounded-md border border-slate-300 bg-slate-50 p-1"
                   >
-                    {(["column", "pie"] as const).map((type) => (
+                    {chartTypeOptions.map((option) => (
                       <button
                         className={`h-8 rounded px-3 text-sm font-semibold transition ${
-                          chartType === type
+                          chartType === option.value
                             ? "bg-white text-slate-950 shadow-sm"
                             : "text-slate-600 hover:text-teal-800"
                         }`}
-                        key={type}
+                        key={option.value}
                         type="button"
-                        onClick={() => setChartType(type)}
+                        onClick={() => setChartType(option.value)}
                       >
-                        {type === "column" ? "Column" : "Pie"}
+                        {option.label}
                       </button>
                     ))}
                   </div>
                   <p className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
-                    {pollResponseTotal} typed
+                    {pollResponseTotal} {chartType === "wordCloud" ? "words" : "typed"}
                   </p>
                   <Link
                     className={`rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold transition hover:border-teal-500 hover:text-teal-800 ${
-                      pollResults.length
+                      chartResults.length
                         ? "text-slate-700"
                         : "pointer-events-none cursor-not-allowed text-slate-400 opacity-50"
                     }`}
@@ -713,7 +798,7 @@ export function TeacherDashboard({ session, initialStats }: TeacherDashboardProp
               <ResultsChart
                 chartType={chartType}
                 maxCount={maxPollCount}
-                results={pollResults}
+                results={chartResults}
                 total={pollResponseTotal}
               />
               <ResponseTimePlot
