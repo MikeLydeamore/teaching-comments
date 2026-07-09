@@ -50,6 +50,7 @@ export type Submission = {
   starred: boolean;
   flagged: boolean;
   version: number;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,6 +72,7 @@ export type GroupQuestion = {
   isAnswered: boolean;
   voteCount: number;
   hasVoted: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -95,6 +97,12 @@ export type SessionStats = {
   latestAt?: string;
 };
 
+export type ArchiveSessionActivityResult = {
+  archivedAt: string;
+  groupQuestions: number;
+  submissions: number;
+};
+
 export type QwtStore = {
   getSession(code: string): Promise<Session | null>;
   getOrCreateSession(code: string): Promise<Session>;
@@ -102,7 +110,7 @@ export type QwtStore = {
   updateSession(code: string, patch: SessionPatch): Promise<Session | null>;
   listSubmissions(
     code: string,
-    options?: { minutes?: number; includeHidden?: boolean },
+    options?: { minutes?: number; includeHidden?: boolean; includeArchived?: boolean },
   ): Promise<Submission[]>;
   addSubmission(
     code: string,
@@ -123,7 +131,7 @@ export type QwtStore = {
   listGroupQuestions(
     code: string,
     voterId?: string,
-    options?: { includeAnswered?: boolean },
+    options?: { includeAnswered?: boolean; includeArchived?: boolean },
   ): Promise<GroupQuestion[]>;
   addGroupQuestion(
     code: string,
@@ -136,6 +144,11 @@ export type QwtStore = {
     id: string,
     isAnswered: boolean,
   ): Promise<GroupQuestion | null>;
+  archiveSessionActivity(code: string): Promise<ArchiveSessionActivityResult | null>;
+  unarchiveSessionActivity(
+    code: string,
+    archivedAt: string,
+  ): Promise<ArchiveSessionActivityResult | null>;
 };
 
 export const DEFAULT_PROMPT =
@@ -513,14 +526,27 @@ export function normalizeSubmissionPatch(patch: SubmissionPatch) {
   return next;
 }
 
-export function calculateStats(submissions: Pick<Submission, "status" | "starred" | "flagged" | "createdAt">[]) {
+export function calculateStats(
+  submissions: Pick<
+    Submission,
+    "status" | "starred" | "flagged" | "createdAt" | "archivedAt"
+  >[],
+) {
+  const activeSubmissions = submissions.filter(
+    (submission) => !submission.archivedAt,
+  );
+
   return {
-    total: submissions.length,
-    visible: submissions.filter((submission) => submission.status === "visible").length,
-    hidden: submissions.filter((submission) => submission.status === "hidden").length,
-    starred: submissions.filter((submission) => submission.starred).length,
-    flagged: submissions.filter((submission) => submission.flagged).length,
-    latestAt: submissions
+    total: activeSubmissions.length,
+    visible: activeSubmissions.filter(
+      (submission) => submission.status === "visible",
+    ).length,
+    hidden: activeSubmissions.filter(
+      (submission) => submission.status === "hidden",
+    ).length,
+    starred: activeSubmissions.filter((submission) => submission.starred).length,
+    flagged: activeSubmissions.filter((submission) => submission.flagged).length,
+    latestAt: activeSubmissions
       .map((submission) => submission.createdAt)
       .sort()
       .at(-1),

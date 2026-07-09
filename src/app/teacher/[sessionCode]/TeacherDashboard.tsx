@@ -30,6 +30,7 @@ type Submission = {
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +42,12 @@ type Stats = {
   starred: number;
   flagged: number;
   latestAt?: string;
+};
+
+type ArchiveSummary = {
+  archivedAt: string;
+  groupQuestions: number;
+  submissions: number;
 };
 
 type TeacherDashboardProps = {
@@ -311,6 +318,7 @@ export function TeacherDashboard({
   const [stats, setStats] = useState(initialStats);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [showLiveControls, setShowLiveControls] = useState(false);
   const [showResultsChart, setShowResultsChart] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
@@ -322,6 +330,11 @@ export function TeacherDashboard({
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState("");
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState("");
+  const [lastArchive, setLastArchive] = useState<ArchiveSummary | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [isUnarchiving, setIsUnarchiving] = useState(false);
+  const [questionsPanelKey, setQuestionsPanelKey] = useState(0);
 
   const refresh = useCallback(async () => {
     const query = new URLSearchParams({
@@ -580,6 +593,81 @@ export function TeacherDashboard({
     }
 
     cancelEditingSubmission();
+  }
+
+  async function archiveRoom() {
+    const confirmed = window.confirm(
+      "Archive current responses and group questions? They will disappear from the live room but remain in CSV export.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsArchiving(true);
+    setArchiveStatus("Archiving room...");
+
+    const response = await fetch(`/api/sessions/${session.code}/archive`, {
+      method: "POST",
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    setIsArchiving(false);
+
+    if (!response.ok) {
+      setArchiveStatus(payload.error ?? "Could not archive this room.");
+      return;
+    }
+
+    const archive = payload.archive as ArchiveSummary | undefined;
+    const archivedSubmissions = archive?.submissions ?? 0;
+    const archivedQuestions = archive?.groupQuestions ?? 0;
+    const archivedTotal = archivedSubmissions + archivedQuestions;
+
+    setSubmissions([]);
+    setOrderedSubmissionIds([]);
+    setStats(payload.stats ?? stats);
+    setQuestionsPanelKey((currentKey) => currentKey + 1);
+    setLastArchive(archive && archivedTotal > 0 ? archive : null);
+    setArchiveStatus(
+      `Archived ${archivedSubmissions} response${archivedSubmissions === 1 ? "" : "s"} and ${archivedQuestions} question${archivedQuestions === 1 ? "" : "s"}.`,
+    );
+    await refresh();
+  }
+
+  async function unarchiveRoom() {
+    if (!lastArchive) {
+      return;
+    }
+
+    setIsUnarchiving(true);
+    setArchiveStatus("Restoring archive...");
+
+    const response = await fetch(`/api/sessions/${session.code}/archive`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archivedAt: lastArchive.archivedAt }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    setIsUnarchiving(false);
+
+    if (!response.ok) {
+      setArchiveStatus(payload.error ?? "Could not restore this archive.");
+      return;
+    }
+
+    const archive = payload.archive as ArchiveSummary | undefined;
+    const restoredSubmissions = archive?.submissions ?? 0;
+    const restoredQuestions = archive?.groupQuestions ?? 0;
+
+    setStats(payload.stats ?? stats);
+    setLastArchive(null);
+    setQuestionsPanelKey((currentKey) => currentKey + 1);
+    setArchiveStatus(
+      `Restored ${restoredSubmissions} response${restoredSubmissions === 1 ? "" : "s"} and ${restoredQuestions} question${restoredQuestions === 1 ? "" : "s"}.`,
+    );
+    await refresh();
   }
 
   useEffect(() => {
@@ -864,84 +952,6 @@ export function TeacherDashboard({
           </section>
 
           <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">Controls</p>
-            <label className="mt-3 block text-sm font-medium text-slate-700" htmlFor="minutes">
-              Show writings from last
-            </label>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                id="minutes"
-                className="h-10 w-20 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                min={1}
-                max={500}
-                type="number"
-                value={minutes}
-                onChange={(event) => setMinutes(Number(event.target.value))}
-              />
-              <span className="text-sm text-slate-600">minutes</span>
-              <button
-                className="ml-auto h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-                onClick={refresh}
-                type="button"
-              >
-                Refresh
-              </button>
-            </div>
-            <label className="mt-4 flex items-center gap-2 text-sm text-slate-700">
-              <input
-                checked={includeHidden}
-                className="size-4 rounded border-slate-300"
-                type="checkbox"
-                onChange={(event) => setIncludeHidden(event.target.checked)}
-              />
-              Include hidden
-            </label>
-            <div className="mt-4">
-              <p className="text-sm font-medium text-slate-700">Card order</p>
-              <div
-                aria-label="Card order"
-                className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1"
-              >
-                {submissionSortOptions.map((option) => (
-                  <button
-                    className={`h-9 rounded px-2 text-sm font-semibold transition ${
-                      submissionSortOrder === option.value
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "text-slate-600 hover:text-teal-800"
-                    }`}
-                    key={option.value}
-                    type="button"
-                    onClick={() => changeSubmissionSortOrder(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              className={`mt-4 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
-                starredOnly
-                  ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
-                  : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
-              }`}
-              type="button"
-              onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}
-            >
-              {starredOnly ? "Showing starred only" : "Show starred only"}
-            </button>
-            <a
-              className="mt-3 flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-              download
-              href={`/api/sessions/${session.code}/export`}
-            >
-              Export CSV
-            </a>
-            <p className="mt-3 text-xs text-slate-500">
-              {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : "Waiting for first refresh"}
-            </p>
-          </section>
-
-          <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">Session totals</p>
             <dl className="mt-3 grid grid-cols-2 gap-3">
               {[
@@ -1002,8 +1012,178 @@ export function TeacherDashboard({
             </div>
           </div>
 
+          <section className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm">
+            <button
+              aria-controls="teacher-room-controls"
+              aria-expanded={showLiveControls}
+              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50"
+              type="button"
+              onClick={() => setShowLiveControls((isShown) => !isShown)}
+            >
+              <div>
+                <p className="text-sm font-semibold text-slate-950">
+                  Room controls
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {lastRefresh
+                    ? `Updated ${lastRefresh.toLocaleTimeString()}`
+                    : "Waiting for first refresh"}
+                </p>
+              </div>
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                {showLiveControls ? "Hide" : "Show"}
+                <svg
+                  aria-hidden="true"
+                  className={`size-4 transition ${
+                    showLiveControls ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </span>
+            </button>
+            {showLiveControls ? (
+              <div
+                className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-4"
+                id="teacher-room-controls"
+              >
+                <div>
+                  <label
+                    className="block text-sm font-medium text-slate-700"
+                    htmlFor="minutes"
+                  >
+                    Show writings from last
+                  </label>
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      className="h-10 w-20 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                      id="minutes"
+                      max={500}
+                      min={1}
+                      type="number"
+                      value={minutes}
+                      onChange={(event) => setMinutes(Number(event.target.value))}
+                    />
+                    <span className="text-sm text-slate-600">minutes</span>
+                    <button
+                      className="ml-auto h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                      type="button"
+                      onClick={refresh}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      checked={includeHidden}
+                      className="size-4 rounded border-slate-300"
+                      type="checkbox"
+                      onChange={(event) => setIncludeHidden(event.target.checked)}
+                    />
+                    Include hidden
+                  </label>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Card order</p>
+                  <div
+                    aria-label="Card order"
+                    className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1"
+                  >
+                    {submissionSortOptions.map((option) => (
+                      <button
+                        className={`h-9 rounded px-2 text-sm font-semibold transition ${
+                          submissionSortOrder === option.value
+                            ? "bg-white text-slate-950 shadow-sm"
+                            : "text-slate-600 hover:text-teal-800"
+                        }`}
+                        key={option.value}
+                        type="button"
+                        onClick={() => changeSubmissionSortOrder(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className={`mt-3 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
+                      starredOnly
+                        ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
+                        : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
+                    }`}
+                    type="button"
+                    onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}
+                  >
+                    {starredOnly ? "Showing starred only" : "Show starred only"}
+                  </button>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Data</p>
+                  <div className="mt-2 space-y-3">
+                    <a
+                      className="flex h-[46px] w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                      download
+                      href={`/api/sessions/${session.code}/export`}
+                    >
+                      Export CSV
+                    </a>
+                    <button
+                      className="h-10 w-full rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isArchiving || isUnarchiving}
+                      type="button"
+                      onClick={() => {
+                        void archiveRoom();
+                      }}
+                    >
+                      {isArchiving ? "Archiving..." : "Clear / archive room"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Current view
+                  </p>
+                  <p className="mt-2 text-sm text-slate-700">
+                    {displayedSubmissions.length} shown
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {showLiveControls && archiveStatus ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
+                <p className="text-sm font-medium text-slate-600">
+                  {archiveStatus}
+                </p>
+                {lastArchive ? (
+                  <button
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isArchiving || isUnarchiving}
+                    type="button"
+                    onClick={() => {
+                      void unarchiveRoom();
+                    }}
+                  >
+                    {isUnarchiving ? "Restoring..." : "Undo archive"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
           <div className="mb-4">
-            <GroupQuestionsPanel sessionCode={session.code} variant="teacher" />
+            <GroupQuestionsPanel
+              key={questionsPanelKey}
+              sessionCode={session.code}
+              variant="teacher"
+            />
           </div>
 
           {showResultsChart ? (

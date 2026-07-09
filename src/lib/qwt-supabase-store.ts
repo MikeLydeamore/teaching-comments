@@ -44,6 +44,7 @@ type SupabaseSubmissionRow = {
   starred: boolean;
   flagged: boolean;
   version: number;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +64,7 @@ type SupabaseGroupQuestionRow = {
   student_name: string;
   text: string;
   is_answered: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -140,7 +142,7 @@ function sessionSelect() {
 }
 
 function submissionSelect() {
-  return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,created_at,updated_at";
+  return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,archived_at,created_at,updated_at";
 }
 
 function questionBankSelect() {
@@ -148,7 +150,7 @@ function questionBankSelect() {
 }
 
 function groupQuestionSelect() {
-  return "id,session_code,student_name,text,is_answered,created_at,updated_at";
+  return "id,session_code,student_name,text,is_answered,archived_at,created_at,updated_at";
 }
 
 function groupQuestionVoteSelect() {
@@ -180,6 +182,7 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
     starred: row.starred,
     flagged: row.flagged,
     version: row.version,
+    archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -213,6 +216,7 @@ function groupQuestionFromRow(
     hasVoted: voterId
       ? questionVotes.some((vote) => vote.voter_id === voterId)
       : false,
+    archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -356,6 +360,10 @@ export const supabaseStore: QwtStore = {
       params.set("status", "neq.hidden");
     }
 
+    if (!options.includeArchived) {
+      params.set("archived_at", "is.null");
+    }
+
     if (typeof options.minutes === "number" && options.minutes > 0) {
       params.set(
         "created_at",
@@ -397,6 +405,7 @@ export const supabaseStore: QwtStore = {
           starred: false,
           flagged: false,
           version: 1,
+          archived_at: null,
           created_at: timestamp,
           updated_at: timestamp,
         }),
@@ -447,6 +456,7 @@ export const supabaseStore: QwtStore = {
     const params = new URLSearchParams({
       session_code: `eq.${sessionCode}`,
       select: submissionSelect(),
+      archived_at: "is.null",
     });
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?${params.toString()}`,
@@ -511,8 +521,9 @@ export const supabaseStore: QwtStore = {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const normalizedVoterId = voterId ? validateGroupQuestionVoterId(voterId) : "";
     const answeredFilter = options.includeAnswered ? "" : "&is_answered=eq.false";
+    const archivedFilter = options.includeArchived ? "" : "&archived_at=is.null";
     const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
-      `/qwt_group_questions?session_code=eq.${encodeFilterValue(sessionCode)}${answeredFilter}&select=${groupQuestionSelect()}&order=created_at.desc`,
+      `/qwt_group_questions?session_code=eq.${encodeFilterValue(sessionCode)}${answeredFilter}${archivedFilter}&select=${groupQuestionSelect()}&order=created_at.desc`,
     );
     const votes = await listVotesForQuestionIds(rows.map((question) => question.id));
 
@@ -547,6 +558,7 @@ export const supabaseStore: QwtStore = {
           student_name: normalizeStudentName(studentName ?? ""),
           text: validateGroupQuestionText(text),
           is_answered: false,
+          archived_at: null,
           created_at: timestamp,
           updated_at: timestamp,
         }),
@@ -628,5 +640,92 @@ export const supabaseStore: QwtStore = {
     );
 
     return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
+  },
+
+  async archiveSessionActivity(code) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const archivedAt = now();
+    const [submissionRows, questionRows] = await Promise.all([
+      supabaseFetch<SupabaseSubmissionRow[]>(
+        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=is.null&select=${submissionSelect()}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            archived_at: archivedAt,
+            updated_at: archivedAt,
+          }),
+          prefer: "return=representation",
+        },
+      ),
+      supabaseFetch<SupabaseGroupQuestionRow[]>(
+        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=is.null&select=${groupQuestionSelect()}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            archived_at: archivedAt,
+            updated_at: archivedAt,
+          }),
+          prefer: "return=representation",
+        },
+      ),
+    ]);
+
+    return {
+      archivedAt,
+      groupQuestions: questionRows.length,
+      submissions: submissionRows.length,
+    };
+  },
+
+  async unarchiveSessionActivity(code, archivedAt) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const archiveDate = new Date(archivedAt);
+
+    if (!Number.isFinite(archiveDate.getTime())) {
+      throw new Error("Archive timestamp could not be read.");
+    }
+
+    const restoredAt = now();
+    const archivedAtFilter = encodeFilterValue(archivedAt);
+    const [submissionRows, questionRows] = await Promise.all([
+      supabaseFetch<SupabaseSubmissionRow[]>(
+        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=eq.${archivedAtFilter}&select=${submissionSelect()}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            archived_at: null,
+            updated_at: restoredAt,
+          }),
+          prefer: "return=representation",
+        },
+      ),
+      supabaseFetch<SupabaseGroupQuestionRow[]>(
+        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=eq.${archivedAtFilter}&select=${groupQuestionSelect()}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            archived_at: null,
+            updated_at: restoredAt,
+          }),
+          prefer: "return=representation",
+        },
+      ),
+    ]);
+
+    return {
+      archivedAt,
+      groupQuestions: questionRows.length,
+      submissions: submissionRows.length,
+    };
   },
 };

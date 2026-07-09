@@ -26,6 +26,7 @@ create table if not exists public.qwt_group_questions (
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null check (char_length(text) between 5 and 500),
   is_answered boolean not null default false,
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -48,6 +49,7 @@ create table if not exists public.qwt_submissions (
   starred boolean not null default false,
   flagged boolean not null default false,
   version integer not null default 1 check (version >= 1),
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint qwt_submissions_text_or_media_check
@@ -64,6 +66,9 @@ create index if not exists qwt_submissions_session_created_idx
 create index if not exists qwt_submissions_session_status_idx
   on public.qwt_submissions (session_code, status);
 
+create index if not exists qwt_submissions_session_archived_created_idx
+  on public.qwt_submissions (session_code, archived_at, created_at desc);
+
 create index if not exists qwt_question_bank_session_title_idx
   on public.qwt_question_bank (session_code, title);
 
@@ -72,6 +77,9 @@ create index if not exists qwt_group_questions_session_created_idx
 
 create index if not exists qwt_group_questions_session_answered_created_idx
   on public.qwt_group_questions (session_code, is_answered, created_at desc);
+
+create index if not exists qwt_group_questions_session_archived_created_idx
+  on public.qwt_group_questions (session_code, archived_at, created_at desc);
 
 create index if not exists qwt_group_question_votes_voter_idx
   on public.qwt_group_question_votes (voter_id);

@@ -67,6 +67,7 @@ function defaultStore(): StoreData {
         starred: false,
         flagged: false,
         version: 1,
+        archivedAt: null,
         createdAt,
         updatedAt: createdAt,
       },
@@ -81,6 +82,7 @@ function defaultStore(): StoreData {
         starred: true,
         flagged: false,
         version: 1,
+        archivedAt: null,
         createdAt,
         updatedAt: createdAt,
       },
@@ -109,6 +111,7 @@ async function readStore(): Promise<StoreData> {
       ...question,
       isAnswered: question.isAnswered ?? false,
       studentName: question.studentName ?? "Anonymous",
+      archivedAt: question.archivedAt ?? null,
       updatedAt: question.updatedAt ?? question.createdAt,
       voterIds: question.voterIds ?? [],
     })),
@@ -128,6 +131,7 @@ async function readStore(): Promise<StoreData> {
       drawingData: submission.drawingData ?? null,
       gifData: submission.gifData ?? null,
       studentName: submission.studentName ?? "Anonymous",
+      archivedAt: submission.archivedAt ?? null,
     })),
   };
 }
@@ -207,6 +211,7 @@ export const localStore: QwtStore = {
 
     return data.submissions
       .filter((submission) => submission.sessionCode === sessionCode)
+      .filter((submission) => options.includeArchived || !submission.archivedAt)
       .filter((submission) => options.includeHidden || submission.status !== "hidden")
       .filter((submission) => new Date(submission.createdAt).getTime() >= cutoff)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -237,6 +242,7 @@ export const localStore: QwtStore = {
       starred: false,
       flagged: false,
       version: 1,
+      archivedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -333,6 +339,7 @@ export const localStore: QwtStore = {
 
     return data.groupQuestions
       .filter((question) => question.sessionCode === sessionCode)
+      .filter((question) => options.includeArchived || !question.archivedAt)
       .filter((question) => options.includeAnswered || !question.isAnswered)
       .map((question) => ({
         id: question.id,
@@ -344,6 +351,7 @@ export const localStore: QwtStore = {
         hasVoted: normalizedVoterId
           ? question.voterIds.includes(normalizedVoterId)
           : false,
+        archivedAt: question.archivedAt,
         createdAt: question.createdAt,
         updatedAt: question.updatedAt,
       }))
@@ -375,6 +383,7 @@ export const localStore: QwtStore = {
       text: validateGroupQuestionText(text),
       isAnswered: false,
       voterIds: [],
+      archivedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -415,6 +424,7 @@ export const localStore: QwtStore = {
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,
       hasVoted: true,
+      archivedAt: question.archivedAt,
       createdAt: question.createdAt,
       updatedAt: question.updatedAt,
     };
@@ -449,6 +459,7 @@ export const localStore: QwtStore = {
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,
       hasVoted: false,
+      archivedAt: question.archivedAt,
       createdAt: question.createdAt,
       updatedAt: question.updatedAt,
     };
@@ -479,8 +490,117 @@ export const localStore: QwtStore = {
       isAnswered: question.isAnswered,
       voteCount: question.voterIds.length,
       hasVoted: false,
+      archivedAt: question.archivedAt,
       createdAt: question.createdAt,
       updatedAt: question.updatedAt,
+    };
+  },
+
+  async archiveSessionActivity(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const session = await this.getSession(sessionCode);
+
+    if (!session) {
+      return null;
+    }
+
+    const data = await readStore();
+    const archivedAt = now();
+    let submissions = 0;
+    let groupQuestions = 0;
+
+    data.submissions = data.submissions.map((submission) => {
+      if (submission.sessionCode !== session.code || submission.archivedAt) {
+        return submission;
+      }
+
+      submissions += 1;
+      return {
+        ...submission,
+        archivedAt,
+        updatedAt: archivedAt,
+      };
+    });
+
+    data.groupQuestions = data.groupQuestions.map((question) => {
+      if (question.sessionCode !== session.code || question.archivedAt) {
+        return question;
+      }
+
+      groupQuestions += 1;
+      return {
+        ...question,
+        archivedAt,
+        updatedAt: archivedAt,
+      };
+    });
+
+    await writeStore(data);
+
+    return {
+      archivedAt,
+      groupQuestions,
+      submissions,
+    };
+  },
+
+  async unarchiveSessionActivity(code, archivedAt) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const session = await this.getSession(sessionCode);
+
+    if (!session) {
+      return null;
+    }
+
+    const archiveDate = new Date(archivedAt);
+
+    if (!Number.isFinite(archiveDate.getTime())) {
+      throw new Error("Archive timestamp could not be read.");
+    }
+
+    const data = await readStore();
+    const restoredAt = now();
+    let submissions = 0;
+    let groupQuestions = 0;
+
+    data.submissions = data.submissions.map((submission) => {
+      if (
+        submission.sessionCode !== session.code ||
+        submission.archivedAt !== archivedAt
+      ) {
+        return submission;
+      }
+
+      submissions += 1;
+      return {
+        ...submission,
+        archivedAt: null,
+        updatedAt: restoredAt,
+      };
+    });
+
+    data.groupQuestions = data.groupQuestions.map((question) => {
+      if (
+        question.sessionCode !== session.code ||
+        question.archivedAt !== archivedAt
+      ) {
+        return question;
+      }
+
+      groupQuestions += 1;
+      return {
+        ...question,
+        archivedAt: null,
+        updatedAt: restoredAt,
+      };
+    });
+
+    await writeStore(data);
+
+    return {
+      archivedAt,
+      groupQuestions,
+      submissions,
     };
   },
 };

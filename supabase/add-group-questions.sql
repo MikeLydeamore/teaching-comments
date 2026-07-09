@@ -4,6 +4,7 @@ create table if not exists public.qwt_group_questions (
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null check (char_length(text) between 5 and 500),
   is_answered boolean not null default false,
+  archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -13,6 +14,9 @@ alter table public.qwt_group_questions
 
 alter table public.qwt_group_questions
   add column if not exists student_name text;
+
+alter table public.qwt_group_questions
+  add column if not exists archived_at timestamptz;
 
 update public.qwt_group_questions
 set is_answered = false
@@ -53,6 +57,9 @@ create index if not exists qwt_group_questions_session_created_idx
 
 create index if not exists qwt_group_questions_session_answered_created_idx
   on public.qwt_group_questions (session_code, is_answered, created_at desc);
+
+create index if not exists qwt_group_questions_session_archived_created_idx
+  on public.qwt_group_questions (session_code, archived_at, created_at desc);
 
 create index if not exists qwt_group_question_votes_voter_idx
   on public.qwt_group_question_votes (voter_id);

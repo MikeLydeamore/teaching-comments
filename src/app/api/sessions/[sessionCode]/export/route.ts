@@ -16,6 +16,7 @@ const columns = [
   "text",
   "created_at",
   "updated_at",
+  "archived_at",
   "status",
   "starred",
   "flagged",
@@ -68,8 +69,11 @@ export async function GET(
   }
 
   const [submissions, groupQuestions] = await Promise.all([
-    listSubmissions(session.code, { includeHidden: true }),
-    listGroupQuestions(session.code, undefined, { includeAnswered: true }),
+    listSubmissions(session.code, { includeArchived: true, includeHidden: true }),
+    listGroupQuestions(session.code, undefined, {
+      includeAnswered: true,
+      includeArchived: true,
+    }),
   ]);
 
   const rows = [
@@ -86,6 +90,7 @@ export async function GET(
         submission.text,
         submission.createdAt,
         submission.updatedAt,
+        submission.archivedAt,
         submission.status,
         submission.starred,
         submission.flagged,
@@ -112,6 +117,7 @@ export async function GET(
         question.text,
         question.createdAt,
         question.updatedAt,
+        question.archivedAt,
         "",
         "",
         "",

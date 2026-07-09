@@ -16,6 +16,7 @@ export type {
   DrawingStroke,
   GifData,
   GroupQuestion,
+  ArchiveSessionActivityResult,
   QuestionBankItem,
   Session,
   SessionPatch,
@@ -61,7 +62,11 @@ export async function updateSession(code: string, patch: SessionPatch) {
 
 export async function listSubmissions(
   code: string,
-  options: { minutes?: number; includeHidden?: boolean } = {},
+  options: {
+    minutes?: number;
+    includeHidden?: boolean;
+    includeArchived?: boolean;
+  } = {},
 ) {
   return getStore().listSubmissions(code, options);
 }
@@ -99,7 +104,7 @@ export async function deleteQuestionFromBank(id: string) {
 export async function listGroupQuestions(
   code: string,
   voterId?: string,
-  options: { includeAnswered?: boolean } = {},
+  options: { includeAnswered?: boolean; includeArchived?: boolean } = {},
 ) {
   return getStore().listGroupQuestions(code, voterId, options);
 }
@@ -122,4 +127,12 @@ export async function unvoteGroupQuestion(id: string, voterId: string) {
 
 export async function setGroupQuestionAnswered(id: string, isAnswered: boolean) {
   return getStore().setGroupQuestionAnswered(id, isAnswered);
+}
+
+export async function archiveSessionActivity(code: string) {
+  return getStore().archiveSessionActivity(code);
+}
+
+export async function unarchiveSessionActivity(code: string, archivedAt: string) {
+  return getStore().unarchiveSessionActivity(code, archivedAt);
 }

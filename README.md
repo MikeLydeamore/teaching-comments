@@ -23,6 +23,7 @@ The current slice includes:
 - star, flag, and hide controls
 - starred-only view filtering
 - teacher CSV export for submissions and group questions
+- clear/archive control with undo for hiding current live responses while keeping exports
 - newest/oldest sorting and drag-and-drop card ordering in the teacher dashboard
 - simple word-frequency summary
 - column and pie charts for short poll-style responses
@@ -108,6 +109,9 @@ added, run `supabase/add-group-question-answered.sql` in the Supabase SQL editor
 
 If you already ran the group-question migration before asker names were added,
 run `supabase/add-group-question-student-name.sql` in the Supabase SQL editor.
+
+If you already ran the schema before clear/archive support was added, run
+`supabase/add-archive-fields.sql` in the Supabase SQL editor.
 
 ## Sessions
 
