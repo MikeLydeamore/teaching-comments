@@ -929,6 +929,13 @@ export function TeacherDashboard({
             >
               {starredOnly ? "Showing starred only" : "Show starred only"}
             </button>
+            <a
+              className="mt-3 flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+              download
+              href={`/api/sessions/${session.code}/export`}
+            >
+              Export CSV
+            </a>
             <p className="mt-3 text-xs text-slate-500">
               {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : "Waiting for first refresh"}
             </p>

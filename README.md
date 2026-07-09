@@ -22,6 +22,7 @@ The current slice includes:
 - recent-submission filtering
 - star, flag, and hide controls
 - starred-only view filtering
+- teacher CSV export for submissions and group questions
 - newest/oldest sorting and drag-and-drop card ordering in the teacher dashboard
 - simple word-frequency summary
 - column and pie charts for short poll-style responses
@@ -128,6 +129,5 @@ Set `TEACHER_PIN` before deploying anywhere public.
 
 1. Add basic rate limiting for student submissions.
 2. Deploy the app to Vercel with the Supabase environment variables.
-3. Add CSV export.
-4. Add response editing/version history.
-5. Add peer comparison and ranking views.
+3. Add response editing/version history.
+4. Add peer comparison and ranking views.

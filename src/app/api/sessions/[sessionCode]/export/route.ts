@@ -1,0 +1,137 @@
+import {
+  getSession,
+  listGroupQuestions,
+  listSubmissions,
+} from "@/lib/qwt-store";
+import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+
+const columns = [
+  "record_type",
+  "session_code",
+  "session_title",
+  "current_prompt",
+  "current_prompt_updated_at",
+  "id",
+  "student_name",
+  "text",
+  "created_at",
+  "updated_at",
+  "status",
+  "starred",
+  "flagged",
+  "version",
+  "has_drawing",
+  "drawing_data_json",
+  "has_gif",
+  "gif_title",
+  "gif_preview_url",
+  "gif_url",
+  "is_answered",
+  "vote_count",
+];
+
+function csvCell(value: unknown) {
+  if (value === null || typeof value === "undefined") {
+    return "";
+  }
+
+  const text = String(value);
+
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+
+  return text;
+}
+
+function csvRow(values: unknown[]) {
+  return values.map(csvCell).join(",");
+}
+
+function filenameFromSessionCode(sessionCode: string) {
+  return `quick-write-${sessionCode}-${new Date().toISOString().slice(0, 10)}.csv`;
+}
+
+export async function GET(
+  _request: Request,
+  ctx: RouteContext<"/api/sessions/[sessionCode]/export">,
+) {
+  if (!(await isTeacherAuthenticated())) {
+    return teacherUnauthorizedResponse();
+  }
+
+  const { sessionCode } = await ctx.params;
+  const session = await getSession(sessionCode);
+
+  if (!session) {
+    return Response.json({ error: "Session not found." }, { status: 404 });
+  }
+
+  const [submissions, groupQuestions] = await Promise.all([
+    listSubmissions(session.code, { includeHidden: true }),
+    listGroupQuestions(session.code, undefined, { includeAnswered: true }),
+  ]);
+
+  const rows = [
+    csvRow(columns),
+    ...submissions.map((submission) =>
+      csvRow([
+        "submission",
+        session.code,
+        session.title,
+        session.prompt,
+        session.promptUpdatedAt,
+        submission.id,
+        submission.studentName,
+        submission.text,
+        submission.createdAt,
+        submission.updatedAt,
+        submission.status,
+        submission.starred,
+        submission.flagged,
+        submission.version,
+        Boolean(submission.drawingData),
+        submission.drawingData ? JSON.stringify(submission.drawingData) : "",
+        Boolean(submission.gifData),
+        submission.gifData?.title ?? "",
+        submission.gifData?.previewUrl ?? "",
+        submission.gifData?.giphyUrl ?? submission.gifData?.url ?? "",
+        "",
+        "",
+      ]),
+    ),
+    ...groupQuestions.map((question) =>
+      csvRow([
+        "group_question",
+        session.code,
+        session.title,
+        session.prompt,
+        session.promptUpdatedAt,
+        question.id,
+        question.studentName,
+        question.text,
+        question.createdAt,
+        question.updatedAt,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        question.isAnswered,
+        question.voteCount,
+      ]),
+    ),
+  ];
+
+  return new Response(`${rows.join("\r\n")}\r\n`, {
+    headers: {
+      "Content-Disposition": `attachment; filename="${filenameFromSessionCode(session.code)}"`,
+      "Content-Type": "text/csv; charset=utf-8",
+    },
+  });
+}
