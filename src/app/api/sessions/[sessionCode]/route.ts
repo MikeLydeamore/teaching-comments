@@ -1,6 +1,7 @@
 import {
   getOrCreateSession,
   getSessionStats,
+  listPromptHistory,
   updateSession,
   type SessionPatch,
 } from "@/lib/qwt-store";
@@ -14,8 +15,9 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[s
   const { sessionCode } = await ctx.params;
   const session = await getOrCreateSession(sessionCode);
   const stats = await getSessionStats(session.code);
+  const promptHistory = await listPromptHistory(session.code);
 
-  return Response.json({ session, stats });
+  return Response.json({ promptHistory, session, stats });
 }
 
 export async function PATCH(
@@ -70,7 +72,8 @@ export async function PATCH(
     }
 
     const stats = await getSessionStats(session.code);
-    return Response.json({ session, stats });
+    const promptHistory = await listPromptHistory(session.code);
+    return Response.json({ promptHistory, session, stats });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Could not update session." },

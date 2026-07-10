@@ -14,9 +14,11 @@ export async function GET(
   const minutesParam = url.searchParams.get("minutes");
   const minutes = minutesParam ? Number(minutesParam) : undefined;
   const includeHidden = url.searchParams.get("includeHidden") === "true";
+  const promptHistoryId = url.searchParams.get("promptHistoryId") || undefined;
   const submissions = await listSubmissions(sessionCode, {
     minutes: Number.isFinite(minutes) ? minutes : undefined,
     includeHidden,
+    promptHistoryId,
   });
 
   return Response.json({ submissions });

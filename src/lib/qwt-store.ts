@@ -17,6 +17,7 @@ export type {
   GifData,
   GroupQuestion,
   ArchiveSessionActivityResult,
+  PromptHistoryItem,
   QuestionBankItem,
   Session,
   SessionPatch,
@@ -60,12 +61,17 @@ export async function updateSession(code: string, patch: SessionPatch) {
   return getStore().updateSession(code, patch);
 }
 
+export async function listPromptHistory(code: string) {
+  return getStore().listPromptHistory(code);
+}
+
 export async function listSubmissions(
   code: string,
   options: {
     minutes?: number;
     includeHidden?: boolean;
     includeArchived?: boolean;
+    promptHistoryId?: string;
   } = {},
 ) {
   return getStore().listSubmissions(code, options);

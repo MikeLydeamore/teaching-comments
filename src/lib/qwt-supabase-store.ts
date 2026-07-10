@@ -16,6 +16,7 @@ import {
   type DrawingData,
   type GifData,
   type GroupQuestion,
+  type PromptHistoryItem,
   type QuestionBankItem,
   type QwtStore,
   type Session,
@@ -56,6 +57,14 @@ type SupabaseQuestionBankRow = {
   text: string;
   created_at: string;
   updated_at: string;
+};
+
+type SupabasePromptHistoryRow = {
+  id: string;
+  session_code: string;
+  prompt: string;
+  started_at: string;
+  ended_at: string | null;
 };
 
 type SupabaseGroupQuestionRow = {
@@ -149,6 +158,10 @@ function questionBankSelect() {
   return "id,session_code,title,text,created_at,updated_at";
 }
 
+function promptHistorySelect() {
+  return "id,session_code,prompt,started_at,ended_at";
+}
+
 function groupQuestionSelect() {
   return "id,session_code,student_name,text,is_answered,archived_at,created_at,updated_at";
 }
@@ -199,6 +212,16 @@ function questionBankItemFromRow(row: SupabaseQuestionBankRow): QuestionBankItem
   };
 }
 
+function promptHistoryItemFromRow(row: SupabasePromptHistoryRow): PromptHistoryItem {
+  return {
+    id: row.id,
+    sessionCode: row.session_code,
+    prompt: row.prompt,
+    startedAt: row.started_at,
+    endedAt: row.ended_at ?? null,
+  };
+}
+
 function groupQuestionFromRow(
   row: SupabaseGroupQuestionRow,
   votes: SupabaseGroupQuestionVoteRow[],
@@ -234,6 +257,47 @@ async function getSessionFromSupabase(code: string) {
   );
 
   return rows[0] ? sessionFromRow(rows[0]) : null;
+}
+
+function promptHistoryContainsSubmission(
+  promptHistory: PromptHistoryItem,
+  submission: Submission,
+) {
+  const createdAt = new Date(submission.createdAt).getTime();
+  const startedAt = new Date(promptHistory.startedAt).getTime();
+  const endedAt = promptHistory.endedAt
+    ? new Date(promptHistory.endedAt).getTime()
+    : Infinity;
+
+  return createdAt >= startedAt && createdAt < endedAt;
+}
+
+async function listPromptHistoryRows(sessionCode: string) {
+  return supabaseFetch<SupabasePromptHistoryRow[]>(
+    `/qwt_prompt_history?session_code=eq.${encodeFilterValue(sessionCode)}&select=${promptHistorySelect()}&order=started_at.desc`,
+  );
+}
+
+async function ensurePromptHistoryForSession(session: Session) {
+  const existingRows = await listPromptHistoryRows(session.code);
+
+  if (existingRows.length) {
+    return existingRows;
+  }
+
+  return supabaseFetch<SupabasePromptHistoryRow[]>(
+    `/qwt_prompt_history?select=${promptHistorySelect()}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        session_code: session.code,
+        prompt: session.prompt,
+        started_at: session.promptUpdatedAt ?? session.createdAt,
+        ended_at: null,
+      }),
+      prefer: "return=representation",
+    },
+  );
 }
 
 async function listVotesForQuestionIds(questionIds: string[]) {
@@ -310,7 +374,9 @@ export const supabaseStore: QwtStore = {
       throw error;
     });
 
-    return sessionFromRow(rows[0]);
+    const session = sessionFromRow(rows[0]);
+    await ensurePromptHistoryForSession(session);
+    return session;
   },
 
   async listSessions() {
@@ -329,6 +395,7 @@ export const supabaseStore: QwtStore = {
     }
 
     const next = applySessionPatch(current, patch);
+    const promptChanged = next.prompt !== current.prompt;
     const rows = await supabaseFetch<SupabaseSessionRow[]>(
       `/qwt_sessions?code=eq.${encodeFilterValue(current.code)}&select=${sessionSelect()}`,
       {
@@ -345,11 +412,62 @@ export const supabaseStore: QwtStore = {
       },
     );
 
-    return rows[0] ? sessionFromRow(rows[0]) : null;
+    const session = rows[0] ? sessionFromRow(rows[0]) : null;
+
+    if (session && promptChanged) {
+      await ensurePromptHistoryForSession(current);
+      await supabaseFetch<SupabasePromptHistoryRow[]>(
+        `/qwt_prompt_history?session_code=eq.${encodeFilterValue(current.code)}&ended_at=is.null&select=${promptHistorySelect()}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ ended_at: session.promptUpdatedAt }),
+          prefer: "return=representation",
+        },
+      );
+      await supabaseFetch<SupabasePromptHistoryRow[]>(
+        `/qwt_prompt_history?select=${promptHistorySelect()}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            session_code: session.code,
+            prompt: session.prompt,
+            started_at: session.promptUpdatedAt,
+            ended_at: null,
+          }),
+          prefer: "return=representation",
+        },
+      );
+    }
+
+    return session;
+  },
+
+  async listPromptHistory(code) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return [];
+    }
+
+    const rows = await ensurePromptHistoryForSession(session);
+    return rows.map(promptHistoryItemFromRow);
   },
 
   async listSubmissions(code, options = {}) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const promptHistoryRows = options.promptHistoryId
+      ? await listPromptHistoryRows(sessionCode)
+      : [];
+    const promptHistory = options.promptHistoryId
+      ? promptHistoryRows
+          .map(promptHistoryItemFromRow)
+          .find((item) => item.id === options.promptHistoryId)
+      : null;
+
+    if (options.promptHistoryId && !promptHistory) {
+      return [];
+    }
+
     const params = new URLSearchParams({
       session_code: `eq.${sessionCode}`,
       select: submissionSelect(),
@@ -364,18 +482,38 @@ export const supabaseStore: QwtStore = {
       params.set("archived_at", "is.null");
     }
 
-    if (typeof options.minutes === "number" && options.minutes > 0) {
-      params.set(
+    const cutoff =
+      typeof options.minutes === "number" && options.minutes > 0
+        ? new Date(Date.now() - options.minutes * 60 * 1000)
+        : null;
+    const promptStart = promptHistory ? new Date(promptHistory.startedAt) : null;
+    const createdAfter =
+      cutoff && promptStart
+        ? new Date(Math.max(cutoff.getTime(), promptStart.getTime()))
+        : cutoff ?? promptStart;
+
+    if (createdAfter) {
+      params.append(
         "created_at",
-        `gte.${new Date(Date.now() - options.minutes * 60 * 1000).toISOString()}`,
+        `gte.${createdAfter.toISOString()}`,
       );
+    }
+
+    if (promptHistory?.endedAt) {
+      params.append("created_at", `lt.${promptHistory.endedAt}`);
     }
 
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?${params.toString()}`,
     );
 
-    return rows.map(submissionFromRow);
+    return rows
+      .map(submissionFromRow)
+      .filter((submission) =>
+        promptHistory
+          ? promptHistoryContainsSubmission(promptHistory, submission)
+          : true,
+      );
   },
 
   async addSubmission(code, text, drawingData, gifData, studentName) {

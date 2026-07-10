@@ -2,7 +2,11 @@ import Link from "next/link";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
-import { getOrCreateSession, listSubmissions } from "@/lib/qwt-store";
+import {
+  getOrCreateSession,
+  listPromptHistory,
+  listSubmissions,
+} from "@/lib/qwt-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
 
@@ -40,6 +44,7 @@ export default async function TeacherResultsPage({
     chartType?: string;
     includeHidden?: string;
     minutes?: string;
+    promptHistoryId?: string;
     starredOnly?: string;
   }>;
 }) {
@@ -48,6 +53,7 @@ export default async function TeacherResultsPage({
   const minutes = parseMinutes(query.minutes);
   const chartType = parseChartType(query.chartType);
   const includeHidden = query.includeHidden === "true";
+  const promptHistoryId = query.promptHistoryId ?? "";
   const starredOnly = query.starredOnly === "true";
   const search = new URLSearchParams({
     chartType,
@@ -55,6 +61,11 @@ export default async function TeacherResultsPage({
     minutes: String(minutes),
     starredOnly: String(starredOnly),
   });
+
+  if (promptHistoryId) {
+    search.set("promptHistoryId", promptHistoryId);
+  }
+
   const nextPath = `/teacher/${sessionCode}/results?${search.toString()}`;
 
   if (!(await isTeacherAuthenticated())) {
@@ -69,9 +80,14 @@ export default async function TeacherResultsPage({
   }
 
   const session = await getOrCreateSession(sessionCode);
+  const promptHistory = await listPromptHistory(session.code);
+  const selectedPromptHistory = promptHistory.find(
+    (item) => item.id === promptHistoryId,
+  );
   const submissions = await listSubmissions(session.code, {
     includeHidden,
     minutes,
+    promptHistoryId: selectedPromptHistory?.id,
   });
   const displayedSubmissions = starredOnly
     ? submissions.filter((submission) => submission.starred)
@@ -97,7 +113,13 @@ export default async function TeacherResultsPage({
             Last {minutes} minute{minutes === 1 ? "" : "s"}
             {includeHidden ? ", including hidden responses" : ""}
             {starredOnly ? ", starred responses only" : ""}
+            {selectedPromptHistory ? ", filtered by prompt" : ""}
           </p>
+          {selectedPromptHistory ? (
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
+              {selectedPromptHistory.prompt}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex rounded-md border border-slate-300 bg-slate-50 p-1">
@@ -140,7 +162,7 @@ export default async function TeacherResultsPage({
         variant="screen"
       />
       <ResponseTimePlot
-        promptUpdatedAt={session.promptUpdatedAt}
+        promptUpdatedAt={selectedPromptHistory?.startedAt ?? session.promptUpdatedAt}
         submissions={displayedSubmissions}
         variant="screen"
       />

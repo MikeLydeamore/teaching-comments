@@ -10,6 +10,7 @@ The current slice includes:
 - a teacher session selector at `/teacher`
 - a prototype teacher PIN gate
 - in-session prompt editing from the teacher dashboard
+- per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
 - teacher-controlled countdown timer shown to students
 - a student privacy notice checkbox
@@ -88,6 +89,9 @@ If you already ran the first schema before drawing support was added, run
 
 If you already ran the schema before response-time plotting was added, run
 `supabase/add-prompt-timing.sql` in the Supabase SQL editor.
+
+If you already ran the schema before prompt history was added, run
+`supabase/add-prompt-history.sql` in the Supabase SQL editor.
 
 If you already ran the schema before student display names were added, run
 `supabase/add-student-name.sql` in the Supabase SQL editor.

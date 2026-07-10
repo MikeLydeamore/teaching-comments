@@ -20,6 +20,15 @@ create table if not exists public.qwt_question_bank (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.qwt_prompt_history (
+  id uuid primary key default gen_random_uuid(),
+  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  prompt text not null check (char_length(prompt) between 5 and 1200),
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  check (ended_at is null or ended_at > started_at)
+);
+
 create table if not exists public.qwt_group_questions (
   id uuid primary key default gen_random_uuid(),
   session_code text not null references public.qwt_sessions(code) on delete cascade,
@@ -72,6 +81,9 @@ create index if not exists qwt_submissions_session_archived_created_idx
 create index if not exists qwt_question_bank_session_title_idx
   on public.qwt_question_bank (session_code, title);
 
+create index if not exists qwt_prompt_history_session_started_idx
+  on public.qwt_prompt_history (session_code, started_at desc);
+
 create index if not exists qwt_group_questions_session_created_idx
   on public.qwt_group_questions (session_code, created_at desc);
 
@@ -87,6 +99,7 @@ create index if not exists qwt_group_question_votes_voter_idx
 alter table public.qwt_sessions enable row level security;
 alter table public.qwt_submissions enable row level security;
 alter table public.qwt_question_bank enable row level security;
+alter table public.qwt_prompt_history enable row level security;
 alter table public.qwt_group_questions enable row level security;
 alter table public.qwt_group_question_votes enable row level security;
 
@@ -98,6 +111,23 @@ values (
   true
 )
 on conflict (code) do nothing;
+
+insert into public.qwt_prompt_history (
+  id,
+  session_code,
+  prompt,
+  started_at,
+  ended_at
+)
+select
+  '44444444-4444-4444-8444-444444444444',
+  session.code,
+  session.prompt,
+  session.prompt_updated_at,
+  null
+from public.qwt_sessions as session
+where session.code = 'demo-lecture'
+on conflict (id) do nothing;
 
 insert into public.qwt_question_bank (
   id,

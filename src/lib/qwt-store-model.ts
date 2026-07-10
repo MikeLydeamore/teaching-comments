@@ -64,6 +64,14 @@ export type QuestionBankItem = {
   updatedAt: string;
 };
 
+export type PromptHistoryItem = {
+  id: string;
+  sessionCode: string;
+  prompt: string;
+  startedAt: string;
+  endedAt: string | null;
+};
+
 export type GroupQuestion = {
   id: string;
   sessionCode: string;
@@ -108,9 +116,15 @@ export type QwtStore = {
   getOrCreateSession(code: string): Promise<Session>;
   listSessions(): Promise<Session[]>;
   updateSession(code: string, patch: SessionPatch): Promise<Session | null>;
+  listPromptHistory(code: string): Promise<PromptHistoryItem[]>;
   listSubmissions(
     code: string,
-    options?: { minutes?: number; includeHidden?: boolean; includeArchived?: boolean },
+    options?: {
+      minutes?: number;
+      includeHidden?: boolean;
+      includeArchived?: boolean;
+      promptHistoryId?: string;
+    },
   ): Promise<Submission[]>;
   addSubmission(
     code: string,

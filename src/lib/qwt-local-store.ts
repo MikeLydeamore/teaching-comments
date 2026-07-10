@@ -17,6 +17,7 @@ import {
   validateSubmissionContent,
   validateQuestionText,
   type GroupQuestion,
+  type PromptHistoryItem,
   type QuestionBankItem,
   type QwtStore,
   type Session,
@@ -25,6 +26,7 @@ import {
 
 type StoreData = {
   groupQuestions: StoredGroupQuestion[];
+  promptHistory: PromptHistoryItem[];
   questionBank: QuestionBankItem[];
   sessions: Session[];
   submissions: Submission[];
@@ -39,9 +41,19 @@ const STORE_PATH = path.join(DATA_DIR, "qwt-store.json");
 
 function defaultStore(): StoreData {
   const createdAt = now();
+  const promptHistoryId = randomUUID();
 
   return {
     groupQuestions: [],
+    promptHistory: [
+      {
+        id: promptHistoryId,
+        sessionCode: "demo-lecture",
+        prompt: DEFAULT_PROMPT,
+        startedAt: createdAt,
+        endedAt: null,
+      },
+    ],
     questionBank: [],
     sessions: [
       {
@@ -100,10 +112,37 @@ async function ensureStore() {
   }
 }
 
+function legacyPromptHistoryId(session: Session) {
+  return `legacy-${session.code}-${session.promptUpdatedAt.replace(/[^a-zA-Z0-9]/g, "")}`;
+}
+
+function promptHistoryContainsSubmission(
+  promptHistory: PromptHistoryItem,
+  submission: Submission,
+) {
+  const createdAt = new Date(submission.createdAt).getTime();
+  const startedAt = new Date(promptHistory.startedAt).getTime();
+  const endedAt = promptHistory.endedAt
+    ? new Date(promptHistory.endedAt).getTime()
+    : Infinity;
+
+  return createdAt >= startedAt && createdAt < endedAt;
+}
+
 async function readStore(): Promise<StoreData> {
   await ensureStore();
   const raw = await readFile(STORE_PATH, "utf8");
   const data = JSON.parse(raw) as Partial<StoreData>;
+  const sessions = (data.sessions ?? []).map((session) => ({
+    ...session,
+    promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
+    timerDurationSeconds: session.timerDurationSeconds ?? 0,
+    timerEndsAt: session.timerEndsAt ?? null,
+  }));
+  const promptHistory = data.promptHistory ?? [];
+  const sessionCodesWithHistory = new Set(
+    promptHistory.map((item) => item.sessionCode),
+  );
 
   return {
     ...data,
@@ -120,12 +159,23 @@ async function readStore(): Promise<StoreData> {
       title: question.title ?? question.text,
       updatedAt: question.updatedAt ?? question.createdAt,
     })),
-    sessions: (data.sessions ?? []).map((session) => ({
-      ...session,
-      promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
-      timerDurationSeconds: session.timerDurationSeconds ?? 0,
-      timerEndsAt: session.timerEndsAt ?? null,
-    })),
+    promptHistory: [
+      ...promptHistory.map((item) => ({
+        ...item,
+        endedAt: item.endedAt ?? null,
+        startedAt: item.startedAt,
+      })),
+      ...sessions
+        .filter((session) => !sessionCodesWithHistory.has(session.code))
+        .map((session) => ({
+          id: legacyPromptHistoryId(session),
+          sessionCode: session.code,
+          prompt: session.prompt,
+          startedAt: session.promptUpdatedAt ?? session.createdAt,
+          endedAt: null,
+        })),
+    ],
+    sessions,
     submissions: (data.submissions ?? []).map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
@@ -175,6 +225,13 @@ export const localStore: QwtStore = {
     };
 
     data.sessions.push(session);
+    data.promptHistory.push({
+      id: randomUUID(),
+      sessionCode: session.code,
+      prompt: session.prompt,
+      startedAt: timestamp,
+      endedAt: null,
+    });
     await writeStore(data);
     return session;
   },
@@ -196,14 +253,52 @@ export const localStore: QwtStore = {
       return null;
     }
 
-    data.sessions[index] = applySessionPatch(data.sessions[index], patch);
+    const currentSession = data.sessions[index];
+    const nextSession = applySessionPatch(currentSession, patch);
+    const promptChanged = nextSession.prompt !== currentSession.prompt;
+
+    data.sessions[index] = nextSession;
+
+    if (promptChanged) {
+      data.promptHistory = data.promptHistory.map((item) =>
+        item.sessionCode === nextSession.code && !item.endedAt
+          ? { ...item, endedAt: nextSession.promptUpdatedAt }
+          : item,
+      );
+      data.promptHistory.push({
+        id: randomUUID(),
+        sessionCode: nextSession.code,
+        prompt: nextSession.prompt,
+        startedAt: nextSession.promptUpdatedAt,
+        endedAt: null,
+      });
+    }
+
     await writeStore(data);
     return data.sessions[index];
+  },
+
+  async listPromptHistory(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+
+    return data.promptHistory
+      .filter((item) => item.sessionCode === sessionCode)
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
   },
 
   async listSubmissions(code, options = {}) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();
+    const promptHistory = options.promptHistoryId
+      ? data.promptHistory.find(
+          (item) =>
+            item.sessionCode === sessionCode && item.id === options.promptHistoryId,
+        )
+      : null;
     const cutoff =
       typeof options.minutes === "number" && options.minutes > 0
         ? Date.now() - options.minutes * 60 * 1000
@@ -213,6 +308,9 @@ export const localStore: QwtStore = {
       .filter((submission) => submission.sessionCode === sessionCode)
       .filter((submission) => options.includeArchived || !submission.archivedAt)
       .filter((submission) => options.includeHidden || submission.status !== "hidden")
+      .filter((submission) =>
+        promptHistory ? promptHistoryContainsSubmission(promptHistory, submission) : true,
+      )
       .filter((submission) => new Date(submission.createdAt).getTime() >= cutoff)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },

@@ -9,7 +9,12 @@ import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
-import type { DrawingData, GifData, QuestionBankItem } from "@/lib/qwt-store";
+import type {
+  DrawingData,
+  GifData,
+  PromptHistoryItem,
+  QuestionBankItem,
+} from "@/lib/qwt-store";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -51,6 +56,7 @@ type ArchiveSummary = {
 };
 
 type TeacherDashboardProps = {
+  initialPromptHistory: PromptHistoryItem[];
   initialQuestionBank: QuestionBankItem[];
   session: Session;
   initialStats: Stats;
@@ -291,7 +297,19 @@ function sortQuestionBank(questionBank: QuestionBankItem[]) {
   return [...questionBank].sort((a, b) => a.title.localeCompare(b.title));
 }
 
+function promptHistoryOptionLabel(item: PromptHistoryItem) {
+  const startedAt = new Date(item.startedAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const prompt =
+    item.prompt.length > 80 ? `${item.prompt.slice(0, 77).trim()}...` : item.prompt;
+
+  return `${startedAt} - ${prompt}`;
+}
+
 export function TeacherDashboard({
+  initialPromptHistory,
   initialQuestionBank,
   session,
   initialStats,
@@ -309,6 +327,8 @@ export function TeacherDashboard({
   const [questionTitleDraft, setQuestionTitleDraft] = useState("");
   const [minutes, setMinutes] = useState(3);
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [promptHistory, setPromptHistory] = useState(initialPromptHistory);
+  const [selectedPromptHistoryId, setSelectedPromptHistoryId] = useState("");
   const [starredOnly, setStarredOnly] = useState(false);
   const [submissionSortOrder, setSubmissionSortOrder] =
     useState<SubmissionSortOrder>("newest");
@@ -342,6 +362,10 @@ export function TeacherDashboard({
       includeHidden: String(includeHidden),
     });
 
+    if (selectedPromptHistoryId) {
+      query.set("promptHistoryId", selectedPromptHistoryId);
+    }
+
     const [submissionsResponse, sessionResponse] = await Promise.all([
       fetch(`/api/sessions/${session.code}/submissions?${query}`),
       fetch(`/api/sessions/${session.code}`),
@@ -359,10 +383,20 @@ export function TeacherDashboard({
     if (sessionPayload.session) {
       setSessionDetails(sessionPayload.session);
     }
+    if (sessionPayload.promptHistory) {
+      setPromptHistory(sessionPayload.promptHistory);
+    }
     setStats(sessionPayload.stats ?? initialStats);
     setLastRefresh(new Date());
     setIsLoading(false);
-  }, [includeHidden, initialStats, minutes, session.code, submissionSortOrder]);
+  }, [
+    includeHidden,
+    initialStats,
+    minutes,
+    selectedPromptHistoryId,
+    session.code,
+    submissionSortOrder,
+  ]);
 
   async function savePrompt() {
     setPromptStatus("Saving...");
@@ -380,6 +414,9 @@ export function TeacherDashboard({
 
     setSessionDetails(payload.session);
     setPromptDraft(payload.session.prompt);
+    if (payload.promptHistory) {
+      setPromptHistory(payload.promptHistory);
+    }
     setStats(payload.stats ?? stats);
     setPromptStatus("Prompt saved.");
   }
@@ -727,6 +764,9 @@ export function TeacherDashboard({
   const selectedQuestion = questionBank.find(
     (question) => question.id === selectedQuestionId,
   );
+  const selectedPromptHistory = promptHistory.find(
+    (item) => item.id === selectedPromptHistoryId,
+  );
   const promptDraftText = promptDraft.trim();
   const promptIsAlreadyInBank = questionBank.some(
     (question) => question.text === promptDraftText,
@@ -739,12 +779,18 @@ export function TeacherDashboard({
   const canConfirmQuestionTitle =
     questionTitleDraftText.length >= 1 && questionTitleDraftText.length <= 1200;
   const isAddingQuestion = questionBankStatus === "Adding question...";
-  const resultsUrl = `/teacher/${session.code}/results?${new URLSearchParams({
+  const resultsSearch = new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
     starredOnly: String(starredOnly),
-  }).toString()}`;
+  });
+
+  if (selectedPromptHistoryId) {
+    resultsSearch.set("promptHistoryId", selectedPromptHistoryId);
+  }
+
+  const resultsUrl = `/teacher/${session.code}/results?${resultsSearch.toString()}`;
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -1088,6 +1134,28 @@ export function TeacherDashboard({
                     />
                     Include hidden
                   </label>
+                  <label
+                    className="mt-3 block text-sm font-medium text-slate-700"
+                    htmlFor="prompt-history-filter"
+                  >
+                    Prompt
+                  </label>
+                  <select
+                    className="mt-2 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                    id="prompt-history-filter"
+                    value={selectedPromptHistoryId}
+                    onChange={(event) => {
+                      setSelectedPromptHistoryId(event.target.value);
+                      setOrderedSubmissionIds([]);
+                    }}
+                  >
+                    <option value="">All prompts</option>
+                    {promptHistory.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {promptHistoryOptionLabel(item)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -1126,16 +1194,17 @@ export function TeacherDashboard({
 
                 <div>
                   <p className="text-sm font-medium text-slate-700">Data</p>
-                  <div className="mt-2 space-y-3">
+                  <div className="mt-2">
                     <a
-                      className="flex h-[46px] w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                      className="flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                       download
                       href={`/api/sessions/${session.code}/export`}
                     >
                       Export CSV
                     </a>
+                    <div aria-hidden="true" className="h-1.5" />
                     <button
-                      className="h-10 w-full rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-3 h-10 w-full rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={isArchiving || isUnarchiving}
                       type="button"
                       onClick={() => {
@@ -1154,6 +1223,11 @@ export function TeacherDashboard({
                   <p className="mt-2 text-sm text-slate-700">
                     {displayedSubmissions.length} shown
                   </p>
+                  {selectedPromptHistory ? (
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                      {selectedPromptHistory.prompt}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -1241,7 +1315,9 @@ export function TeacherDashboard({
                 total={pollResponseTotal}
               />
               <ResponseTimePlot
-                promptUpdatedAt={sessionDetails.promptUpdatedAt}
+                promptUpdatedAt={
+                  selectedPromptHistory?.startedAt ?? sessionDetails.promptUpdatedAt
+                }
                 submissions={displayedSubmissions}
               />
             </section>
