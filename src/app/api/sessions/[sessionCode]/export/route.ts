@@ -1,9 +1,8 @@
 import {
-  getSession,
   listGroupQuestions,
   listSubmissions,
 } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 const columns = [
   "record_type",
@@ -57,16 +56,14 @@ export async function GET(
   _request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/export">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
-  }
-
   const { sessionCode } = await ctx.params;
-  const session = await getSession(sessionCode);
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
 
-  if (!session) {
-    return Response.json({ error: "Session not found." }, { status: 404 });
+  if (authorization.response) {
+    return authorization.response;
   }
+
+  const { session } = authorization;
 
   const [submissions, groupQuestions] = await Promise.all([
     listSubmissions(session.code, { includeArchived: true, includeHidden: true }),

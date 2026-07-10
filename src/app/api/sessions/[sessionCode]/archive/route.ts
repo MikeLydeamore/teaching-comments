@@ -3,17 +3,19 @@ import {
   getSessionStats,
   unarchiveSessionActivity,
 } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function POST(
   _request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/archive">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { sessionCode } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
-  const { sessionCode } = await ctx.params;
   const result = await archiveSessionActivity(sessionCode);
 
   if (!result) {
@@ -28,11 +30,13 @@ export async function DELETE(
   request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/archive">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { sessionCode } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
-  const { sessionCode } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as {
     archivedAt?: unknown;
   };

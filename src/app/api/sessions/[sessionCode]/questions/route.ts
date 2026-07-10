@@ -1,15 +1,17 @@
 import { addQuestionToBank, listQuestionBank } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
   _request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/questions">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { sessionCode } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
-  const { sessionCode } = await ctx.params;
   const questionBank = await listQuestionBank(sessionCode);
 
   return Response.json({ questionBank });
@@ -19,11 +21,13 @@ export async function POST(
   request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/questions">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { sessionCode } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
-  const { sessionCode } = await ctx.params;
   const body = (await request.json().catch(() => ({}))) as {
     text?: string;
     title?: string;

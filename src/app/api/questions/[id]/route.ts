@@ -1,8 +1,11 @@
 import { deleteQuestionFromBank } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import {
+  isAnyTeacherAuthenticated,
+  teacherUnauthorizedResponse,
+} from "@/lib/teacher-session-auth";
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/questions/[id]">) {
-  if (!(await isTeacherAuthenticated())) {
+  if (!(await isAnyTeacherAuthenticated())) {
     return teacherUnauthorizedResponse();
   }
 

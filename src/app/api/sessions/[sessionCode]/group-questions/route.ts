@@ -1,5 +1,5 @@
 import { addGroupQuestion, listGroupQuestions } from "@/lib/qwt-store";
-import { isTeacherAuthenticated } from "@/lib/teacher-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
   request: Request,
@@ -9,7 +9,10 @@ export async function GET(
   const url = new URL(request.url);
   const voterId = url.searchParams.get("voterId") ?? undefined;
   const wantsAnswered = url.searchParams.get("includeAnswered") === "true";
-  const includeAnswered = wantsAnswered && (await isTeacherAuthenticated());
+  const authorization = wantsAnswered
+    ? await getAuthorizedTeacherSession(sessionCode)
+    : null;
+  const includeAnswered = Boolean(wantsAnswered && !authorization?.response);
 
   try {
     const questions = await listGroupQuestions(sessionCode, voterId, {

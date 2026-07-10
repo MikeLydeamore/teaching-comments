@@ -1,9 +1,11 @@
 import {
+  DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
   applySessionPatch,
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
+  normalizeSpaceCode,
   normalizeStudentName,
   normalizeSubmissionPatch,
   now,
@@ -13,6 +15,8 @@ import {
   validateQuestionTitle,
   validateQuestionText,
   validateSubmissionContent,
+  validateTeacherSpaceName,
+  validateTeacherSpacePinHash,
   type DrawingData,
   type GifData,
   type GroupQuestion,
@@ -21,10 +25,19 @@ import {
   type QwtStore,
   type Session,
   type Submission,
+  type TeacherSpace,
 } from "./qwt-store-model";
+
+type SupabaseTeacherSpaceRow = {
+  code: string;
+  name: string;
+  pin_hash: string;
+  created_at: string;
+};
 
 type SupabaseSessionRow = {
   code: string;
+  space_code: string;
   title: string;
   prompt: string;
   is_open: boolean;
@@ -147,7 +160,11 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "code,title,prompt,is_open,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+  return "code,space_code,title,prompt,is_open,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+}
+
+function teacherSpaceSelect() {
+  return "code,name,pin_hash,created_at";
 }
 
 function submissionSelect() {
@@ -173,6 +190,7 @@ function groupQuestionVoteSelect() {
 function sessionFromRow(row: SupabaseSessionRow): Session {
   return {
     code: row.code,
+    spaceCode: row.space_code ?? DEFAULT_SPACE_CODE,
     title: row.title,
     prompt: row.prompt,
     isOpen: row.is_open,
@@ -180,6 +198,15 @@ function sessionFromRow(row: SupabaseSessionRow): Session {
     promptUpdatedAt: row.prompt_updated_at ?? row.created_at,
     timerDurationSeconds: row.timer_duration_seconds ?? 0,
     timerEndsAt: row.timer_ends_at ?? null,
+  };
+}
+
+function teacherSpaceFromRow(row: SupabaseTeacherSpaceRow): TeacherSpace {
+  return {
+    code: row.code,
+    name: row.name,
+    pinHash: row.pin_hash,
+    createdAt: row.created_at,
   };
 }
 
@@ -259,6 +286,41 @@ async function getSessionFromSupabase(code: string) {
   return rows[0] ? sessionFromRow(rows[0]) : null;
 }
 
+async function getTeacherSpaceFromSupabase(code: string) {
+  const spaceCode = normalizeSpaceCode(code);
+
+  if (!spaceCode) {
+    return null;
+  }
+
+  const rows = await supabaseFetch<SupabaseTeacherSpaceRow[]>(
+    `/qwt_teacher_spaces?code=eq.${encodeFilterValue(spaceCode)}&select=${teacherSpaceSelect()}&limit=1`,
+  );
+
+  return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
+}
+
+async function getSessionInSpaceFromSupabase(spaceCode: string, code: string) {
+  const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+  const sessionCode = normalizeSessionCode(code);
+
+  if (!normalizedSpaceCode || !sessionCode) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    code: `eq.${sessionCode}`,
+    space_code: `eq.${normalizedSpaceCode}`,
+    select: sessionSelect(),
+    limit: "1",
+  });
+  const rows = await supabaseFetch<SupabaseSessionRow[]>(
+    `/qwt_sessions?${params.toString()}`,
+  );
+
+  return rows[0] ? sessionFromRow(rows[0]) : null;
+}
+
 function promptHistoryContainsSubmission(
   promptHistory: PromptHistoryItem,
   submission: Submission,
@@ -325,11 +387,67 @@ async function getGroupQuestionFromSupabase(id: string, voterId = "") {
 }
 
 export const supabaseStore: QwtStore = {
+  async createTeacherSpace(code, name, pinHash) {
+    const spaceCode = normalizeSpaceCode(code);
+
+    if (!spaceCode) {
+      throw new Error("Space code is required.");
+    }
+
+    const rows = await supabaseFetch<SupabaseTeacherSpaceRow[]>(
+      `/qwt_teacher_spaces?select=${teacherSpaceSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          code: spaceCode,
+          name: validateTeacherSpaceName(name),
+          pin_hash: validateTeacherSpacePinHash(pinHash),
+        }),
+        prefer: "return=representation",
+      },
+    ).catch((error) => {
+      if (error instanceof SupabaseStoreError && error.status === 409) {
+        throw new Error("That space code already exists.");
+      }
+
+      throw error;
+    });
+
+    return teacherSpaceFromRow(rows[0]);
+  },
+
+  getTeacherSpace: getTeacherSpaceFromSupabase,
+
   getSession: getSessionFromSupabase,
 
+  getSessionInSpace: getSessionInSpaceFromSupabase,
+
   async getOrCreateSession(code) {
+    const session = await this.getOrCreateSessionInSpace(
+      DEFAULT_SPACE_CODE,
+      code,
+    );
+
+    if (!session) {
+      throw new Error("Default teaching space is missing.");
+    }
+
+    return session;
+  },
+
+  async getOrCreateSessionInSpace(spaceCode, code) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode) || DEFAULT_SPACE_CODE;
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
-    const existing = await getSessionFromSupabase(sessionCode);
+    const space = await getTeacherSpaceFromSupabase(normalizedSpaceCode);
+
+    if (!space) {
+      return null;
+    }
+
+    const existing = await getSessionInSpaceFromSupabase(
+      normalizedSpaceCode,
+      sessionCode,
+    );
 
     if (existing) {
       return existing;
@@ -342,6 +460,7 @@ export const supabaseStore: QwtStore = {
         method: "POST",
         body: JSON.stringify({
           code: sessionCode,
+          space_code: normalizedSpaceCode,
           title: titleFromCode(sessionCode) || "Quick Write",
           prompt: DEFAULT_PROMPT,
           is_open: true,
@@ -355,10 +474,11 @@ export const supabaseStore: QwtStore = {
     ).catch(async (error) => {
       if (error instanceof SupabaseStoreError && error.status === 409) {
         const session = await getSessionFromSupabase(sessionCode);
-        if (session) {
+        if (session?.spaceCode === normalizedSpaceCode) {
           return [
             {
               code: session.code,
+              space_code: session.spaceCode,
               title: session.title,
               prompt: session.prompt,
               is_open: session.isOpen,
@@ -369,6 +489,8 @@ export const supabaseStore: QwtStore = {
             },
           ];
         }
+
+        throw new Error("That session code is already used in another space.");
       }
 
       throw error;
@@ -379,9 +501,19 @@ export const supabaseStore: QwtStore = {
     return session;
   },
 
-  async listSessions() {
+  async listSessions(spaceCode) {
+    const params = new URLSearchParams({
+      select: sessionSelect(),
+      order: "created_at.desc",
+    });
+    const normalizedSpaceCode = spaceCode ? normalizeSpaceCode(spaceCode) : "";
+
+    if (normalizedSpaceCode) {
+      params.set("space_code", `eq.${normalizedSpaceCode}`);
+    }
+
     const rows = await supabaseFetch<SupabaseSessionRow[]>(
-      `/qwt_sessions?select=${sessionSelect()}&order=created_at.desc`,
+      `/qwt_sessions?${params.toString()}`,
     );
 
     return rows.map(sessionFromRow);

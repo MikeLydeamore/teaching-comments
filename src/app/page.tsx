@@ -29,8 +29,8 @@ export default function Home() {
               Join with a code
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Opens a student join page where a class session code unlocks the
-              writing box.
+              Opens a student join page where a teaching space and session code
+              unlock the writing box.
             </p>
           </Link>
 
@@ -45,7 +45,7 @@ export default function Home() {
               Select a session
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Unlock teacher access, choose a session, and watch responses
+              Unlock a teaching space, choose a session, and watch responses
               live.
             </p>
           </Link>
@@ -63,7 +63,7 @@ export default function Home() {
               className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
               href="/teacher"
             >
-              Select teacher session
+              Open teacher space
             </Link>
             <Link
               className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"

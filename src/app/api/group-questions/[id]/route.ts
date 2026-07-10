@@ -1,11 +1,14 @@
 import { setGroupQuestionAnswered } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import {
+  isAnyTeacherAuthenticated,
+  teacherUnauthorizedResponse,
+} from "@/lib/teacher-session-auth";
 
 export async function PATCH(
   request: Request,
   ctx: RouteContext<"/api/group-questions/[id]">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
+  if (!(await isAnyTeacherAuthenticated())) {
     return teacherUnauthorizedResponse();
   }
 

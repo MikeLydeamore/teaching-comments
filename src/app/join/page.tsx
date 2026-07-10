@@ -4,6 +4,7 @@ import { joinSession } from "./actions";
 const messages = {
   closed: "That quick write session is closed.",
   missing: "Enter the session code from your teacher.",
+  "space-missing": "Enter the teaching space code from your teacher.",
   "name-too-long": "Names must be 80 characters or fewer.",
   "not-found": "We could not find that quick write session.",
 };
@@ -11,7 +12,7 @@ const messages = {
 export default async function JoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; session?: string }>;
+  searchParams: Promise<{ error?: string; session?: string; space?: string }>;
 }) {
   const query = await searchParams;
   const error = query.error && query.error in messages
@@ -28,21 +29,31 @@ export default async function JoinPage({
           Join a session
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Enter the session code your teacher shared. Session lists are not
-          public, which keeps class activities harder to spam.
+          Enter the space code and session code your teacher shared. Session
+          lists are not public, which keeps class activities harder to spam.
         </p>
 
         <form action={joinSession} className="mt-5">
-          <label className="text-sm font-semibold text-slate-700" htmlFor="sessionCode">
-            Session code
+          <label className="text-sm font-semibold text-slate-700" htmlFor="spaceCode">
+            Space code
           </label>
           <input
             autoFocus
             className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+            defaultValue={query.space ?? ""}
+            id="spaceCode"
+            name="spaceCode"
+            placeholder="stats-101"
+          />
+          <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="sessionCode">
+            Session code
+          </label>
+          <input
+            className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
             defaultValue={query.session ?? ""}
             id="sessionCode"
             name="sessionCode"
-            placeholder="demo-lecture"
+            placeholder="week-1"
           />
           <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="studentName">
             Name

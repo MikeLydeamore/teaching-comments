@@ -4,6 +4,7 @@ type TeacherLoginProps = {
   authFailed: boolean;
   nextPath?: string;
   sessionCode: string;
+  spaceCode?: string;
   usesDefaultPin: boolean;
 };
 
@@ -11,9 +12,12 @@ export function TeacherLogin({
   authFailed,
   nextPath,
   sessionCode,
+  spaceCode,
   usesDefaultPin,
 }: TeacherLoginProps) {
-  const next = nextPath ?? `/teacher/${sessionCode}`;
+  const next = nextPath ?? (spaceCode
+    ? `/teacher/${spaceCode}/${sessionCode}`
+    : `/teacher/${sessionCode}`);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
@@ -21,13 +25,13 @@ export function TeacherLogin({
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
           Teacher PIN
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
-          Unlock dashboard
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
+          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
+            Unlock dashboard
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
           This keeps student submissions out of public view while preserving
           login-free student access.
-        </p>
+          </p>
         {usesDefaultPin ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             Local prototype PIN is <strong>teach123</strong>.
@@ -35,8 +39,9 @@ export function TeacherLogin({
         ) : null}
         <form action={loginTeacher} className="mt-5">
           <input name="next" type="hidden" value={next} />
+          {spaceCode ? <input name="spaceCode" type="hidden" value={spaceCode} /> : null}
           <label className="text-sm font-semibold text-slate-700" htmlFor="pin">
-            PIN
+            {spaceCode ? "Space PIN" : "PIN"}
           </label>
           <input
             autoFocus

@@ -1,6 +1,7 @@
 import { localStore } from "./qwt-local-store";
 import { supabaseStore } from "./qwt-supabase-store";
 import {
+  normalizeSpaceCode,
   normalizeSessionCode,
   normalizeStudentName,
   type QwtStore,
@@ -9,6 +10,7 @@ import {
 } from "./qwt-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
+export { normalizeSpaceCode };
 export type {
   QwtStore,
   DrawingData,
@@ -25,6 +27,7 @@ export type {
   Submission,
   SubmissionPatch,
   SubmissionStatus,
+  TeacherSpace,
 } from "./qwt-store-model";
 
 function shouldUseSupabaseStore() {
@@ -49,12 +52,32 @@ export async function getSession(code: string) {
   return getStore().getSession(code);
 }
 
+export async function createTeacherSpace(
+  code: string,
+  name: string,
+  pinHash: string,
+) {
+  return getStore().createTeacherSpace(code, name, pinHash);
+}
+
+export async function getTeacherSpace(code: string) {
+  return getStore().getTeacherSpace(code);
+}
+
+export async function getSessionInSpace(spaceCode: string, code: string) {
+  return getStore().getSessionInSpace(spaceCode, code);
+}
+
 export async function getOrCreateSession(code: string) {
   return getStore().getOrCreateSession(code);
 }
 
-export async function listSessions() {
-  return getStore().listSessions();
+export async function getOrCreateSessionInSpace(spaceCode: string, code: string) {
+  return getStore().getOrCreateSessionInSpace(spaceCode, code);
+}
+
+export async function listSessions(spaceCode?: string) {
+  return getStore().listSessions(spaceCode);
 }
 
 export async function updateSession(code: string, patch: SessionPatch) {

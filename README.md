@@ -4,11 +4,11 @@ A zero-cost first prototype of a live formative writing tool for large classes.
 
 The current slice includes:
 
-- a student writing page at `/s/demo-lecture`
+- a student writing page at `/s/default/demo-lecture`
 - a student join page at `/join`
-- a teacher dashboard at `/teacher/demo-lecture`
-- a teacher session selector at `/teacher`
-- a prototype teacher PIN gate
+- a teacher dashboard at `/teacher/default/demo-lecture`
+- teacher spaces with an admin-created space PIN
+- a prototype admin PIN gate for creating spaces
 - in-session prompt editing from the teacher dashboard
 - per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
@@ -43,8 +43,10 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/join`
-- `http://localhost:3000/s/demo-lecture`
-- `http://localhost:3000/teacher/demo-lecture`
+- `http://localhost:3000/s/default/demo-lecture`
+- `http://localhost:3000/teacher`
+- `http://localhost:3000/teacher/default`
+- `http://localhost:3000/teacher/default/demo-lecture`
 
 ## Verify
 
@@ -70,6 +72,8 @@ QWT_STORAGE_BACKEND=supabase
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 TEACHER_PIN=replace-with-a-private-pin-before-deploying
+ADMIN_PIN=replace-with-a-private-admin-pin-before-deploying
+TEACHER_AUTH_SECRET=replace-with-a-random-cookie-secret-before-deploying
 ```
 
 Keep the service role key server-side only. Do not put it in browser code or
@@ -92,6 +96,9 @@ If you already ran the schema before response-time plotting was added, run
 
 If you already ran the schema before prompt history was added, run
 `supabase/add-prompt-history.sql` in the Supabase SQL editor.
+
+If you already ran the schema before teacher spaces were added, run
+`supabase/add-teacher-spaces.sql` in the Supabase SQL editor.
 
 If you already ran the schema before student display names were added, run
 `supabase/add-student-name.sql` in the Supabase SQL editor.
@@ -119,19 +126,26 @@ If you already ran the schema before clear/archive support was added, run
 
 ## Sessions
 
-Students join with a session code on `/join` or by opening `/s/<session-code>`.
-Student routes and submission APIs only accept existing open sessions. Teachers
-create sessions by opening a session from `/teacher` after entering the PIN.
+Students join with a space code and session code on `/join` or by opening
+`/s/<space-code>/<session-code>`. Student routes and submission APIs only
+accept existing open sessions. Teachers create sessions by opening a session
+from `/teacher/<space-code>` after entering that space's teacher PIN.
 
-## Teacher PIN
+For this prototype, session codes are still globally unique internally even
+though access and navigation are scoped by teaching space.
 
-The local prototype defaults to this teacher PIN:
+## Teacher Spaces And PINs
+
+The local prototype defaults to this admin PIN and default-space PIN:
 
 ```text
 teach123
 ```
 
-Set `TEACHER_PIN` before deploying anywhere public.
+Set `ADMIN_PIN` before deploying anywhere public. If `ADMIN_PIN` is not set,
+the app falls back to `TEACHER_PIN` for compatibility with the earlier
+prototype setup. Space PINs are created in the app and stored hashed in the
+database.
 
 ## Next steps
 

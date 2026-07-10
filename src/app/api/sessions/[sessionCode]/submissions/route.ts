@@ -1,15 +1,17 @@
 import { addSubmission, listSubmissions } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
   request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/submissions">,
 ) {
-  if (!(await isTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { sessionCode } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(sessionCode);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
-  const { sessionCode } = await ctx.params;
   const url = new URL(request.url);
   const minutesParam = url.searchParams.get("minutes");
   const minutes = minutesParam ? Number(minutesParam) : undefined;

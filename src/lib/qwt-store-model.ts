@@ -28,8 +28,16 @@ export type GifData = {
   height: number;
 };
 
+export type TeacherSpace = {
+  code: string;
+  name: string;
+  pinHash: string;
+  createdAt: string;
+};
+
 export type Session = {
   code: string;
+  spaceCode: string;
   title: string;
   prompt: string;
   isOpen: boolean;
@@ -112,9 +120,20 @@ export type ArchiveSessionActivityResult = {
 };
 
 export type QwtStore = {
+  createTeacherSpace(
+    code: string,
+    name: string,
+    pinHash: string,
+  ): Promise<TeacherSpace>;
+  getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   getSession(code: string): Promise<Session | null>;
+  getSessionInSpace(spaceCode: string, code: string): Promise<Session | null>;
   getOrCreateSession(code: string): Promise<Session>;
-  listSessions(): Promise<Session[]>;
+  getOrCreateSessionInSpace(
+    spaceCode: string,
+    code: string,
+  ): Promise<Session | null>;
+  listSessions(spaceCode?: string): Promise<Session[]>;
   updateSession(code: string, patch: SessionPatch): Promise<Session | null>;
   listPromptHistory(code: string): Promise<PromptHistoryItem[]>;
   listSubmissions(
@@ -165,6 +184,8 @@ export type QwtStore = {
   ): Promise<ArchiveSessionActivityResult | null>;
 };
 
+export const DEFAULT_SPACE_CODE = "default";
+
 export const DEFAULT_PROMPT =
   "In one or two sentences, explain what the p-value tells us in this setting.";
 
@@ -181,12 +202,38 @@ export function normalizeSessionCode(code: string) {
     .replace(/-{2,}/g, "-");
 }
 
+export const normalizeSpaceCode = normalizeSessionCode;
+
 export function titleFromCode(code: string) {
   return code
     .split(/[-_]/)
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+export function validateTeacherSpaceName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ");
+
+  if (!normalized) {
+    throw new Error("Space name is required.");
+  }
+
+  if (normalized.length > 120) {
+    throw new Error("Space name must be 120 characters or fewer.");
+  }
+
+  return normalized;
+}
+
+export function validateTeacherSpacePinHash(pinHash: string) {
+  const normalized = pinHash.trim();
+
+  if (normalized.length < 8 || normalized.length > 300) {
+    throw new Error("Space PIN hash could not be saved.");
+  }
+
+  return normalized;
 }
 
 export function normalizeStudentName(name: string) {

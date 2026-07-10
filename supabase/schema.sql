@@ -1,7 +1,15 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.qwt_teacher_spaces (
+  code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  name text not null check (char_length(name) between 1 and 120),
+  pin_hash text not null check (char_length(pin_hash) between 8 and 300),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.qwt_sessions (
   code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  space_code text not null default 'default' references public.qwt_teacher_spaces(code) on delete restrict,
   title text not null check (char_length(title) between 1 and 120),
   prompt text not null check (char_length(prompt) between 5 and 1200),
   is_open boolean not null default true,
@@ -78,6 +86,12 @@ create index if not exists qwt_submissions_session_status_idx
 create index if not exists qwt_submissions_session_archived_created_idx
   on public.qwt_submissions (session_code, archived_at, created_at desc);
 
+create index if not exists qwt_sessions_space_created_idx
+  on public.qwt_sessions (space_code, created_at desc);
+
+create unique index if not exists qwt_sessions_space_code_idx
+  on public.qwt_sessions (space_code, code);
+
 create index if not exists qwt_question_bank_session_title_idx
   on public.qwt_question_bank (session_code, title);
 
@@ -96,12 +110,17 @@ create index if not exists qwt_group_questions_session_archived_created_idx
 create index if not exists qwt_group_question_votes_voter_idx
   on public.qwt_group_question_votes (voter_id);
 
+alter table public.qwt_teacher_spaces enable row level security;
 alter table public.qwt_sessions enable row level security;
 alter table public.qwt_submissions enable row level security;
 alter table public.qwt_question_bank enable row level security;
 alter table public.qwt_prompt_history enable row level security;
 alter table public.qwt_group_questions enable row level security;
 alter table public.qwt_group_question_votes enable row level security;
+
+insert into public.qwt_teacher_spaces (code, name, pin_hash)
+values ('default', 'Default Space', 'plain:teach123')
+on conflict (code) do nothing;
 
 insert into public.qwt_sessions (code, title, prompt, is_open)
 values (

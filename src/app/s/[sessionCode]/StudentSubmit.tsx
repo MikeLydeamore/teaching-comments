@@ -11,6 +11,7 @@ import type { DrawingData, GifData } from "@/lib/qwt-store";
 type StudentSubmitProps = {
   initialStudentName: string;
   sessionCode: string;
+  spaceCode?: string;
   prompt: string;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
@@ -27,6 +28,7 @@ type SavedSubmission = {
 export function StudentSubmit({
   initialStudentName,
   sessionCode,
+  spaceCode,
   prompt,
   timerDurationSeconds,
   timerEndsAt,
@@ -146,7 +148,9 @@ export function StudentSubmit({
         </div>
         <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-sm shadow-sm">
           <p className="font-medium text-slate-900">{sessionCode}</p>
-          <p className="text-slate-500">session</p>
+          <p className="text-slate-500">
+            {spaceCode ? `${spaceCode} space` : "session"}
+          </p>
         </div>
       </div>
 

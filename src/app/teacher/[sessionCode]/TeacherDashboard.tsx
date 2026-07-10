@@ -60,6 +60,7 @@ type TeacherDashboardProps = {
   initialQuestionBank: QuestionBankItem[];
   session: Session;
   initialStats: Stats;
+  spaceCode?: string;
 };
 
 type SubmissionSortOrder = "newest" | "oldest";
@@ -313,6 +314,7 @@ export function TeacherDashboard({
   initialQuestionBank,
   session,
   initialStats,
+  spaceCode,
 }: TeacherDashboardProps) {
   const [sessionDetails, setSessionDetails] = useState(session);
   const [promptDraft, setPromptDraft] = useState(session.prompt);
@@ -790,7 +792,14 @@ export function TeacherDashboard({
     resultsSearch.set("promptHistoryId", selectedPromptHistoryId);
   }
 
-  const resultsUrl = `/teacher/${session.code}/results?${resultsSearch.toString()}`;
+  const studentUrl = spaceCode
+    ? `/s/${spaceCode}/${session.code}`
+    : `/s/${session.code}`;
+  const teacherHomeUrl = spaceCode ? `/teacher/${spaceCode}` : "/teacher";
+  const dashboardUrl = spaceCode
+    ? `/teacher/${spaceCode}/${session.code}`
+    : `/teacher/${session.code}`;
+  const resultsUrl = `${dashboardUrl}/results?${resultsSearch.toString()}`;
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -806,18 +815,18 @@ export function TeacherDashboard({
           </div>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={`/s/${session.code}`}
+            href={studentUrl}
           >
             Open student page
           </Link>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href="/teacher"
+            href={teacherHomeUrl}
           >
             Select session
           </Link>
           <form action={logoutTeacher}>
-            <input name="next" type="hidden" value="/teacher" />
+            <input name="next" type="hidden" value={teacherHomeUrl} />
             <button
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
               type="submit"

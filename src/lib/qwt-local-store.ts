@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
   applySessionPatch,
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
+  normalizeSpaceCode,
   normalizeStudentName,
   normalizeSubmissionPatch,
   now,
@@ -16,12 +18,15 @@ import {
   validateQuestionTitle,
   validateSubmissionContent,
   validateQuestionText,
+  validateTeacherSpaceName,
+  validateTeacherSpacePinHash,
   type GroupQuestion,
   type PromptHistoryItem,
   type QuestionBankItem,
   type QwtStore,
   type Session,
   type Submission,
+  type TeacherSpace,
 } from "./qwt-store-model";
 
 type StoreData = {
@@ -30,6 +35,7 @@ type StoreData = {
   questionBank: QuestionBankItem[];
   sessions: Session[];
   submissions: Submission[];
+  teacherSpaces: TeacherSpace[];
 };
 
 type StoredGroupQuestion = Omit<GroupQuestion, "hasVoted" | "voteCount"> & {
@@ -55,9 +61,18 @@ function defaultStore(): StoreData {
       },
     ],
     questionBank: [],
+    teacherSpaces: [
+      {
+        code: DEFAULT_SPACE_CODE,
+        name: "Default Space",
+        pinHash: "plain:teach123",
+        createdAt,
+      },
+    ],
     sessions: [
       {
         code: "demo-lecture",
+        spaceCode: DEFAULT_SPACE_CODE,
         title: "Demo Lecture",
         prompt: DEFAULT_PROMPT,
         isOpen: true,
@@ -133,8 +148,26 @@ async function readStore(): Promise<StoreData> {
   await ensureStore();
   const raw = await readFile(STORE_PATH, "utf8");
   const data = JSON.parse(raw) as Partial<StoreData>;
+  const createdAt = now();
+  const teacherSpaces = data.teacherSpaces?.length
+    ? data.teacherSpaces.map((space) => ({
+        ...space,
+        code: normalizeSpaceCode(space.code) || DEFAULT_SPACE_CODE,
+        name: space.name ?? (titleFromCode(space.code) || "Teaching Space"),
+        pinHash: space.pinHash ?? "plain:teach123",
+        createdAt: space.createdAt ?? createdAt,
+      }))
+    : [
+        {
+          code: DEFAULT_SPACE_CODE,
+          name: "Default Space",
+          pinHash: "plain:teach123",
+          createdAt,
+        },
+      ];
   const sessions = (data.sessions ?? []).map((session) => ({
     ...session,
+    spaceCode: session.spaceCode ?? DEFAULT_SPACE_CODE,
     promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
     timerDurationSeconds: session.timerDurationSeconds ?? 0,
     timerEndsAt: session.timerEndsAt ?? null,
@@ -154,6 +187,7 @@ async function readStore(): Promise<StoreData> {
       updatedAt: question.updatedAt ?? question.createdAt,
       voterIds: question.voterIds ?? [],
     })),
+    teacherSpaces,
     questionBank: (data.questionBank ?? []).map((question) => ({
       ...question,
       title: question.title ?? question.text,
@@ -192,6 +226,43 @@ async function writeStore(data: StoreData) {
 }
 
 export const localStore: QwtStore = {
+  async createTeacherSpace(code, name, pinHash) {
+    const spaceCode = normalizeSpaceCode(code);
+
+    if (!spaceCode) {
+      throw new Error("Space code is required.");
+    }
+
+    const data = await readStore();
+    const existing = data.teacherSpaces.find((space) => space.code === spaceCode);
+
+    if (existing) {
+      throw new Error("That space code already exists.");
+    }
+
+    const space: TeacherSpace = {
+      code: spaceCode,
+      name: validateTeacherSpaceName(name),
+      pinHash: validateTeacherSpacePinHash(pinHash),
+      createdAt: now(),
+    };
+
+    data.teacherSpaces.push(space);
+    await writeStore(data);
+    return space;
+  },
+
+  async getTeacherSpace(code) {
+    const spaceCode = normalizeSpaceCode(code);
+
+    if (!spaceCode) {
+      return null;
+    }
+
+    const data = await readStore();
+    return data.teacherSpaces.find((space) => space.code === spaceCode) ?? null;
+  },
+
   async getSession(code) {
     const sessionCode = normalizeSessionCode(code);
 
@@ -203,10 +274,53 @@ export const localStore: QwtStore = {
     return data.sessions.find((session) => session.code === sessionCode) ?? null;
   },
 
+  async getSessionInSpace(spaceCode, code) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+    const sessionCode = normalizeSessionCode(code);
+
+    if (!normalizedSpaceCode || !sessionCode) {
+      return null;
+    }
+
+    const data = await readStore();
+    return (
+      data.sessions.find(
+        (session) =>
+          session.spaceCode === normalizedSpaceCode && session.code === sessionCode,
+      ) ?? null
+    );
+  },
+
   async getOrCreateSession(code) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const session = await this.getOrCreateSessionInSpace(
+      DEFAULT_SPACE_CODE,
+      sessionCode,
+    );
+
+    if (!session) {
+      throw new Error("Default teaching space is missing.");
+    }
+
+    return session;
+  },
+
+  async getOrCreateSessionInSpace(spaceCode, code) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode) || DEFAULT_SPACE_CODE;
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();
-    const existing = data.sessions.find((session) => session.code === sessionCode);
+    const space = data.teacherSpaces.find(
+      (teacherSpace) => teacherSpace.code === normalizedSpaceCode,
+    );
+
+    if (!space) {
+      return null;
+    }
+
+    const existing = data.sessions.find(
+      (session) =>
+        session.spaceCode === normalizedSpaceCode && session.code === sessionCode,
+    );
 
     if (existing) {
       return existing;
@@ -215,6 +329,7 @@ export const localStore: QwtStore = {
     const timestamp = now();
     const session: Session = {
       code: sessionCode,
+      spaceCode: normalizedSpaceCode,
       title: titleFromCode(sessionCode) || "Quick Write",
       prompt: DEFAULT_PROMPT,
       isOpen: true,
@@ -236,12 +351,18 @@ export const localStore: QwtStore = {
     return session;
   },
 
-  async listSessions() {
+  async listSessions(spaceCode) {
+    const normalizedSpaceCode = spaceCode ? normalizeSpaceCode(spaceCode) : "";
     const data = await readStore();
 
-    return [...data.sessions].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    return [...data.sessions]
+      .filter((session) =>
+        normalizedSpaceCode ? session.spaceCode === normalizedSpaceCode : true,
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
   },
 
   async updateSession(code, patch) {

@@ -1,8 +1,11 @@
 import { updateSubmission } from "@/lib/qwt-store";
-import { isTeacherAuthenticated, teacherUnauthorizedResponse } from "@/lib/teacher-auth";
+import {
+  isAnyTeacherAuthenticated,
+  teacherUnauthorizedResponse,
+} from "@/lib/teacher-session-auth";
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/submissions/[id]">) {
-  if (!(await isTeacherAuthenticated())) {
+  if (!(await isAnyTeacherAuthenticated())) {
     return teacherUnauthorizedResponse();
   }
 
