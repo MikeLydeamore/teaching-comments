@@ -12,6 +12,7 @@ type StudentSubmitProps = {
   initialStudentName: string;
   sessionCode: string;
   spaceCode?: string;
+  spaceName?: string;
   prompt: string;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
@@ -29,6 +30,7 @@ export function StudentSubmit({
   initialStudentName,
   sessionCode,
   spaceCode,
+  spaceName,
   prompt,
   timerDurationSeconds,
   timerEndsAt,
@@ -149,7 +151,7 @@ export function StudentSubmit({
         <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-sm shadow-sm">
           <p className="font-medium text-slate-900">{sessionCode}</p>
           <p className="text-slate-500">
-            {spaceCode ? `${spaceCode} space` : "session"}
+            {spaceName ?? (spaceCode ? `${spaceCode} space` : "session")}
           </p>
         </div>
       </div>

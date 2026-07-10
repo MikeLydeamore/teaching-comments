@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { getSessionInSpace } from "@/lib/qwt-store";
+import { getSessionInSpace, getTeacherSpace } from "@/lib/qwt-store";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "../StudentSubmit";
 
@@ -12,7 +12,10 @@ export default async function StudentSpacePage({
 }) {
   await connection();
   const { roomCode, sessionCode: spaceCode } = await params;
-  const session = await getSessionInSpace(spaceCode, roomCode);
+  const [session, space] = await Promise.all([
+    getSessionInSpace(spaceCode, roomCode),
+    getTeacherSpace(spaceCode),
+  ]);
 
   if (!session) {
     return (
@@ -42,6 +45,7 @@ export default async function StudentSpacePage({
       prompt={session.prompt}
       sessionCode={session.code}
       spaceCode={spaceCode}
+      spaceName={space?.name ?? spaceCode}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
     />
