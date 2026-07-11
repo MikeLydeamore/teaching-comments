@@ -1,17 +1,13 @@
-import { createTeachingSpace, enterTeacherSpace } from "./actions";
+import { enterTeacherSpace } from "./actions";
 
 type TeacherSessionChooserProps = {
-  createStatus: string;
   initialSpaceCode: string;
   spaceStatus: string;
-  usesDefaultAdminPin: boolean;
 };
 
 export function TeacherSessionChooser({
-  createStatus,
   initialSpaceCode,
   spaceStatus,
-  usesDefaultAdminPin,
 }: TeacherSessionChooserProps) {
   const spaceMessage =
     {
@@ -19,13 +15,6 @@ export function TeacherSessionChooser({
       missing: "Enter a space code.",
       "not-found": "We could not find that teaching space.",
     }[spaceStatus] ?? "";
-  const createMessage =
-    {
-      "admin-failed": "That admin PIN did not work.",
-      exists: "That space code already exists.",
-      invalid: "Check the space name, code, and PIN.",
-      missing: "Enter a space code.",
-    }[createStatus] ?? "";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -43,15 +32,6 @@ export function TeacherSessionChooser({
             rooms for the space they unlock.
           </p>
         </header>
-
-        {usesDefaultAdminPin ? (
-          <aside className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            Local prototype admin PIN is <strong>teach123</strong>. Set
-            <code className="mx-1 rounded bg-amber-100 px-1">ADMIN_PIN</code>
-            before deploying. If it is not set, the app falls back to
-            <code className="mx-1 rounded bg-amber-100 px-1">TEACHER_PIN</code>.
-          </aside>
-        ) : null}
 
         <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">Unlock a space</h2>
@@ -91,73 +71,6 @@ export function TeacherSessionChooser({
           {spaceMessage ? (
             <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
               {spaceMessage}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">Create a space</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Use the admin PIN for this one-time setup. The space PIN is what
-            teachers will use day to day.
-          </p>
-          <form action={createTeachingSpace} className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-sm font-semibold text-slate-700" htmlFor="new-space-code">
-                Space code
-              </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="new-space-code"
-                name="spaceCode"
-                placeholder="stats-101"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700" htmlFor="spaceName">
-                Space name
-              </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="spaceName"
-                name="spaceName"
-                placeholder="STAT101 Semester 2"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700" htmlFor="spacePin">
-                Space PIN
-              </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="spacePin"
-                name="spacePin"
-                type="password"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-slate-700" htmlFor="adminPin">
-                Admin PIN
-              </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="adminPin"
-                name="adminPin"
-                type="password"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <button
-                className="h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-                type="submit"
-              >
-                Create space
-              </button>
-            </div>
-          </form>
-          {createMessage ? (
-            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
-              {createMessage}
             </p>
           ) : null}
         </section>

@@ -9,6 +9,7 @@ import type { TeacherSpace } from "@/lib/qwt-store";
 
 export const TEACHER_COOKIE = "qwt_teacher";
 export const TEACHER_SPACE_COOKIE = "qwt_teacher_space";
+export const ADMIN_COOKIE = "qwt_admin";
 
 const COOKIE_MAX_AGE_SECONDS = 8 * 60 * 60;
 const DEFAULT_DEV_PIN = "teach123";
@@ -49,6 +50,12 @@ export function isValidAdminPin(pin: string) {
 function teacherToken() {
   return createHash("sha256")
     .update(`quick-write-teacher:${teacherPin()}`)
+    .digest("hex");
+}
+
+function adminToken() {
+  return createHash("sha256")
+    .update(`quick-write-admin:${adminPin()}:${authSecret()}`)
     .digest("hex");
 }
 
@@ -109,6 +116,13 @@ export async function isTeacherAuthenticated() {
   return Boolean(value && safeEqual(value, teacherToken()));
 }
 
+export async function isAdminAuthenticated() {
+  const cookieStore = await cookies();
+  const value = cookieStore.get(ADMIN_COOKIE)?.value;
+
+  return Boolean(value && safeEqual(value, adminToken()));
+}
+
 export async function getAuthenticatedTeacherSpaceCode() {
   const cookieStore = await cookies();
   const value = cookieStore.get(TEACHER_SPACE_COOKIE)?.value ?? "";
@@ -148,6 +162,18 @@ export async function setTeacherAuthCookie() {
   });
 }
 
+export async function setAdminAuthCookie() {
+  const cookieStore = await cookies();
+
+  cookieStore.set(ADMIN_COOKIE, adminToken(), {
+    httpOnly: true,
+    maxAge: COOKIE_MAX_AGE_SECONDS,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
 export async function setTeacherSpaceAuthCookie(space: TeacherSpace) {
   const cookieStore = await cookies();
 
@@ -168,6 +194,7 @@ export async function clearTeacherAuthCookie() {
   const cookieStore = await cookies();
   cookieStore.delete(TEACHER_COOKIE);
   cookieStore.delete(TEACHER_SPACE_COOKIE);
+  cookieStore.delete(ADMIN_COOKIE);
 }
 
 export async function teacherUnauthorizedResponse() {

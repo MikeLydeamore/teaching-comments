@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   clearTeacherAuthCookie,
   hashTeacherSpacePin,
+  setAdminAuthCookie,
   isTeacherAuthenticated,
   isTeacherSpaceCookieValid,
   isValidAdminPin,
@@ -36,23 +37,34 @@ function teacherSessionPath(spaceCode: string, sessionCode: string) {
   return `${teacherSpacePath(spaceCode)}/${sessionCode || "demo-lecture"}`;
 }
 
+function adminSpacesPath(status: string, spaceCode = "") {
+  const params = new URLSearchParams({ spaceCreate: status });
+
+  if (spaceCode) {
+    params.set("space", spaceCode);
+  }
+
+  return `/admin/spaces?${params.toString()}`;
+}
+
 export async function createTeachingSpace(formData: FormData) {
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const name = String(formData.get("spaceName") ?? "");
   const spacePin = String(formData.get("spacePin") ?? "");
   const adminPin = String(formData.get("adminPin") ?? "");
-  let space: Awaited<ReturnType<typeof createTeacherSpace>>;
 
   if (!spaceCode) {
-    redirect("/teacher?spaceCreate=missing");
+    redirect(adminSpacesPath("missing"));
   }
 
   if (!isValidAdminPin(adminPin)) {
-    redirect(`/teacher?spaceCreate=admin-failed&space=${encodeURIComponent(spaceCode)}`);
+    redirect(adminSpacesPath("admin-failed", spaceCode));
   }
 
+  await setAdminAuthCookie();
+
   try {
-    space = await createTeacherSpace(
+    await createTeacherSpace(
       spaceCode,
       name || spaceCode,
       hashTeacherSpacePin(spacePin),
@@ -62,11 +74,10 @@ export async function createTeachingSpace(formData: FormData) {
       error instanceof Error && error.message.includes("already exists")
         ? "exists"
         : "invalid";
-    redirect(`/teacher?spaceCreate=${reason}&space=${encodeURIComponent(spaceCode)}`);
+    redirect(adminSpacesPath(reason, spaceCode));
   }
 
-  await setTeacherSpaceAuthCookie(space);
-  redirect(teacherSpacePath(space.code));
+  redirect(adminSpacesPath("created", spaceCode));
 }
 
 export async function enterTeacherSpace(formData: FormData) {

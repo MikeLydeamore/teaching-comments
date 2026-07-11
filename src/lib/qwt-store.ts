@@ -28,6 +28,7 @@ export type {
   SubmissionPatch,
   SubmissionStatus,
   TeacherSpace,
+  TeacherSpaceSummary,
 } from "./qwt-store-model";
 
 function shouldUseSupabaseStore() {
@@ -62,6 +63,17 @@ export async function createTeacherSpace(
 
 export async function getTeacherSpace(code: string) {
   return getStore().getTeacherSpace(code);
+}
+
+export async function listTeacherSpaces() {
+  return getStore().listTeacherSpaces();
+}
+
+export async function updateTeacherSpacePinHash(
+  code: string,
+  pinHash: string,
+) {
+  return getStore().updateTeacherSpacePinHash(code, pinHash);
 }
 
 export async function getSessionInSpace(spaceCode: string, code: string) {

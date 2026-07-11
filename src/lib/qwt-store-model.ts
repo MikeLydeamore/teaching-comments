@@ -35,6 +35,8 @@ export type TeacherSpace = {
   createdAt: string;
 };
 
+export type TeacherSpaceSummary = Omit<TeacherSpace, "pinHash">;
+
 export type Session = {
   code: string;
   spaceCode: string;
@@ -126,6 +128,11 @@ export type QwtStore = {
     pinHash: string,
   ): Promise<TeacherSpace>;
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
+  listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
+  updateTeacherSpacePinHash(
+    code: string,
+    pinHash: string,
+  ): Promise<TeacherSpace | null>;
   getSession(code: string): Promise<Session | null>;
   getSessionInSpace(spaceCode: string, code: string): Promise<Session | null>;
   getOrCreateSession(code: string): Promise<Session>;

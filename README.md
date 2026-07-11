@@ -8,7 +8,7 @@ The current slice includes:
 - a student join page at `/join`
 - a teacher dashboard at `/teacher/default/demo-lecture`
 - teacher spaces with an admin-created space PIN
-- a prototype admin PIN gate for creating spaces
+- a prototype admin page at `/admin/spaces` for creating spaces and resetting space PINs
 - in-session prompt editing from the teacher dashboard
 - per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
@@ -45,6 +45,7 @@ Open:
 - `http://localhost:3000/join`
 - `http://localhost:3000/s/default/demo-lecture`
 - `http://localhost:3000/teacher`
+- `http://localhost:3000/admin/spaces`
 - `http://localhost:3000/teacher/default`
 - `http://localhost:3000/teacher/default/demo-lecture`
 
@@ -144,8 +145,8 @@ teach123
 
 Set `ADMIN_PIN` before deploying anywhere public. If `ADMIN_PIN` is not set,
 the app falls back to `TEACHER_PIN` for compatibility with the earlier
-prototype setup. Space PINs are created in the app and stored hashed in the
-database.
+prototype setup. Space PINs are created and reset from `/admin/spaces`, then
+stored hashed in the database.
 
 ## Next steps
 

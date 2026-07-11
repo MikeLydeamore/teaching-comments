@@ -35,6 +35,12 @@ type SupabaseTeacherSpaceRow = {
   created_at: string;
 };
 
+type SupabaseTeacherSpaceSummaryRow = {
+  code: string;
+  name: string;
+  created_at: string;
+};
+
 type SupabaseSessionRow = {
   code: string;
   space_code: string;
@@ -167,6 +173,10 @@ function teacherSpaceSelect() {
   return "code,name,pin_hash,created_at";
 }
 
+function teacherSpaceSummarySelect() {
+  return "code,name,created_at";
+}
+
 function submissionSelect() {
   return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,archived_at,created_at,updated_at";
 }
@@ -206,6 +216,14 @@ function teacherSpaceFromRow(row: SupabaseTeacherSpaceRow): TeacherSpace {
     code: row.code,
     name: row.name,
     pinHash: row.pin_hash,
+    createdAt: row.created_at,
+  };
+}
+
+function teacherSpaceSummaryFromRow(row: SupabaseTeacherSpaceSummaryRow) {
+  return {
+    code: row.code,
+    name: row.name,
     createdAt: row.created_at,
   };
 }
@@ -417,6 +435,35 @@ export const supabaseStore: QwtStore = {
   },
 
   getTeacherSpace: getTeacherSpaceFromSupabase,
+
+  async listTeacherSpaces() {
+    const rows = await supabaseFetch<SupabaseTeacherSpaceSummaryRow[]>(
+      `/qwt_teacher_spaces?select=${teacherSpaceSummarySelect()}&order=name.asc`,
+    );
+
+    return rows.map(teacherSpaceSummaryFromRow);
+  },
+
+  async updateTeacherSpacePinHash(code, pinHash) {
+    const spaceCode = normalizeSpaceCode(code);
+
+    if (!spaceCode) {
+      return null;
+    }
+
+    const rows = await supabaseFetch<SupabaseTeacherSpaceRow[]>(
+      `/qwt_teacher_spaces?code=eq.${encodeFilterValue(spaceCode)}&select=${teacherSpaceSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          pin_hash: validateTeacherSpacePinHash(pinHash),
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
+  },
 
   getSession: getSessionFromSupabase,
 

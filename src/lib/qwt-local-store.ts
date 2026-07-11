@@ -263,6 +263,33 @@ export const localStore: QwtStore = {
     return data.teacherSpaces.find((space) => space.code === spaceCode) ?? null;
   },
 
+  async listTeacherSpaces() {
+    const data = await readStore();
+
+    return data.teacherSpaces
+      .map(({ code, name, createdAt }) => ({ code, name, createdAt }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  },
+
+  async updateTeacherSpacePinHash(code, pinHash) {
+    const spaceCode = normalizeSpaceCode(code);
+
+    if (!spaceCode) {
+      return null;
+    }
+
+    const data = await readStore();
+    const space = data.teacherSpaces.find((item) => item.code === spaceCode);
+
+    if (!space) {
+      return null;
+    }
+
+    space.pinHash = validateTeacherSpacePinHash(pinHash);
+    await writeStore(data);
+    return space;
+  },
+
   async getSession(code) {
     const sessionCode = normalizeSessionCode(code);
 
