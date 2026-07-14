@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { enterTeacherSession, logoutTeacher } from "./actions";
 import type { Session, TeacherSpace } from "@/lib/qwt-store";
@@ -94,17 +95,22 @@ export function TeacherSpaceDashboard({
           {sessions.length ? (
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {sessions.map((session) => (
-                <Link
+                <PendingLink
                   className="rounded-md border border-slate-200 p-4 transition hover:border-teal-500 hover:bg-teal-50"
                   href={`/host/${space.code}/${session.code}`}
                   key={session.code}
+                  pendingStatusText="Opening dashboard..."
+                  statusClassName="mt-3 block text-sm font-semibold text-teal-700"
+                  statusText="Open dashboard"
                 >
-                  <p className="font-semibold text-slate-950">{session.title}</p>
+                  <p className="font-semibold text-slate-950">
+                    {session.title}
+                  </p>
                   <p className="mt-1 text-sm text-slate-500">{session.code}</p>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
                     {session.prompt}
                   </p>
-                </Link>
+                </PendingLink>
               ))}
             </div>
           ) : (
