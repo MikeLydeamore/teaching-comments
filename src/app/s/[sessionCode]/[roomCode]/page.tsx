@@ -20,7 +20,7 @@ export default async function StudentSpacePage({
   if (!session) {
     return (
       <StudentSessionUnavailable
-        message="We could not find that quick write session in this space."
+        message="We could not find that Ed.ie session in this space."
         sessionCode={`${spaceCode}/${roomCode}`}
       />
     );
@@ -29,7 +29,7 @@ export default async function StudentSpacePage({
   if (!session.isOpen) {
     return (
       <StudentSessionUnavailable
-        message="This quick write session is closed."
+        message="This Ed.ie session is closed."
         sessionCode={`${spaceCode}/${session.code}`}
       />
     );
@@ -63,7 +63,7 @@ function StudentSessionUnavailable({
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-          Quick Write
+          Ed.ie
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
           Session unavailable

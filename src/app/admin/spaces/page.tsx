@@ -53,7 +53,7 @@ export default async function AdminSpacesPage({
       <div className="mx-auto max-w-4xl">
         <header className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-            Admin setup
+            Ed.ie admin
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
             Create a teaching space
@@ -67,7 +67,7 @@ export default async function AdminSpacesPage({
 
         {isDefaultAdminPin() ? (
           <aside className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            Local prototype admin PIN is <strong>teach123</strong>. Set
+            Local development admin PIN is <strong>teach123</strong>. Set
             <code className="mx-1 rounded bg-amber-100 px-1">ADMIN_PIN</code>
             before deploying. If it is not set, the app falls back to
             <code className="mx-1 rounded bg-amber-100 px-1">TEACHER_PIN</code>.

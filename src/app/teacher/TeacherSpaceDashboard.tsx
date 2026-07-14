@@ -45,7 +45,7 @@ export function TeacherSpaceDashboard({
           <h2 className="text-lg font-semibold text-slate-950">Open a session</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Enter a session code to open its live dashboard. If the code does
-            not exist yet, the prototype will create it in this space.
+            not exist yet, Ed.ie will create it in this space.
           </p>
           <form
             action={enterTeacherSession}

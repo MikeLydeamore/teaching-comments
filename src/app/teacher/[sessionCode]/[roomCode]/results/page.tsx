@@ -119,7 +119,7 @@ export default async function TeacherSpaceResultsPage({
       <header className="flex flex-wrap items-start justify-between gap-5 border-b border-slate-200 pb-5">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-            Quick Write results
+            Ed.ie results
           </p>
           <h1 className="mt-2 text-5xl font-semibold tracking-normal">
             {session.title}

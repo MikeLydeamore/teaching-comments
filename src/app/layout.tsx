@@ -4,8 +4,8 @@ import { ThemeSelector } from "@/components/ThemeSelector";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Quick Write Tool",
-  description: "A formative writing feedback prototype for large classes.",
+  title: "Ed.ie",
+  description: "A classroom helper for questions, responses, and live check-ins.",
 };
 
 export default function RootLayout({

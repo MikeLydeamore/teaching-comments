@@ -2,11 +2,11 @@ import Link from "next/link";
 import { joinSession } from "./actions";
 
 const messages = {
-  closed: "That quick write session is closed.",
+  closed: "That Ed.ie session is closed.",
   missing: "Enter the session code from your teacher.",
   "space-missing": "Enter the teaching space code from your teacher.",
   "name-too-long": "Names must be 80 characters or fewer.",
-  "not-found": "We could not find that quick write session.",
+  "not-found": "We could not find that Ed.ie session.",
 };
 
 export default async function JoinPage({
@@ -23,7 +23,7 @@ export default async function JoinPage({
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-          Quick Write
+          Ed.ie
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
           Join a session

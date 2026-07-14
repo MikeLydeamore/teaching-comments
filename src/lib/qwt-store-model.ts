@@ -295,7 +295,7 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
   let pointCount = 0;
 
   if (value.strokes.length > MAX_DRAWING_STROKES) {
-    throw new Error("Please keep drawings a little simpler for this prototype.");
+    throw new Error("Please keep drawings a little simpler.");
   }
 
   for (const rawStroke of value.strokes) {
@@ -326,7 +326,7 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
       pointCount += 1;
 
       if (pointCount > MAX_DRAWING_POINTS) {
-        throw new Error("Please keep drawings a little simpler for this prototype.");
+        throw new Error("Please keep drawings a little simpler.");
       }
     }
 
@@ -351,7 +351,7 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
   };
 
   if (JSON.stringify(drawingData).length > MAX_DRAWING_PAYLOAD_CHARS) {
-    throw new Error("Please keep drawings a little simpler for this prototype.");
+    throw new Error("Please keep drawings a little simpler.");
   }
 
   return drawingData;
@@ -427,7 +427,7 @@ export function validateSubmissionText(text: string) {
   const trimmed = text.trim();
 
   if (trimmed.length > 2000) {
-    throw new Error("Please keep submissions under 2000 characters for the prototype.");
+    throw new Error("Please keep submissions under 2000 characters.");
   }
 
   return trimmed;

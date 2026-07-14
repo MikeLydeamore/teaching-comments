@@ -6,14 +6,15 @@ export default function Home() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 rounded-md border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-            Quick Write Tool
+            Ed.ie
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
-            Real-time formative writing feedback
+            Ask, answer, understand
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            A first prototype for collecting anonymous student writing during a
-            lecture and giving teachers a live, sortable view of the room.
+            Ed.ie is a friendly classroom helper for quick questions, short
+            responses, drawings, polls, and live check-ins. It helps students
+            speak up and helps teachers see what is making sense.
           </p>
         </header>
 
@@ -26,11 +27,11 @@ export default function Home() {
               Student view
             </p>
             <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-              Join with a code
+              Join an Ed.ie session
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Opens a student join page where a teaching space and session code
-              unlock the writing box.
+              Enter the space and session code from your teacher to respond,
+              draw, ask a question, or vote on questions from the room.
             </p>
           </Link>
 
@@ -42,43 +43,23 @@ export default function Home() {
               Teacher view
             </p>
             <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-              Select a session
+              Open your teaching space
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Unlock a teaching space, choose a session, and watch responses
-              live.
+              Choose a session, update the prompt, show a QR code, and watch
+              responses and questions arrive live.
             </p>
           </Link>
         </section>
 
-        <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">Prototype notes</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            This first slice uses local file storage so we can test the classroom
-            workflow with no paid services. The storage layer is isolated so
-            Supabase can replace it when we are ready to host a shared pilot.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-              href="/teacher"
-            >
-              Open teacher space
-            </Link>
-            <Link
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-              href="/privacy"
-            >
-              Privacy notice
-            </Link>
-            <Link
-              className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 transition hover:border-teal-500 hover:text-teal-800"
-              href="/admin/spaces"
-            >
-              Admin setup
-            </Link>
-          </div>
-        </section>
+        <div className="mt-5">
+          <Link
+            className="text-sm font-semibold text-teal-700 underline"
+            href="/privacy"
+          >
+            Privacy notice
+          </Link>
+        </div>
       </div>
     </main>
   );

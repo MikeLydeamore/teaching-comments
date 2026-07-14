@@ -34,7 +34,7 @@ export function TeacherLogin({
           </p>
         {usesDefaultPin ? (
           <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            Local prototype PIN is <strong>teach123</strong>.
+            Local development PIN is <strong>teach123</strong>.
           </p>
         ) : null}
         <form action={loginTeacher} className="mt-5">

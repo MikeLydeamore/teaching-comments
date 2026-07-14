@@ -49,7 +49,7 @@ function csvRow(values: unknown[]) {
 }
 
 function filenameFromSessionCode(sessionCode: string) {
-  return `quick-write-${sessionCode}-${new Date().toISOString().slice(0, 10)}.csv`;
+  return `edie-${sessionCode}-${new Date().toISOString().slice(0, 10)}.csv`;
 }
 
 export async function GET(

@@ -142,7 +142,7 @@ export function StudentSubmit({
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-            Quick Write
+            Ed.ie
           </p>
           <h1 className="mt-2 text-4xl font-semibold tracking-normal text-slate-950">
             Write a response

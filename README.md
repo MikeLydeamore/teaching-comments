@@ -1,6 +1,7 @@
-# Quick Write Tool prototype
+# Ed.ie
 
-A zero-cost first prototype of a live formative writing tool for large classes.
+Ed.ie is a classroom helper for questions, short responses, drawings, polls,
+and live check-ins.
 
 The current slice includes:
 
@@ -9,7 +10,7 @@ The current slice includes:
 - a teacher dashboard at `/teacher/default/demo-lecture`
 - teacher-generated QR codes for the student session link
 - teacher spaces with an admin-created space PIN
-- a prototype admin page at `/admin/spaces` for creating spaces and resetting space PINs
+- an admin page at `/admin/spaces` for creating spaces and resetting space PINs
 - in-session prompt editing from the teacher dashboard
 - per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
@@ -59,10 +60,10 @@ npm run build
 
 ## Storage
 
-For the first local prototype, submissions are stored in `.data/qwt-store.json`.
+For local development, submissions are stored in `.data/qwt-store.json`.
 This keeps the first step free and fast to iterate on.
 
-For a hosted prototype, use Supabase Postgres so data survives Vercel server
+For a hosted deployment, use Supabase Postgres so data survives Vercel server
 restarts and can be managed outside the app:
 
 1. Create a free Supabase project.
@@ -133,12 +134,12 @@ Students join with a space code and session code on `/join` or by opening
 accept existing open sessions. Teachers create sessions by opening a session
 from `/teacher/<space-code>` after entering that space's teacher PIN.
 
-For this prototype, session codes are still globally unique internally even
+For now, session codes are still globally unique internally even
 though access and navigation are scoped by teaching space.
 
 ## Teacher Spaces And PINs
 
-The local prototype defaults to this admin PIN and default-space PIN:
+Local development defaults to this admin PIN and default-space PIN:
 
 ```text
 teach123
@@ -146,7 +147,7 @@ teach123
 
 Set `ADMIN_PIN` before deploying anywhere public. If `ADMIN_PIN` is not set,
 the app falls back to `TEACHER_PIN` for compatibility with the earlier
-prototype setup. Space PINs are created and reset from `/admin/spaces`, then
+setup. Space PINs are created and reset from `/admin/spaces`, then
 stored hashed in the database.
 
 ## Next steps

@@ -508,7 +508,7 @@ export const supabaseStore: QwtStore = {
         body: JSON.stringify({
           code: sessionCode,
           space_code: normalizedSpaceCode,
-          title: titleFromCode(sessionCode) || "Quick Write",
+          title: titleFromCode(sessionCode) || "Ed.ie Session",
           prompt: DEFAULT_PROMPT,
           is_open: true,
           created_at: timestamp,
@@ -700,11 +700,11 @@ export const supabaseStore: QwtStore = {
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
-      throw new Error("This quick write session does not exist. Check the code from your teacher.");
+      throw new Error("This Ed.ie session does not exist. Check the code from your teacher.");
     }
 
     if (!session.isOpen) {
-      throw new Error("This quick write session is closed.");
+      throw new Error("This Ed.ie session is closed.");
     }
 
     const timestamp = now();
