@@ -1,3 +1,4 @@
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { enterTeacherSpace } from "./actions";
 
 type TeacherSessionChooserProps = {
@@ -60,12 +61,12 @@ export function TeacherSessionChooser({
               />
             </div>
             <div className="flex items-end">
-              <button
+              <PendingSubmitButton
                 className="h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 md:w-auto"
-                type="submit"
+                pendingChildren="Opening space..."
               >
                 Open space
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
           {spaceMessage ? (

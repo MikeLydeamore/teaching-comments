@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
@@ -875,12 +876,12 @@ export function TeacherDashboard({
           </Link>
           <form action={logoutTeacher}>
             <input name="next" type="hidden" value={teacherHomeUrl} />
-            <button
+            <PendingSubmitButton
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
-              type="submit"
+              pendingChildren="Locking..."
             >
               Lock
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
       </header>

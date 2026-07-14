@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { joinSession } from "./actions";
 
 const messages = {
@@ -69,12 +70,12 @@ export default async function JoinPage({
           <p className="mt-2 text-xs leading-5 text-slate-500">
             Optional. Leave blank to submit as Anonymous.
           </p>
-          <button
+          <PendingSubmitButton
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-            type="submit"
+            pendingChildren="Joining..."
           >
             Join session
-          </button>
+          </PendingSubmitButton>
         </form>
 
         {error ? (

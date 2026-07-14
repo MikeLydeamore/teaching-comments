@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { enterTeacherSession, logoutTeacher } from "./actions";
 import type { Session, TeacherSpace } from "@/lib/qwt-store";
 
@@ -31,12 +32,12 @@ export function TeacherSpaceDashboard({
             </div>
             <form action={logoutTeacher}>
               <input name="next" type="hidden" value="/host" />
-              <button
+              <PendingSubmitButton
                 className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
-                type="submit"
+                pendingChildren="Locking..."
               >
                 Lock
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         </header>
@@ -65,12 +66,12 @@ export function TeacherSpaceDashboard({
               />
             </div>
             <div className="flex items-end">
-              <button
+              <PendingSubmitButton
                 className="h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 md:w-auto"
-                type="submit"
+                pendingChildren="Opening dashboard..."
               >
                 Open dashboard
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
           {authFailed ? (

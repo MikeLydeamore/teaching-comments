@@ -1,3 +1,4 @@
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { loginTeacher } from "../actions";
 
 type TeacherLoginProps = {
@@ -50,12 +51,12 @@ export function TeacherLogin({
             name="pin"
             type="password"
           />
-          <button
+          <PendingSubmitButton
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-            type="submit"
+            pendingChildren="Unlocking..."
           >
             Unlock host view
-          </button>
+          </PendingSubmitButton>
         </form>
         {authFailed ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">

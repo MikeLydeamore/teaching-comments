@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeNavCard } from "@/components/HomeNavCard";
 
 export default function Home() {
   return (
@@ -19,37 +20,25 @@ export default function Home() {
         </header>
 
         <section className="grid gap-4 md:grid-cols-2">
-          <Link
-            className="rounded-md border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-500 hover:shadow-md"
+          <HomeNavCard
             href="/join"
+            kicker="Participant view"
+            pendingLabel="Opening join page..."
+            title="Join an Ed.ie session"
           >
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Participant view
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-              Join an Ed.ie session
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Enter the space and session code from your host to respond,
-              draw, ask a question, or vote on questions from the room.
-            </p>
-          </Link>
+            Enter the space and session code from your host to respond, draw,
+            ask a question, or vote on questions from the room.
+          </HomeNavCard>
 
-          <Link
-            className="rounded-md border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-500 hover:shadow-md"
+          <HomeNavCard
             href="/host"
+            kicker="Host view"
+            pendingLabel="Opening host view..."
+            title="Manage your hosted space"
           >
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Host view
-            </p>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-              Manage your hosted space
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Choose a session, update the prompt, show a QR code, and watch
-              responses and questions arrive live.
-            </p>
-          </Link>
+            Choose a session, update the prompt, show a QR code, and watch
+            responses and questions arrive live.
+          </HomeNavCard>
         </section>
 
         <div className="mt-5">
