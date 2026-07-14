@@ -47,6 +47,7 @@ type SupabaseSessionRow = {
   title: string;
   prompt: string;
   is_open: boolean;
+  group_questions_screening_enabled: boolean;
   created_at: string;
   prompt_updated_at: string;
   timer_duration_seconds: number;
@@ -92,6 +93,7 @@ type SupabaseGroupQuestionRow = {
   student_name: string;
   text: string;
   is_answered: boolean;
+  is_visible: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -166,7 +168,7 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "code,space_code,title,prompt,is_open,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+  return "code,space_code,title,prompt,is_open,group_questions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
 }
 
 function teacherSpaceSelect() {
@@ -190,7 +192,7 @@ function promptHistorySelect() {
 }
 
 function groupQuestionSelect() {
-  return "id,session_code,student_name,text,is_answered,archived_at,created_at,updated_at";
+  return "id,session_code,student_name,text,is_answered,is_visible,archived_at,created_at,updated_at";
 }
 
 function groupQuestionVoteSelect() {
@@ -204,6 +206,7 @@ function sessionFromRow(row: SupabaseSessionRow): Session {
     title: row.title,
     prompt: row.prompt,
     isOpen: row.is_open,
+    groupQuestionsScreeningEnabled: row.group_questions_screening_enabled ?? false,
     createdAt: row.created_at,
     promptUpdatedAt: row.prompt_updated_at ?? row.created_at,
     timerDurationSeconds: row.timer_duration_seconds ?? 0,
@@ -280,6 +283,7 @@ function groupQuestionFromRow(
     studentName: row.student_name ?? "Anonymous",
     text: row.text,
     isAnswered: row.is_answered,
+    isVisible: row.is_visible ?? true,
     voteCount: questionVotes.length,
     hasVoted: voterId
       ? questionVotes.some((vote) => vote.voter_id === voterId)
@@ -511,6 +515,7 @@ export const supabaseStore: QwtStore = {
           title: titleFromCode(sessionCode) || "Ed.ie Session",
           prompt: DEFAULT_PROMPT,
           is_open: true,
+          group_questions_screening_enabled: false,
           created_at: timestamp,
           prompt_updated_at: timestamp,
           timer_duration_seconds: 0,
@@ -529,6 +534,8 @@ export const supabaseStore: QwtStore = {
               title: session.title,
               prompt: session.prompt,
               is_open: session.isOpen,
+              group_questions_screening_enabled:
+                session.groupQuestionsScreeningEnabled,
               created_at: session.createdAt,
               prompt_updated_at: session.promptUpdatedAt,
               timer_duration_seconds: session.timerDurationSeconds,
@@ -586,6 +593,8 @@ export const supabaseStore: QwtStore = {
           timer_duration_seconds: next.timerDurationSeconds,
           timer_ends_at: next.timerEndsAt,
           is_open: next.isOpen,
+          group_questions_screening_enabled:
+            next.groupQuestionsScreeningEnabled,
         }),
         prefer: "return=representation",
       },
@@ -838,9 +847,10 @@ export const supabaseStore: QwtStore = {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const normalizedVoterId = voterId ? validateGroupQuestionVoterId(voterId) : "";
     const answeredFilter = options.includeAnswered ? "" : "&is_answered=eq.false";
+    const visibleFilter = options.includeHidden ? "" : "&is_visible=eq.true";
     const archivedFilter = options.includeArchived ? "" : "&archived_at=is.null";
     const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
-      `/qwt_group_questions?session_code=eq.${encodeFilterValue(sessionCode)}${answeredFilter}${archivedFilter}&select=${groupQuestionSelect()}&order=created_at.desc`,
+      `/qwt_group_questions?session_code=eq.${encodeFilterValue(sessionCode)}${answeredFilter}${visibleFilter}${archivedFilter}&select=${groupQuestionSelect()}&order=created_at.desc`,
     );
     const votes = await listVotesForQuestionIds(rows.map((question) => question.id));
 
@@ -875,6 +885,7 @@ export const supabaseStore: QwtStore = {
           student_name: normalizeStudentName(studentName ?? ""),
           text: validateGroupQuestionText(text),
           is_answered: false,
+          is_visible: !session.groupQuestionsScreeningEnabled,
           archived_at: null,
           created_at: timestamp,
           updated_at: timestamp,
@@ -950,6 +961,23 @@ export const supabaseStore: QwtStore = {
         method: "PATCH",
         body: JSON.stringify({
           is_answered: isAnswered,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
+  },
+
+  async setGroupQuestionVisible(id, isVisible) {
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
+      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&select=${groupQuestionSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          is_visible: isVisible,
           updated_at: timestamp,
         }),
         prefer: "return=representation",

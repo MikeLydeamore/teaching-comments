@@ -1,4 +1,7 @@
-import { setGroupQuestionAnswered } from "@/lib/qwt-store";
+import {
+  setGroupQuestionAnswered,
+  setGroupQuestionVisible,
+} from "@/lib/qwt-store";
 import {
   isAnyTeacherAuthenticated,
   teacherUnauthorizedResponse,
@@ -13,13 +16,30 @@ export async function PATCH(
   }
 
   const { id } = await ctx.params;
-  const body = (await request.json().catch(() => ({}))) as { isAnswered?: boolean };
+  const body = (await request.json().catch(() => ({}))) as {
+    isAnswered?: boolean;
+    isVisible?: boolean;
+  };
 
-  if (typeof body.isAnswered !== "boolean") {
-    return Response.json({ error: "Answered state is required." }, { status: 400 });
+  if (
+    typeof body.isAnswered !== "boolean" &&
+    typeof body.isVisible !== "boolean"
+  ) {
+    return Response.json(
+      { error: "Answered or visibility state is required." },
+      { status: 400 },
+    );
   }
 
-  const question = await setGroupQuestionAnswered(id, body.isAnswered);
+  let question = null;
+
+  if (typeof body.isAnswered === "boolean") {
+    question = await setGroupQuestionAnswered(id, body.isAnswered);
+  }
+
+  if (typeof body.isVisible === "boolean") {
+    question = await setGroupQuestionVisible(id, body.isVisible);
+  }
 
   if (!question) {
     return Response.json({ error: "Question not found." }, { status: 404 });

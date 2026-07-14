@@ -27,6 +27,7 @@ const columns = [
   "gif_preview_url",
   "gif_url",
   "is_answered",
+  "is_visible",
   "vote_count",
 ];
 
@@ -70,6 +71,7 @@ export async function GET(
     listGroupQuestions(session.code, undefined, {
       includeAnswered: true,
       includeArchived: true,
+      includeHidden: true,
     }),
   ]);
 
@@ -100,6 +102,7 @@ export async function GET(
         submission.gifData?.giphyUrl ?? submission.gifData?.url ?? "",
         "",
         "",
+        "",
       ]),
     ),
     ...groupQuestions.map((question) =>
@@ -126,6 +129,7 @@ export async function GET(
         "",
         "",
         question.isAnswered,
+        question.isVisible,
         question.voteCount,
       ]),
     ),

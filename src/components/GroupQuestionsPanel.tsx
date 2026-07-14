@@ -62,6 +62,15 @@ function ThumbsUpIcon({ isActive = false }: { isActive?: boolean }) {
   );
 }
 
+function sortGroupQuestions(questions: GroupQuestion[]) {
+  return [...questions].sort(
+    (a, b) =>
+      Number(a.isAnswered) - Number(b.isAnswered) ||
+      b.voteCount - a.voteCount ||
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
 export function GroupQuestionsPanel({
   canAsk = false,
   sessionCode,
@@ -79,6 +88,7 @@ export function GroupQuestionsPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [votingQuestionId, setVotingQuestionId] = useState<string | null>(null);
   const [answeringQuestionId, setAnsweringQuestionId] = useState<string | null>(null);
+  const [screeningQuestionId, setScreeningQuestionId] = useState<string | null>(null);
   const [showAnswered, setShowAnswered] = useState(false);
 
   const remaining = useMemo(() => 500 - questionDraft.length, [questionDraft]);
@@ -86,6 +96,9 @@ export function GroupQuestionsPanel({
     questionDraft.trim().length >= 5 && questionDraft.trim().length <= 500;
   const canMarkAnswered = variant === "teacher";
   const activeQuestionCount = questions.filter((question) => !question.isAnswered).length;
+  const hiddenQuestionCount = questions.filter(
+    (question) => !question.isAnswered && !question.isVisible,
+  ).length;
   const answeredQuestionCount = questions.length - activeQuestionCount;
 
   const refreshQuestions = useCallback(async () => {
@@ -96,6 +109,7 @@ export function GroupQuestionsPanel({
     const query = new URLSearchParams({
       voterId,
       ...(canMarkAnswered && showAnswered ? { includeAnswered: "true" } : {}),
+      ...(canMarkAnswered ? { includeHidden: "true" } : {}),
     });
     const response = await fetch(
       `/api/sessions/${sessionCode}/group-questions?${query.toString()}`,
@@ -152,7 +166,7 @@ export function GroupQuestionsPanel({
     setQuestionDraft("");
     setWebsite("");
     setIsAskOpen(false);
-    setStatus("Question added.");
+    setStatus(payload.question?.isVisible ? "Question added." : "Question sent for review.");
     await refreshQuestions();
   }
 
@@ -179,16 +193,12 @@ export function GroupQuestionsPanel({
 
     const nextQuestion = payload.question as GroupQuestion;
     setQuestions((currentQuestions) =>
-      currentQuestions
+      sortGroupQuestions(
+        currentQuestions
         .map((question) =>
           question.id === nextQuestion.id ? nextQuestion : question,
         )
-        .sort(
-          (a, b) =>
-            Number(a.isAnswered) - Number(b.isAnswered) ||
-            b.voteCount - a.voteCount ||
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ),
+      ),
     );
   }
 
@@ -219,14 +229,38 @@ export function GroupQuestionsPanel({
               currentQuestion.id === questionId ? nextQuestion : currentQuestion,
             );
 
-      return nextQuestions.sort(
-        (a, b) =>
-          Number(a.isAnswered) - Number(b.isAnswered) ||
-          b.voteCount - a.voteCount ||
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+      return sortGroupQuestions(nextQuestions);
     });
-    setStatus(isAnswered ? "Question marked answered." : "Question re-shown.");
+    setStatus(isAnswered ? "Question marked answered." : "Question marked unanswered.");
+  }
+
+  async function setVisible(question: GroupQuestion, isVisible: boolean) {
+    const questionId = question.id;
+    setScreeningQuestionId(questionId);
+    setStatus("");
+
+    const response = await fetch(`/api/group-questions/${questionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isVisible }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setScreeningQuestionId(null);
+
+    if (!response.ok) {
+      setStatus(payload.error ?? "Could not update question.");
+      return;
+    }
+
+    const nextQuestion = payload.question as GroupQuestion;
+    setQuestions((currentQuestions) =>
+      sortGroupQuestions(
+        currentQuestions.map((currentQuestion) =>
+          currentQuestion.id === questionId ? nextQuestion : currentQuestion,
+        ),
+      ),
+    );
+    setStatus(isVisible ? "Question shown to participants." : "Question hidden.");
   }
 
   return (
@@ -240,6 +274,7 @@ export function GroupQuestionsPanel({
           <p className="text-sm font-semibold text-slate-500">Group questions</p>
           <p className="mt-1 text-xs text-slate-500">
             {activeQuestionCount} active
+            {hiddenQuestionCount ? `, ${hiddenQuestionCount} hidden` : ""}
             {showAnswered ? `, ${answeredQuestionCount} answered` : ""}
           </p>
         </div>
@@ -282,38 +317,67 @@ export function GroupQuestionsPanel({
               className={`rounded-md border p-3 ${
                 question.isAnswered
                   ? "border-emerald-200 bg-emerald-50/60"
+                  : !question.isVisible
+                    ? "border-amber-200 bg-amber-50/70"
                   : "border-slate-200 bg-slate-50"
               }`}
               key={question.id}
             >
               {canMarkAnswered ? (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {question.studentName || "Anonymous"}
-                </p>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {question.studentName || "Anonymous"}
+                  </p>
+                  {!question.isVisible ? (
+                    <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                      Hidden
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
               <p className="whitespace-pre-wrap text-sm leading-6 text-slate-900">
                 {question.text}
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs font-medium text-slate-500">
-                  {question.isAnswered ? "Answered" : questionAge(question.createdAt)}
+                  {question.isAnswered
+                    ? "Answered"
+                    : !question.isVisible
+                      ? "Hidden from participants"
+                      : questionAge(question.createdAt)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {canMarkAnswered ? (
-                    <button
-                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-70"
-                      disabled={answeringQuestionId === question.id}
-                      type="button"
-                      onClick={() => {
-                        void setAnswered(question, !question.isAnswered);
-                      }}
-                    >
-                      {answeringQuestionId === question.id
-                        ? "Saving..."
-                        : question.isAnswered
-                          ? "Re-show"
-                          : "Mark answered"}
-                    </button>
+                    <>
+                      <button
+                        className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-amber-500 hover:text-amber-800 disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={screeningQuestionId === question.id}
+                        type="button"
+                        onClick={() => {
+                          void setVisible(question, !question.isVisible);
+                        }}
+                      >
+                        {screeningQuestionId === question.id
+                          ? "Saving..."
+                          : question.isVisible
+                            ? "Hide"
+                            : "Show"}
+                      </button>
+                      <button
+                        className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={answeringQuestionId === question.id}
+                        type="button"
+                        onClick={() => {
+                          void setAnswered(question, !question.isAnswered);
+                        }}
+                      >
+                        {answeringQuestionId === question.id
+                          ? "Saving..."
+                          : question.isAnswered
+                            ? "Mark unanswered"
+                            : "Mark answered"}
+                      </button>
+                    </>
                   ) : null}
                   <button
                     aria-label={question.hasVoted ? "Remove upvote" : "Upvote"}

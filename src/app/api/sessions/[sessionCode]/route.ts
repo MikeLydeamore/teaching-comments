@@ -34,6 +34,7 @@ export async function PATCH(
 
   const body = (await request.json().catch(() => ({}))) as {
     clearTimer?: boolean;
+    groupQuestionsScreeningEnabled?: boolean;
     isOpen?: boolean;
     prompt?: string;
     timerDurationSeconds?: number;
@@ -43,6 +44,7 @@ export async function PATCH(
   try {
     const patch: SessionPatch = {
       isOpen: body.isOpen,
+      groupQuestionsScreeningEnabled: body.groupQuestionsScreeningEnabled,
       prompt: body.prompt,
       title: body.title,
     };

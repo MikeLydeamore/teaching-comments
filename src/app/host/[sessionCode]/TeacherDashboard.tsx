@@ -25,6 +25,7 @@ type Session = {
   title: string;
   prompt: string;
   promptUpdatedAt: string;
+  groupQuestionsScreeningEnabled: boolean;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
 };
@@ -351,6 +352,7 @@ export function TeacherDashboard({
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
+  const [screeningStatus, setScreeningStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
   const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
@@ -550,6 +552,29 @@ export function TeacherDashboard({
 
   async function clearTimer() {
     await patchSession({ clearTimer: true }, "Clearing timer...");
+  }
+
+  async function setGroupQuestionsScreeningMode(isEnabled: boolean) {
+    setScreeningStatus("Saving...");
+    const response = await fetch(`/api/sessions/${session.code}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupQuestionsScreeningEnabled: isEnabled }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setScreeningStatus(payload.error ?? "Could not update screening mode.");
+      return;
+    }
+
+    setSessionDetails(payload.session);
+    setStats(payload.stats ?? stats);
+    setScreeningStatus(
+      isEnabled
+        ? "Screening mode on. New questions will start hidden."
+        : "Screening mode off. New questions will show immediately.",
+    );
   }
 
   function setTimerDraftDuration(seconds: number) {
@@ -1306,6 +1331,39 @@ export function TeacherDashboard({
                   >
                     {starredOnly ? "Showing starred only" : "Show starred only"}
                   </button>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-slate-700">
+                    Group questions
+                  </p>
+                  <button
+                    className={`mt-2 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
+                      sessionDetails.groupQuestionsScreeningEnabled
+                        ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
+                        : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      void setGroupQuestionsScreeningMode(
+                        !sessionDetails.groupQuestionsScreeningEnabled,
+                      );
+                    }}
+                  >
+                    {sessionDetails.groupQuestionsScreeningEnabled
+                      ? "Screening mode on"
+                      : "Screening mode off"}
+                  </button>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {sessionDetails.groupQuestionsScreeningEnabled
+                      ? "New group questions are hidden until you show them."
+                      : "New group questions appear to participants immediately."}
+                  </p>
+                  {screeningStatus ? (
+                    <p className="mt-2 text-xs font-medium text-slate-600">
+                      {screeningStatus}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div>

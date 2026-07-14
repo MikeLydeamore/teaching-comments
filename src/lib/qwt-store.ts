@@ -145,7 +145,11 @@ export async function deleteQuestionFromBank(id: string) {
 export async function listGroupQuestions(
   code: string,
   voterId?: string,
-  options: { includeAnswered?: boolean; includeArchived?: boolean } = {},
+  options: {
+    includeAnswered?: boolean;
+    includeArchived?: boolean;
+    includeHidden?: boolean;
+  } = {},
 ) {
   return getStore().listGroupQuestions(code, voterId, options);
 }
@@ -168,6 +172,10 @@ export async function unvoteGroupQuestion(id: string, voterId: string) {
 
 export async function setGroupQuestionAnswered(id: string, isAnswered: boolean) {
   return getStore().setGroupQuestionAnswered(id, isAnswered);
+}
+
+export async function setGroupQuestionVisible(id: string, isVisible: boolean) {
+  return getStore().setGroupQuestionVisible(id, isVisible);
 }
 
 export async function archiveSessionActivity(code: string) {

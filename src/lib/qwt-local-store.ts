@@ -76,6 +76,7 @@ function defaultStore(): StoreData {
         title: "Demo Lecture",
         prompt: DEFAULT_PROMPT,
         isOpen: true,
+        groupQuestionsScreeningEnabled: false,
         createdAt,
         promptUpdatedAt: createdAt,
         timerDurationSeconds: 0,
@@ -168,6 +169,8 @@ async function readStore(): Promise<StoreData> {
   const sessions = (data.sessions ?? []).map((session) => ({
     ...session,
     spaceCode: session.spaceCode ?? DEFAULT_SPACE_CODE,
+    groupQuestionsScreeningEnabled:
+      session.groupQuestionsScreeningEnabled ?? false,
     promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
     timerDurationSeconds: session.timerDurationSeconds ?? 0,
     timerEndsAt: session.timerEndsAt ?? null,
@@ -182,6 +185,7 @@ async function readStore(): Promise<StoreData> {
     groupQuestions: (data.groupQuestions ?? []).map((question) => ({
       ...question,
       isAnswered: question.isAnswered ?? false,
+      isVisible: question.isVisible ?? true,
       studentName: question.studentName ?? "Anonymous",
       archivedAt: question.archivedAt ?? null,
       updatedAt: question.updatedAt ?? question.createdAt,
@@ -360,6 +364,7 @@ export const localStore: QwtStore = {
       title: titleFromCode(sessionCode) || "Ed.ie Session",
       prompt: DEFAULT_PROMPT,
       isOpen: true,
+      groupQuestionsScreeningEnabled: false,
       createdAt: timestamp,
       promptUpdatedAt: timestamp,
       timerDurationSeconds: 0,
@@ -587,12 +592,14 @@ export const localStore: QwtStore = {
       .filter((question) => question.sessionCode === sessionCode)
       .filter((question) => options.includeArchived || !question.archivedAt)
       .filter((question) => options.includeAnswered || !question.isAnswered)
+      .filter((question) => options.includeHidden || question.isVisible)
       .map((question) => ({
         id: question.id,
         sessionCode: question.sessionCode,
         studentName: question.studentName,
         text: question.text,
         isAnswered: question.isAnswered,
+        isVisible: question.isVisible,
         voteCount: question.voterIds.length,
         hasVoted: normalizedVoterId
           ? question.voterIds.includes(normalizedVoterId)
@@ -628,6 +635,7 @@ export const localStore: QwtStore = {
       studentName: normalizeStudentName(studentName ?? ""),
       text: validateGroupQuestionText(text),
       isAnswered: false,
+      isVisible: !session.groupQuestionsScreeningEnabled,
       voterIds: [],
       archivedAt: null,
       createdAt: timestamp,
@@ -668,6 +676,7 @@ export const localStore: QwtStore = {
       studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
+      isVisible: question.isVisible,
       voteCount: question.voterIds.length,
       hasVoted: true,
       archivedAt: question.archivedAt,
@@ -703,6 +712,7 @@ export const localStore: QwtStore = {
       studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
+      isVisible: question.isVisible,
       voteCount: question.voterIds.length,
       hasVoted: false,
       archivedAt: question.archivedAt,
@@ -734,6 +744,39 @@ export const localStore: QwtStore = {
       studentName: question.studentName,
       text: question.text,
       isAnswered: question.isAnswered,
+      isVisible: question.isVisible,
+      voteCount: question.voterIds.length,
+      hasVoted: false,
+      archivedAt: question.archivedAt,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
+  },
+
+  async setGroupQuestionVisible(id, isVisible) {
+    const data = await readStore();
+    const index = data.groupQuestions.findIndex((question) => question.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const question = data.groupQuestions[index];
+
+    if (question.isVisible !== isVisible) {
+      question.isVisible = isVisible;
+      question.updatedAt = now();
+      data.groupQuestions[index] = question;
+      await writeStore(data);
+    }
+
+    return {
+      id: question.id,
+      sessionCode: question.sessionCode,
+      studentName: question.studentName,
+      text: question.text,
+      isAnswered: question.isAnswered,
+      isVisible: question.isVisible,
       voteCount: question.voterIds.length,
       hasVoted: false,
       archivedAt: question.archivedAt,

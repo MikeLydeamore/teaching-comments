@@ -13,6 +13,7 @@ create table if not exists public.qwt_sessions (
   title text not null check (char_length(title) between 1 and 120),
   prompt text not null check (char_length(prompt) between 5 and 1200),
   is_open boolean not null default true,
+  group_questions_screening_enabled boolean not null default false,
   created_at timestamptz not null default now(),
   prompt_updated_at timestamptz not null default now(),
   timer_duration_seconds integer not null default 0 check (timer_duration_seconds between 0 and 3600),
@@ -43,6 +44,7 @@ create table if not exists public.qwt_group_questions (
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null check (char_length(text) between 5 and 500),
   is_answered boolean not null default false,
+  is_visible boolean not null default true,
   archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -103,6 +105,9 @@ create index if not exists qwt_group_questions_session_created_idx
 
 create index if not exists qwt_group_questions_session_answered_created_idx
   on public.qwt_group_questions (session_code, is_answered, created_at desc);
+
+create index if not exists qwt_group_questions_session_visible_created_idx
+  on public.qwt_group_questions (session_code, is_visible, created_at desc);
 
 create index if not exists qwt_group_questions_session_archived_created_idx
   on public.qwt_group_questions (session_code, archived_at, created_at desc);

@@ -43,6 +43,7 @@ export type Session = {
   title: string;
   prompt: string;
   isOpen: boolean;
+  groupQuestionsScreeningEnabled: boolean;
   createdAt: string;
   promptUpdatedAt: string;
   timerDurationSeconds: number;
@@ -88,6 +89,7 @@ export type GroupQuestion = {
   studentName: string;
   text: string;
   isAnswered: boolean;
+  isVisible: boolean;
   voteCount: number;
   hasVoted: boolean;
   archivedAt: string | null;
@@ -102,7 +104,12 @@ export type SubmissionPatch = Partial<
 export type SessionPatch = Partial<
   Pick<
     Session,
-    "prompt" | "title" | "isOpen" | "timerDurationSeconds" | "timerEndsAt"
+    | "prompt"
+    | "title"
+    | "isOpen"
+    | "groupQuestionsScreeningEnabled"
+    | "timerDurationSeconds"
+    | "timerEndsAt"
   >
 >;
 
@@ -171,7 +178,11 @@ export type QwtStore = {
   listGroupQuestions(
     code: string,
     voterId?: string,
-    options?: { includeAnswered?: boolean; includeArchived?: boolean },
+    options?: {
+      includeAnswered?: boolean;
+      includeArchived?: boolean;
+      includeHidden?: boolean;
+    },
   ): Promise<GroupQuestion[]>;
   addGroupQuestion(
     code: string,
@@ -183,6 +194,10 @@ export type QwtStore = {
   setGroupQuestionAnswered(
     id: string,
     isAnswered: boolean,
+  ): Promise<GroupQuestion | null>;
+  setGroupQuestionVisible(
+    id: string,
+    isVisible: boolean,
   ): Promise<GroupQuestion | null>;
   archiveSessionActivity(code: string): Promise<ArchiveSessionActivityResult | null>;
   unarchiveSessionActivity(
@@ -567,6 +582,10 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
     promptUpdatedAt: promptChanged ? now() : current.promptUpdatedAt,
     title: nextTitle || current.title,
     isOpen: typeof patch.isOpen === "boolean" ? patch.isOpen : current.isOpen,
+    groupQuestionsScreeningEnabled:
+      typeof patch.groupQuestionsScreeningEnabled === "boolean"
+        ? patch.groupQuestionsScreeningEnabled
+        : current.groupQuestionsScreeningEnabled,
     timerDurationSeconds: nextTimerDurationSeconds,
     timerEndsAt: nextTimerEndsAt,
   };

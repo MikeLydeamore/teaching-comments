@@ -9,14 +9,17 @@ export async function GET(
   const url = new URL(request.url);
   const voterId = url.searchParams.get("voterId") ?? undefined;
   const wantsAnswered = url.searchParams.get("includeAnswered") === "true";
-  const authorization = wantsAnswered
+  const wantsHidden = url.searchParams.get("includeHidden") === "true";
+  const authorization = wantsAnswered || wantsHidden
     ? await getAuthorizedTeacherSession(sessionCode)
     : null;
   const includeAnswered = Boolean(wantsAnswered && !authorization?.response);
+  const includeHidden = Boolean(wantsHidden && !authorization?.response);
 
   try {
     const questions = await listGroupQuestions(sessionCode, voterId, {
       includeAnswered,
+      includeHidden,
     });
     return Response.json({ questions });
   } catch (error) {
