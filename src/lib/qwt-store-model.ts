@@ -44,6 +44,7 @@ export type Session = {
   prompt: string;
   isOpen: boolean;
   groupQuestionsScreeningEnabled: boolean;
+  submissionsScreeningEnabled: boolean;
   createdAt: string;
   promptUpdatedAt: string;
   timerDurationSeconds: number;
@@ -108,6 +109,7 @@ export type SessionPatch = Partial<
     | "title"
     | "isOpen"
     | "groupQuestionsScreeningEnabled"
+    | "submissionsScreeningEnabled"
     | "timerDurationSeconds"
     | "timerEndsAt"
   >
@@ -586,6 +588,10 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
       typeof patch.groupQuestionsScreeningEnabled === "boolean"
         ? patch.groupQuestionsScreeningEnabled
         : current.groupQuestionsScreeningEnabled,
+    submissionsScreeningEnabled:
+      typeof patch.submissionsScreeningEnabled === "boolean"
+        ? patch.submissionsScreeningEnabled
+        : current.submissionsScreeningEnabled,
     timerDurationSeconds: nextTimerDurationSeconds,
     timerEndsAt: nextTimerEndsAt,
   };

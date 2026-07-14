@@ -37,6 +37,7 @@ export async function PATCH(
     groupQuestionsScreeningEnabled?: boolean;
     isOpen?: boolean;
     prompt?: string;
+    submissionsScreeningEnabled?: boolean;
     timerDurationSeconds?: number;
     title?: string;
   };
@@ -45,6 +46,7 @@ export async function PATCH(
     const patch: SessionPatch = {
       isOpen: body.isOpen,
       groupQuestionsScreeningEnabled: body.groupQuestionsScreeningEnabled,
+      submissionsScreeningEnabled: body.submissionsScreeningEnabled,
       prompt: body.prompt,
       title: body.title,
     };

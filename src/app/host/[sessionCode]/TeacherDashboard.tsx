@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
@@ -26,6 +26,7 @@ type Session = {
   prompt: string;
   promptUpdatedAt: string;
   groupQuestionsScreeningEnabled: boolean;
+  submissionsScreeningEnabled: boolean;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
 };
@@ -353,6 +354,9 @@ export function TeacherDashboard({
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
   const [screeningStatus, setScreeningStatus] = useState("");
+  const submissionsPopoutWindowRef = useRef<Window | null>(null);
+  const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
+  const [submissionsPopoutStatus, setSubmissionsPopoutStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
   const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
@@ -574,6 +578,29 @@ export function TeacherDashboard({
       isEnabled
         ? "Screening mode on. New questions will start hidden."
         : "Screening mode off. New questions will show immediately.",
+    );
+  }
+
+  async function setSubmissionsScreeningMode(isEnabled: boolean) {
+    setScreeningStatus("Saving...");
+    const response = await fetch(`/api/sessions/${session.code}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ submissionsScreeningEnabled: isEnabled }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setScreeningStatus(payload.error ?? "Could not update submissions mode.");
+      return;
+    }
+
+    setSessionDetails(payload.session);
+    setStats(payload.stats ?? stats);
+    setScreeningStatus(
+      isEnabled
+        ? "Submissions on. New submissions will start hidden."
+        : "Submissions off. New submissions will show immediately.",
     );
   }
 
@@ -837,17 +864,6 @@ export function TeacherDashboard({
   const canConfirmQuestionTitle =
     questionTitleDraftText.length >= 1 && questionTitleDraftText.length <= 1200;
   const isAddingQuestion = questionBankStatus === "Adding question...";
-  const resultsSearch = new URLSearchParams({
-    chartType,
-    includeHidden: String(includeHidden),
-    minutes: String(minutes),
-    starredOnly: String(starredOnly),
-  });
-
-  if (selectedPromptHistoryId) {
-    resultsSearch.set("promptHistoryId", selectedPromptHistoryId);
-  }
-
   const studentUrl = spaceCode
     ? `/spaces/${spaceCode}/${session.code}`
     : `/spaces/${session.code}`;
@@ -859,7 +875,74 @@ export function TeacherDashboard({
     ? `/host/${spaceCode}/${session.code}`
     : `/host/${session.code}`;
   const qrPopoutUrl = `${dashboardUrl}/qr`;
+
+  function buildViewSearch(showHiddenSubmissions = includeHidden) {
+    const search = new URLSearchParams({
+      includeHidden: String(showHiddenSubmissions),
+      minutes: String(minutes),
+      starredOnly: String(starredOnly),
+    });
+
+    if (selectedPromptHistoryId) {
+      search.set("promptHistoryId", selectedPromptHistoryId);
+    }
+
+    return search;
+  }
+
+  const resultsSearch = buildViewSearch();
+  resultsSearch.set("chartType", chartType);
   const resultsUrl = `${dashboardUrl}/results?${resultsSearch.toString()}`;
+  const submissionsPopoutSearch = buildViewSearch(false);
+  submissionsPopoutSearch.set("sortOrder", submissionSortOrder);
+  const submissionsPopoutUrl = `${dashboardUrl}/submissions?${submissionsPopoutSearch.toString()}`;
+
+  function openSubmissionsPopout(url: string) {
+    const popoutWindow = window.open(url, "edie-submissions-popout");
+
+    if (!popoutWindow) {
+      setSubmissionsPopoutStatus("Popout blocked. Allow popups and try again.");
+      return false;
+    }
+
+    submissionsPopoutWindowRef.current = popoutWindow;
+    popoutWindow.focus();
+    return true;
+  }
+
+  function popOutSubmissions() {
+    if (openSubmissionsPopout(submissionsPopoutUrl)) {
+      setSubmissionsPopoutOpen(true);
+      setSubmissionsPopoutStatus("Submissions screen open.");
+    }
+  }
+
+  function toggleHiddenSubmissions() {
+    const nextIncludeHidden = !includeHidden;
+    setIncludeHidden(nextIncludeHidden);
+    setSubmissionsPopoutStatus(
+      nextIncludeHidden
+        ? "Hidden submissions will show in the host view."
+        : "Hidden submissions are hidden in the host view.",
+    );
+  }
+
+  useEffect(() => {
+    if (!submissionsPopoutOpen) {
+      return;
+    }
+
+    const popoutWindow = submissionsPopoutWindowRef.current;
+
+    if (!popoutWindow || popoutWindow.closed) {
+      submissionsPopoutWindowRef.current = null;
+      setSubmissionsPopoutOpen(false);
+      setSubmissionsPopoutStatus("Submissions screen closed.");
+      return;
+    }
+
+    popoutWindow.location.href = submissionsPopoutUrl;
+  }, [submissionsPopoutOpen, submissionsPopoutUrl]);
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -1196,6 +1279,13 @@ export function TeacherDashboard({
               >
                 {showResultsChart ? "Hide results" : "Visualise results"}
               </button>
+              <button
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                type="button"
+                onClick={popOutSubmissions}
+              >
+                Pop out submissions
+              </button>
             </div>
           </div>
 
@@ -1266,15 +1356,6 @@ export function TeacherDashboard({
                       Refresh
                     </button>
                   </div>
-                  <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      checked={includeHidden}
-                      className="size-4 rounded border-slate-300"
-                      type="checkbox"
-                      onChange={(event) => setIncludeHidden(event.target.checked)}
-                    />
-                    Include hidden
-                  </label>
                   <label
                     className="mt-3 block text-sm font-medium text-slate-700"
                     htmlFor="prompt-history-filter"
@@ -1335,7 +1416,7 @@ export function TeacherDashboard({
 
                 <div>
                   <p className="text-sm font-medium text-slate-700">
-                    Group questions
+                    Screening
                   </p>
                   <button
                     className={`mt-2 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
@@ -1351,19 +1432,47 @@ export function TeacherDashboard({
                     }}
                   >
                     {sessionDetails.groupQuestionsScreeningEnabled
-                      ? "Screening mode on"
-                      : "Screening mode off"}
+                      ? "Group Questions On"
+                      : "Group Questions Off"}
                   </button>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    {sessionDetails.groupQuestionsScreeningEnabled
-                      ? "New group questions are hidden until you show them."
-                      : "New group questions appear to participants immediately."}
-                  </p>
-                  {screeningStatus ? (
-                    <p className="mt-2 text-xs font-medium text-slate-600">
-                      {screeningStatus}
-                    </p>
-                  ) : null}
+                  <button
+                    className={`mt-3 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
+                      sessionDetails.submissionsScreeningEnabled
+                        ? "border-teal-300 bg-teal-100 text-teal-950 hover:bg-teal-50"
+                        : "border-slate-300 bg-white text-slate-700 hover:border-teal-400 hover:text-teal-900"
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      void setSubmissionsScreeningMode(
+                        !sessionDetails.submissionsScreeningEnabled,
+                      );
+                    }}
+                  >
+                    {sessionDetails.submissionsScreeningEnabled
+                      ? "Submissions On"
+                      : "Submissions Off"}
+                  </button>
+                  <button
+                    aria-checked={includeHidden}
+                    className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    role="switch"
+                    type="button"
+                    onClick={toggleHiddenSubmissions}
+                  >
+                    <span className="leading-5">Show hidden submissions</span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+                        includeHidden ? "bg-teal-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                          includeHidden ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </span>
+                  </button>
                 </div>
 
                 <div>

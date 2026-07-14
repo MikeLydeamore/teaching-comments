@@ -48,6 +48,7 @@ type SupabaseSessionRow = {
   prompt: string;
   is_open: boolean;
   group_questions_screening_enabled: boolean;
+  submissions_screening_enabled: boolean;
   created_at: string;
   prompt_updated_at: string;
   timer_duration_seconds: number;
@@ -168,7 +169,7 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "code,space_code,title,prompt,is_open,group_questions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+  return "code,space_code,title,prompt,is_open,group_questions_screening_enabled,submissions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
 }
 
 function teacherSpaceSelect() {
@@ -207,6 +208,7 @@ function sessionFromRow(row: SupabaseSessionRow): Session {
     prompt: row.prompt,
     isOpen: row.is_open,
     groupQuestionsScreeningEnabled: row.group_questions_screening_enabled ?? false,
+    submissionsScreeningEnabled: row.submissions_screening_enabled ?? false,
     createdAt: row.created_at,
     promptUpdatedAt: row.prompt_updated_at ?? row.created_at,
     timerDurationSeconds: row.timer_duration_seconds ?? 0,
@@ -516,6 +518,7 @@ export const supabaseStore: QwtStore = {
           prompt: DEFAULT_PROMPT,
           is_open: true,
           group_questions_screening_enabled: false,
+          submissions_screening_enabled: false,
           created_at: timestamp,
           prompt_updated_at: timestamp,
           timer_duration_seconds: 0,
@@ -536,6 +539,8 @@ export const supabaseStore: QwtStore = {
               is_open: session.isOpen,
               group_questions_screening_enabled:
                 session.groupQuestionsScreeningEnabled,
+              submissions_screening_enabled:
+                session.submissionsScreeningEnabled,
               created_at: session.createdAt,
               prompt_updated_at: session.promptUpdatedAt,
               timer_duration_seconds: session.timerDurationSeconds,
@@ -595,6 +600,7 @@ export const supabaseStore: QwtStore = {
           is_open: next.isOpen,
           group_questions_screening_enabled:
             next.groupQuestionsScreeningEnabled,
+          submissions_screening_enabled: next.submissionsScreeningEnabled,
         }),
         prefer: "return=representation",
       },
@@ -727,7 +733,7 @@ export const supabaseStore: QwtStore = {
           text: submissionContent.text,
           drawing_data: submissionContent.drawingData,
           gif_data: submissionContent.gifData,
-          status: "visible",
+          status: session.submissionsScreeningEnabled ? "hidden" : "visible",
           starred: false,
           flagged: false,
           version: 1,
