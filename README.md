@@ -7,6 +7,7 @@ The current slice includes:
 - a student writing page at `/s/default/demo-lecture`
 - a student join page at `/join`
 - a teacher dashboard at `/teacher/default/demo-lecture`
+- teacher-generated QR codes for the student session link
 - teacher spaces with an admin-created space PIN
 - a prototype admin page at `/admin/spaces` for creating spaces and resetting space PINs
 - in-session prompt editing from the teacher dashboard
