@@ -822,15 +822,15 @@ export function TeacherDashboard({
   }
 
   const studentUrl = spaceCode
-    ? `/s/${spaceCode}/${session.code}`
-    : `/s/${session.code}`;
+    ? `/spaces/${spaceCode}/${session.code}`
+    : `/spaces/${session.code}`;
   const studentShareUrl = studentLinkOrigin
     ? `${studentLinkOrigin}${studentUrl}`
     : "";
-  const teacherHomeUrl = spaceCode ? `/teacher/${spaceCode}` : "/teacher";
+  const teacherHomeUrl = spaceCode ? `/host/${spaceCode}` : "/host";
   const dashboardUrl = spaceCode
-    ? `/teacher/${spaceCode}/${session.code}`
-    : `/teacher/${session.code}`;
+    ? `/host/${spaceCode}/${session.code}`
+    : `/host/${session.code}`;
   const qrPopoutUrl = `${dashboardUrl}/qr`;
   const resultsUrl = `${dashboardUrl}/results?${resultsSearch.toString()}`;
 
@@ -840,7 +840,7 @@ export function TeacherDashboard({
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-              Teacher view
+              Host view
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal text-slate-950">
               {sessionDetails.title}

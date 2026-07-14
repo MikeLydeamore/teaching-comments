@@ -12,7 +12,7 @@ export default async function TeacherQrPage({
 }) {
   const { sessionCode } = await params;
   const query = await searchParams;
-  const nextPath = `/teacher/${sessionCode}/qr`;
+  const nextPath = `/host/${sessionCode}/qr`;
 
   if (!(await isTeacherAuthenticated())) {
     return (
@@ -29,9 +29,9 @@ export default async function TeacherQrPage({
 
   return (
     <QrPopout
-      dashboardUrl={`/teacher/${session.code}`}
+      dashboardUrl={`/host/${session.code}`}
       sessionTitle={session.title}
-      studentUrl={`/s/${session.code}`}
+      studentUrl={`/spaces/${session.code}`}
     />
   );
 }

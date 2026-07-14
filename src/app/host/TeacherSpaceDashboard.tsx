@@ -22,7 +22,7 @@ export function TeacherSpaceDashboard({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-                Teaching space
+                Hosted Space
               </p>
               <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
                 {space.name}
@@ -30,7 +30,7 @@ export function TeacherSpaceDashboard({
               <p className="mt-2 text-sm text-slate-500">{space.code}</p>
             </div>
             <form action={logoutTeacher}>
-              <input name="next" type="hidden" value="/teacher" />
+              <input name="next" type="hidden" value="/host" />
               <button
                 className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
                 type="submit"
@@ -85,7 +85,7 @@ export function TeacherSpaceDashboard({
             <h2 className="text-lg font-semibold text-slate-950">Existing sessions</h2>
             <Link
               className="text-sm font-semibold text-teal-700 underline"
-              href="/teacher"
+              href="/host"
             >
               Switch space
             </Link>
@@ -95,7 +95,7 @@ export function TeacherSpaceDashboard({
               {sessions.map((session) => (
                 <Link
                   className="rounded-md border border-slate-200 p-4 transition hover:border-teal-500 hover:bg-teal-50"
-                  href={`/teacher/${space.code}/${session.code}`}
+                  href={`/host/${space.code}/${session.code}`}
                   key={session.code}
                 >
                   <p className="font-semibold text-slate-950">{session.title}</p>

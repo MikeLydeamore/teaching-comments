@@ -13,7 +13,7 @@ export default async function TeacherSpaceQrPage({
 }) {
   const { roomCode, sessionCode: spaceCode } = await params;
   const query = await searchParams;
-  const nextPath = `/teacher/${spaceCode}/${roomCode}/qr`;
+  const nextPath = `/host/${spaceCode}/${roomCode}/qr`;
   const space = await getTeacherSpace(spaceCode);
 
   if (!space) {
@@ -32,7 +32,7 @@ export default async function TeacherSpaceQrPage({
     return (
       <TeacherLogin
         authFailed={query.auth === "failed"}
-        nextPath={`/teacher/${space.code}/${roomCode}/qr`}
+        nextPath={`/host/${space.code}/${roomCode}/qr`}
         sessionCode={roomCode}
         spaceCode={space.code}
         usesDefaultPin={isDefaultTeacherPin()}
@@ -46,7 +46,7 @@ export default async function TeacherSpaceQrPage({
     return (
       <TeacherLogin
         authFailed
-        nextPath={`/teacher/${space.code}`}
+        nextPath={`/host/${space.code}`}
         sessionCode={roomCode}
         spaceCode={space.code}
         usesDefaultPin={isDefaultTeacherPin()}
@@ -56,9 +56,9 @@ export default async function TeacherSpaceQrPage({
 
   return (
     <QrPopout
-      dashboardUrl={`/teacher/${space.code}/${session.code}`}
+      dashboardUrl={`/host/${space.code}/${session.code}`}
       sessionTitle={session.title}
-      studentUrl={`/s/${space.code}/${session.code}`}
+      studentUrl={`/spaces/${space.code}/${session.code}`}
     />
   );
 }

@@ -25,7 +25,7 @@ export default async function TeacherSpaceSessionPage({
     return (
       <TeacherLogin
         authFailed={query.auth === "failed"}
-        nextPath={`/teacher/${spaceCode}/${roomCode}`}
+        nextPath={`/host/${spaceCode}/${roomCode}`}
         sessionCode={roomCode}
         spaceCode={spaceCode}
         usesDefaultPin={isDefaultTeacherPin()}
@@ -37,7 +37,7 @@ export default async function TeacherSpaceSessionPage({
     return (
       <TeacherLogin
         authFailed={query.auth === "failed"}
-        nextPath={`/teacher/${space.code}/${roomCode}`}
+        nextPath={`/host/${space.code}/${roomCode}`}
         sessionCode={roomCode}
         spaceCode={space.code}
         usesDefaultPin={isDefaultTeacherPin()}
@@ -51,7 +51,7 @@ export default async function TeacherSpaceSessionPage({
     return (
       <TeacherLogin
         authFailed
-        nextPath={`/teacher/${space.code}`}
+        nextPath={`/host/${space.code}`}
         sessionCode={roomCode}
         spaceCode={space.code}
         usesDefaultPin={isDefaultTeacherPin()}

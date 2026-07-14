@@ -67,7 +67,7 @@ export default async function TeacherSpaceResultsPage({
     search.set("promptHistoryId", promptHistoryId);
   }
 
-  const nextPath = `/teacher/${spaceCode}/${roomCode}/results?${search.toString()}`;
+  const nextPath = `/host/${spaceCode}/${roomCode}/results?${search.toString()}`;
 
   if (!(await isTeacherAuthenticatedForSpaceCode(spaceCode))) {
     return (
@@ -87,7 +87,7 @@ export default async function TeacherSpaceResultsPage({
     return (
       <TeacherLogin
         authFailed
-        nextPath={`/teacher/${spaceCode}`}
+        nextPath={`/host/${spaceCode}`}
         sessionCode={roomCode}
         spaceCode={spaceCode}
         usesDefaultPin={isDefaultTeacherPin()}
@@ -149,7 +149,7 @@ export default async function TeacherSpaceResultsPage({
                       ? "bg-white text-slate-950 shadow-sm"
                       : "text-slate-600 hover:text-teal-800"
                   }`}
-                  href={`/teacher/${spaceCode}/${session.code}/results?${typeSearch.toString()}`}
+                  href={`/host/${spaceCode}/${session.code}/results?${typeSearch.toString()}`}
                   key={option.value}
                 >
                   {option.label}
@@ -162,7 +162,7 @@ export default async function TeacherSpaceResultsPage({
           </p>
           <Link
             className="rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={`/teacher/${spaceCode}/${session.code}`}
+            href={`/host/${spaceCode}/${session.code}`}
           >
             Dashboard
           </Link>

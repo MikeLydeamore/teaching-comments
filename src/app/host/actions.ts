@@ -21,8 +21,8 @@ import {
 } from "@/lib/qwt-store";
 
 function safeNextPath(value: FormDataEntryValue | null) {
-  const next = typeof value === "string" ? value : "/teacher";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/teacher";
+  const next = typeof value === "string" ? value : "/host";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/host";
 }
 
 function authFailedPath(next: string) {
@@ -30,7 +30,7 @@ function authFailedPath(next: string) {
 }
 
 function teacherSpacePath(spaceCode: string) {
-  return `/teacher/${spaceCode || "default"}`;
+  return `/host/${spaceCode || "default"}`;
 }
 
 function teacherSessionPath(spaceCode: string, sessionCode: string) {
@@ -85,13 +85,13 @@ export async function enterTeacherSpace(formData: FormData) {
   const pin = String(formData.get("pin") ?? "");
 
   if (!spaceCode) {
-    redirect("/teacher?spaceAuth=missing");
+    redirect("/host?spaceAuth=missing");
   }
 
   const space = await getTeacherSpace(spaceCode);
 
   if (!space) {
-    redirect(`/teacher?spaceAuth=not-found&space=${encodeURIComponent(spaceCode)}`);
+    redirect(`/host?spaceAuth=not-found&space=${encodeURIComponent(spaceCode)}`);
   }
 
   if (isValidTeacherSpacePin(pin, space.pinHash)) {
@@ -99,7 +99,7 @@ export async function enterTeacherSpace(formData: FormData) {
     redirect(teacherSpacePath(space.code));
   }
 
-  redirect(`/teacher?spaceAuth=failed&space=${encodeURIComponent(spaceCode)}`);
+  redirect(`/host?spaceAuth=failed&space=${encodeURIComponent(spaceCode)}`);
 }
 
 export async function enterTeacherSession(formData: FormData) {
@@ -108,11 +108,11 @@ export async function enterTeacherSession(formData: FormData) {
   const pin = String(formData.get("pin") ?? "");
   const target = spaceCode
     ? teacherSessionPath(spaceCode, sessionCode)
-    : `/teacher/${sessionCode || "demo-lecture"}`;
+    : `/host/${sessionCode || "demo-lecture"}`;
   const space = spaceCode ? await getTeacherSpace(spaceCode) : null;
 
   if (spaceCode && !space) {
-    redirect(`/teacher?spaceAuth=not-found&space=${encodeURIComponent(spaceCode)}`);
+    redirect(`/host?spaceAuth=not-found&space=${encodeURIComponent(spaceCode)}`);
   }
 
   const alreadyAuthenticated = space
@@ -138,8 +138,8 @@ export async function enterTeacherSession(formData: FormData) {
 
   redirect(
     spaceCode
-      ? `/teacher/${spaceCode}?auth=failed&session=${encodeURIComponent(sessionCode)}`
-      : `/teacher?auth=failed&session=${encodeURIComponent(sessionCode)}`,
+      ? `/host/${spaceCode}?auth=failed&session=${encodeURIComponent(sessionCode)}`
+      : `/host?auth=failed&session=${encodeURIComponent(sessionCode)}`,
   );
 }
 

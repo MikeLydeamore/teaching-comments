@@ -29,7 +29,7 @@ export default async function TeacherPage({
       return (
         <TeacherLogin
           authFailed={query.auth === "failed"}
-          nextPath={`/teacher/${space.code}`}
+          nextPath={`/host/${space.code}`}
           sessionCode=""
           spaceCode={space.code}
           usesDefaultPin={isDefaultTeacherPin()}

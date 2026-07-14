@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listTeacherSpaces } from "@/lib/qwt-store";
 import { isAdminAuthenticated, isDefaultAdminPin } from "@/lib/teacher-auth";
-import { createTeachingSpace } from "@/app/teacher/actions";
+import { createTeachingSpace } from "@/app/host/actions";
 import { resetTeacherSpacePin, unlockAdminSpaces } from "./actions";
 
 type AdminSpacesPageProps = {
@@ -29,8 +29,8 @@ export default async function AdminSpacesPage({
     {
       "admin-failed": "That admin PIN did not work.",
       created: query.space
-        ? `Space "${query.space}" was created. Email the teacher this space code and the space PIN you chose.`
-        : "Space created. Email the teacher the space code and the space PIN you chose.",
+        ? `Space "${query.space}" was created. Email the host this space code and the space PIN you chose.`
+        : "Space created. Email the host the space code and the space PIN you chose.",
       exists: "That space code already exists.",
       invalid: "Check the space name, code, and PIN.",
       missing: "Enter a space code.",
@@ -41,10 +41,10 @@ export default async function AdminSpacesPage({
     {
       invalid: "Use a new space PIN between 4 and 120 characters.",
       missing: "Choose a space before resetting a PIN.",
-      "not-found": "We could not find that teaching space.",
+      "not-found": "We could not find that space.",
       updated: query.space
-        ? `PIN reset for "${query.space}". Send the new PIN to that teacher.`
-        : "PIN reset. Send the new PIN to that teacher.",
+        ? `PIN reset for "${query.space}". Send the new PIN to that host.`
+        : "PIN reset. Send the new PIN to that host.",
     }[query.pinReset ?? ""] ?? "";
   const pinResetSucceeded = query.pinReset === "updated";
 
@@ -56,11 +56,11 @@ export default async function AdminSpacesPage({
             Ed.ie admin
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
-            Create a teaching space
+            Host a new space
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-            Use this page to create a space for a subject, teacher, or cohort.
-            Teachers use the space code and space PIN on the regular teacher
+            Use this page to create a space for a subject, host, or cohort.
+            Hosts use the space code and space PIN on the regular host
             page.
           </p>
         </header>
@@ -77,7 +77,7 @@ export default async function AdminSpacesPage({
         <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">New space</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            The space PIN is what the teacher will use day to day. The admin
+            The space PIN is what the host will use day to day. The admin
             PIN is only for creating the space.
           </p>
           <form action={createTeachingSpace} className="mt-4 grid gap-4 md:grid-cols-2">
@@ -149,9 +149,9 @@ export default async function AdminSpacesPage({
         </section>
 
         <p className="mt-4 text-sm text-slate-600">
-          Teachers should use{" "}
-          <Link className="font-semibold text-teal-700 hover:text-teal-900" href="/teacher">
-            the teacher page
+          Hosts should use{" "}
+          <Link className="font-semibold text-teal-700 hover:text-teal-900" href="/host">
+            the host page
           </Link>{" "}
           once their space exists.
         </p>
@@ -164,7 +164,7 @@ export default async function AdminSpacesPage({
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Space PINs are not shown. Share the code and the PIN you chose
-                with the teacher for that space.
+                with the host for that space.
               </p>
             </div>
             {canViewSpaces ? (
@@ -183,7 +183,7 @@ export default async function AdminSpacesPage({
                       <th className="py-2 pr-4 font-semibold">Name</th>
                       <th className="py-2 pr-4 font-semibold">Code</th>
                       <th className="py-2 pr-4 font-semibold">Created</th>
-                      <th className="py-2 font-semibold">Teacher link</th>
+                      <th className="py-2 font-semibold">Host link</th>
                       <th className="py-2 pl-4 font-semibold">Reset PIN</th>
                     </tr>
                   </thead>
@@ -202,7 +202,7 @@ export default async function AdminSpacesPage({
                         <td className="py-3">
                           <Link
                             className="font-semibold text-teal-700 hover:text-teal-900"
-                            href={`/teacher/${space.code}`}
+                            href={`/host/${space.code}`}
                           >
                             Open
                           </Link>

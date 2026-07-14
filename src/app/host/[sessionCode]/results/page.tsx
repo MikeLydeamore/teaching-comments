@@ -66,7 +66,7 @@ export default async function TeacherResultsPage({
     search.set("promptHistoryId", promptHistoryId);
   }
 
-  const nextPath = `/teacher/${sessionCode}/results?${search.toString()}`;
+  const nextPath = `/host/${sessionCode}/results?${search.toString()}`;
 
   if (!(await isTeacherAuthenticated())) {
     return (
@@ -134,7 +134,7 @@ export default async function TeacherResultsPage({
                       ? "bg-white text-slate-950 shadow-sm"
                       : "text-slate-600 hover:text-teal-800"
                   }`}
-                  href={`/teacher/${session.code}/results?${typeSearch.toString()}`}
+                  href={`/host/${session.code}/results?${typeSearch.toString()}`}
                   key={option.value}
                 >
                   {option.label}
@@ -147,7 +147,7 @@ export default async function TeacherResultsPage({
           </p>
           <Link
             className="rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={`/teacher/${session.code}`}
+            href={`/host/${session.code}`}
           >
             Dashboard
           </Link>

@@ -60,5 +60,5 @@ export async function joinSession(formData: FormData) {
     });
   }
 
-  redirect(`/s/${spaceCode}/${session.code}`);
+  redirect(`/spaces/${spaceCode}/${session.code}`);
 }

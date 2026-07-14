@@ -5,29 +5,29 @@ and live check-ins.
 
 The current slice includes:
 
-- a student writing page at `/s/default/demo-lecture`
+- a student writing page at `/spaces/default/demo-lecture`
 - a student join page at `/join`
-- a teacher dashboard at `/teacher/default/demo-lecture`
-- teacher-generated QR codes for the student session link
+- a host dashboard at `/host/default/demo-lecture`
+- host-generated QR codes for the student session link
 - teacher spaces with an admin-created space PIN
 - an admin page at `/admin/spaces` for creating spaces and resetting space PINs
-- in-session prompt editing from the teacher dashboard
+- in-session prompt editing from the host dashboard
 - per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
-- teacher-controlled countdown timer shown to students
+- host-controlled countdown timer shown to students
 - a student privacy notice checkbox
 - a privacy notice page at `/privacy`
 - typed and drawn student responses
 - optional GIF responses through GIPHY search
 - optional student display names, defaulting to Anonymous
-- student group questions with shared upvoting, teacher-visible asker names, and teacher answered/re-show controls
-- teacher-facing submission cards
+- student group questions with shared upvoting, host-visible asker names, and host answered/re-show controls
+- host-facing submission cards
 - recent-submission filtering
 - star, flag, and hide controls
 - starred-only view filtering
-- teacher CSV export for submissions and group questions
+- host CSV export for submissions and group questions
 - clear/archive control with undo for hiding current live responses while keeping exports
-- newest/oldest sorting and drag-and-drop card ordering in the teacher dashboard
+- newest/oldest sorting and drag-and-drop card ordering in the host dashboard
 - simple word-frequency summary
 - column and pie charts for short poll-style responses
 - word cloud charts for common words in typed responses
@@ -45,11 +45,11 @@ Open:
 
 - `http://localhost:3000`
 - `http://localhost:3000/join`
-- `http://localhost:3000/s/default/demo-lecture`
-- `http://localhost:3000/teacher`
+- `http://localhost:3000/spaces/default/demo-lecture`
+- `http://localhost:3000/host`
 - `http://localhost:3000/admin/spaces`
-- `http://localhost:3000/teacher/default`
-- `http://localhost:3000/teacher/default/demo-lecture`
+- `http://localhost:3000/host/default`
+- `http://localhost:3000/host/default/demo-lecture`
 
 ## Verify
 
@@ -130,9 +130,9 @@ If you already ran the schema before clear/archive support was added, run
 ## Sessions
 
 Students join with a space code and session code on `/join` or by opening
-`/s/<space-code>/<session-code>`. Student routes and submission APIs only
+`/spaces/<space-code>/<session-code>`. Student routes and submission APIs only
 accept existing open sessions. Teachers create sessions by opening a session
-from `/teacher/<space-code>` after entering that space's teacher PIN.
+from `/host/<space-code>` after entering that space's teacher PIN.
 
 For now, session codes are still globally unique internally even
 though access and navigation are scoped by teaching space.

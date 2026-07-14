@@ -25,7 +25,7 @@ export default function PrivacyPage() {
               We store the writing, drawing, or group question you submit, the
               session code, an optional selected GIF, an optional display name,
               timestamps, anonymous browser vote markers for group-question
-              upvotes, answered markers for group questions, and teacher
+              upvotes, answered markers for group questions, and host
               moderation markers such as starred, flagged, or hidden. The
               service may also create ordinary technical logs through its
               hosting provider.
@@ -55,9 +55,9 @@ export default function PrivacyPage() {
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Who can see responses</h2>
             <p className="mt-2">
-              Teaching staff with the teacher PIN can see submitted responses
+              Teaching staff with the host PIN can see submitted responses
               and group questions. Students in the same session can see and
-              upvote group questions. A teacher may choose to discuss or display
+              upvote group questions. A host may choose to discuss or display
               selected responses or questions during class.
             </p>
           </div>

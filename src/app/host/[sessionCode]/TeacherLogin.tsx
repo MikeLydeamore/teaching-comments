@@ -16,14 +16,14 @@ export function TeacherLogin({
   usesDefaultPin,
 }: TeacherLoginProps) {
   const next = nextPath ?? (spaceCode
-    ? `/teacher/${spaceCode}/${sessionCode}`
-    : `/teacher/${sessionCode}`);
+    ? `/host/${spaceCode}/${sessionCode}`
+    : `/host/${sessionCode}`);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-          Teacher PIN
+          Host PIN
         </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
             Unlock dashboard
@@ -54,7 +54,7 @@ export function TeacherLogin({
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
             type="submit"
           >
-            Unlock teacher view
+            Unlock host view
           </button>
         </form>
         {authFailed ? (

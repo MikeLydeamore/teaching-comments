@@ -3,8 +3,8 @@ import { joinSession } from "./actions";
 
 const messages = {
   closed: "That Ed.ie session is closed.",
-  missing: "Enter the session code from your teacher.",
-  "space-missing": "Enter the teaching space code from your teacher.",
+  missing: "Enter the session code from your host.",
+  "space-missing": "Enter the space code from your host.",
   "name-too-long": "Names must be 80 characters or fewer.",
   "not-found": "We could not find that Ed.ie session.",
 };
@@ -29,7 +29,7 @@ export default async function JoinPage({
           Join a session
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Enter the space code and session code your teacher shared. Session
+          Enter the space code and session code your host shared. Session
           lists are not public, which keeps class activities harder to spam.
         </p>
 
