@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import type { Submission } from "@/lib/qwt-store";
@@ -19,6 +25,18 @@ type SubmissionsPopoutProps = {
   starredOnly: boolean;
 };
 
+function subscribeToHydration() {
+  return () => {};
+}
+
+function useHasHydrated() {
+  return useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
+}
+
 function sortSubmissions(
   submissions: Submission[],
   sortOrder: "newest" | "oldest",
@@ -31,7 +49,11 @@ function sortSubmissions(
   });
 }
 
-function responseTime(value: string) {
+function responseTime(value: string, hasHydrated: boolean) {
+  if (!hasHydrated) {
+    return "Submitted";
+  }
+
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -53,6 +75,7 @@ export function SubmissionsPopout({
   const [submissions, setSubmissions] = useState(() =>
     sortSubmissions(initialSubmissions, sortOrder),
   );
+  const hasHydrated = useHasHydrated();
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const queryString = useMemo(() => {
@@ -163,7 +186,7 @@ export function SubmissionsPopout({
                     {submission.studentName || "Anonymous"}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {responseTime(submission.createdAt)}
+                    {responseTime(submission.createdAt, hasHydrated)}
                   </p>
                 </div>
                 {submission.status === "hidden" ? (

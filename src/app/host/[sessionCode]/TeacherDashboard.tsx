@@ -353,10 +353,8 @@ export function TeacherDashboard({
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
-  const [screeningStatus, setScreeningStatus] = useState("");
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
   const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
-  const [submissionsPopoutStatus, setSubmissionsPopoutStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
   const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
@@ -559,7 +557,6 @@ export function TeacherDashboard({
   }
 
   async function setGroupQuestionsScreeningMode(isEnabled: boolean) {
-    setScreeningStatus("Saving...");
     const response = await fetch(`/api/sessions/${session.code}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -568,21 +565,14 @@ export function TeacherDashboard({
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      setScreeningStatus(payload.error ?? "Could not update screening mode.");
       return;
     }
 
     setSessionDetails(payload.session);
     setStats(payload.stats ?? stats);
-    setScreeningStatus(
-      isEnabled
-        ? "Screening mode on. New questions will start hidden."
-        : "Screening mode off. New questions will show immediately.",
-    );
   }
 
   async function setSubmissionsScreeningMode(isEnabled: boolean) {
-    setScreeningStatus("Saving...");
     const response = await fetch(`/api/sessions/${session.code}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -591,17 +581,11 @@ export function TeacherDashboard({
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      setScreeningStatus(payload.error ?? "Could not update submissions mode.");
       return;
     }
 
     setSessionDetails(payload.session);
     setStats(payload.stats ?? stats);
-    setScreeningStatus(
-      isEnabled
-        ? "Submissions on. New submissions will start hidden."
-        : "Submissions off. New submissions will show immediately.",
-    );
   }
 
   function setTimerDraftDuration(seconds: number) {
@@ -901,7 +885,6 @@ export function TeacherDashboard({
     const popoutWindow = window.open(url, "edie-submissions-popout");
 
     if (!popoutWindow) {
-      setSubmissionsPopoutStatus("Popout blocked. Allow popups and try again.");
       return false;
     }
 
@@ -913,18 +896,11 @@ export function TeacherDashboard({
   function popOutSubmissions() {
     if (openSubmissionsPopout(submissionsPopoutUrl)) {
       setSubmissionsPopoutOpen(true);
-      setSubmissionsPopoutStatus("Submissions screen open.");
     }
   }
 
   function toggleHiddenSubmissions() {
-    const nextIncludeHidden = !includeHidden;
-    setIncludeHidden(nextIncludeHidden);
-    setSubmissionsPopoutStatus(
-      nextIncludeHidden
-        ? "Hidden submissions will show in the host view."
-        : "Hidden submissions are hidden in the host view.",
-    );
+    setIncludeHidden((isIncludingHidden) => !isIncludingHidden);
   }
 
   useEffect(() => {
@@ -937,7 +913,6 @@ export function TeacherDashboard({
     if (!popoutWindow || popoutWindow.closed) {
       submissionsPopoutWindowRef.current = null;
       setSubmissionsPopoutOpen(false);
-      setSubmissionsPopoutStatus("Submissions screen closed.");
       return;
     }
 
