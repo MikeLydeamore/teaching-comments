@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GroupQuestion } from "@/lib/qwt-store";
 
 type GroupQuestionsPanelProps = {
@@ -88,7 +88,13 @@ export function GroupQuestionsPanel({
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [votingQuestionId, setVotingQuestionId] = useState<string | null>(null);
+  const [votingQuestionIds, setVotingQuestionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const pendingVotesRef = useRef(new Map<string, {
+    hasVoted: boolean;
+    voteCount: number;
+  }>());
   const [answeringQuestionId, setAnsweringQuestionId] = useState<string | null>(null);
   const [screeningQuestionId, setScreeningQuestionId] = useState<string | null>(null);
   const [showAnswered, setShowAnswered] = useState(false);
@@ -123,7 +129,21 @@ export function GroupQuestionsPanel({
       return;
     }
 
-    setQuestions(payload.questions ?? []);
+    const nextQuestions = (payload.questions ?? []) as GroupQuestion[];
+
+    setQuestions(
+      nextQuestions.map((question) => {
+        const pendingVote = pendingVotesRef.current.get(question.id);
+
+        return pendingVote
+          ? {
+              ...question,
+              hasVoted: pendingVote.hasVoted,
+              voteCount: pendingVote.voteCount,
+            }
+          : question;
+      }),
+    );
   }, [canMarkAnswered, sessionCode, showAnswered, voterId]);
 
   useEffect(() => {
@@ -173,27 +193,98 @@ export function GroupQuestionsPanel({
   }
 
   async function toggleVote(question: GroupQuestion) {
-    if (!voterId) {
+    if (!voterId || pendingVotesRef.current.has(question.id)) {
       return;
     }
 
-    setVotingQuestionId(question.id);
-    setStatus("");
+    const optimisticVote = {
+      hasVoted: !question.hasVoted,
+      voteCount: Math.max(
+        0,
+        question.voteCount + (question.hasVoted ? -1 : 1),
+      ),
+    };
 
-    const response = await fetch(`/api/group-questions/${question.id}/vote`, {
-      method: question.hasVoted ? "DELETE" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voterId }),
+    pendingVotesRef.current.set(question.id, optimisticVote);
+    setVotingQuestionIds((currentQuestionIds) =>
+      new Set(currentQuestionIds).add(question.id),
+    );
+    setStatus("");
+    setQuestions((currentQuestions) =>
+      currentQuestions.map((currentQuestion) =>
+        currentQuestion.id === question.id
+          ? {
+              ...currentQuestion,
+              hasVoted: optimisticVote.hasVoted,
+              voteCount: optimisticVote.voteCount,
+            }
+          : currentQuestion,
+      ),
+    );
+
+    let response: Response;
+    let payload: { error?: string; question?: GroupQuestion };
+
+    try {
+      response = await fetch(`/api/group-questions/${question.id}/vote`, {
+        method: question.hasVoted ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voterId }),
+      });
+      payload = await response.json().catch(() => ({}));
+    } catch {
+      pendingVotesRef.current.delete(question.id);
+      setVotingQuestionIds((currentQuestionIds) => {
+        const nextQuestionIds = new Set(currentQuestionIds);
+        nextQuestionIds.delete(question.id);
+        return nextQuestionIds;
+      });
+      setQuestions((currentQuestions) =>
+        currentQuestions.map((currentQuestion) =>
+          currentQuestion.id === question.id
+            ? {
+                ...currentQuestion,
+                hasVoted: question.hasVoted,
+                voteCount: question.voteCount,
+              }
+            : currentQuestion,
+        ),
+      );
+      setStatus("Could not save vote.");
+      return;
+    }
+
+    pendingVotesRef.current.delete(question.id);
+    setVotingQuestionIds((currentQuestionIds) => {
+      const nextQuestionIds = new Set(currentQuestionIds);
+      nextQuestionIds.delete(question.id);
+      return nextQuestionIds;
     });
-    const payload = await response.json().catch(() => ({}));
-    setVotingQuestionId(null);
 
     if (!response.ok) {
       setStatus(payload.error ?? "Could not save vote.");
+      setQuestions((currentQuestions) =>
+        currentQuestions.map((currentQuestion) =>
+          currentQuestion.id === question.id
+            ? {
+                ...currentQuestion,
+                hasVoted: question.hasVoted,
+                voteCount: question.voteCount,
+              }
+            : currentQuestion,
+        ),
+      );
+      void refreshQuestions();
       return;
     }
 
-    const nextQuestion = payload.question as GroupQuestion;
+    const nextQuestion = payload.question;
+
+    if (!nextQuestion) {
+      await refreshQuestions();
+      return;
+    }
+
     setQuestions((currentQuestions) =>
       sortGroupQuestions(
         currentQuestions
@@ -380,14 +471,29 @@ export function GroupQuestionsPanel({
                     </>
                   ) : null}
                   <button
-                    aria-label={question.hasVoted ? "Remove upvote" : "Upvote"}
+                    aria-busy={votingQuestionIds.has(question.id)}
+                    aria-label={
+                      votingQuestionIds.has(question.id)
+                        ? "Saving vote"
+                        : question.hasVoted
+                          ? "Remove upvote"
+                          : "Upvote"
+                    }
                     className={`h-9 rounded-md border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                      votingQuestionIds.has(question.id) ? "animate-pulse" : ""
+                    } ${
                       question.hasVoted
                         ? "border-teal-300 bg-teal-50 text-teal-800 hover:border-teal-500"
                         : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
                     }`}
-                    disabled={votingQuestionId === question.id}
-                    title={question.hasVoted ? "Remove upvote" : "Upvote"}
+                    disabled={votingQuestionIds.has(question.id)}
+                    title={
+                      votingQuestionIds.has(question.id)
+                        ? "Saving vote"
+                        : question.hasVoted
+                          ? "Remove upvote"
+                          : "Upvote"
+                    }
                     type="button"
                     onClick={() => {
                       void toggleVote(question);
