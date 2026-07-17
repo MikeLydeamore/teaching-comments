@@ -11,8 +11,10 @@ import {
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
+import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
-import type { DrawingData, GifData } from "@/lib/qwt-store";
+import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
+import type { DrawingData, GifData, ParticipantPoll } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
   initialStudentName: string;
@@ -48,6 +50,10 @@ export function StudentSubmit({
   const [currentTimerDurationSeconds, setCurrentTimerDurationSeconds] =
     useState(timerDurationSeconds);
   const [studentName, setStudentName] = useState(initialStudentName);
+  const [pollParticipantId] = useState(() =>
+    typeof window === "undefined" ? "" : getOrCreatePollParticipantId(),
+  );
+  const [activePoll, setActivePoll] = useState<ParticipantPoll | null>(null);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
   const [gifData, setGifData] = useState<GifData | null>(null);
@@ -62,7 +68,10 @@ export function StudentSubmit({
     text.trim().length >= 1 || drawingData !== null || gifData !== null;
 
   const refreshSession = useCallback(async () => {
-    const response = await fetch(`/api/sessions/${sessionCode}/student`);
+    const query = pollParticipantId
+      ? `?participantId=${encodeURIComponent(pollParticipantId)}`
+      : "";
+    const response = await fetch(`/api/sessions/${sessionCode}/student${query}`);
 
     if (!response.ok) {
       return;
@@ -73,6 +82,7 @@ export function StudentSubmit({
     const nextIsOpen = payload.session?.isOpen;
     const nextTimerEndsAt = payload.session?.timerEndsAt;
     const nextTimerDurationSeconds = payload.session?.timerDurationSeconds;
+    setActivePoll(payload.activePoll ?? null);
 
     if (typeof nextPrompt === "string") {
       setCurrentPrompt((previousPrompt) => {
@@ -93,7 +103,7 @@ export function StudentSubmit({
     if (typeof nextTimerDurationSeconds === "number") {
       setCurrentTimerDurationSeconds(nextTimerDurationSeconds);
     }
-  }, [sessionCode]);
+  }, [pollParticipantId, sessionCode]);
 
   useEffect(() => {
     const firstRefresh = window.setTimeout(() => {
@@ -165,6 +175,13 @@ export function StudentSubmit({
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-5 py-8">
+      {activePoll && pollParticipantId ? (
+        <ParticipantPollOverlay
+          key={activePoll.id}
+          participantId={pollParticipantId}
+          poll={activePoll}
+        />
+      ) : null}
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">

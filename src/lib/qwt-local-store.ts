@@ -15,6 +15,9 @@ import {
   titleFromCode,
   validateGroupQuestionText,
   validateGroupQuestionVoterId,
+  validatePollDefinition,
+  validatePollExtension,
+  validatePollParticipantId,
   validateQuestionTitle,
   validateSubmissionContent,
   validateQuestionText,
@@ -22,15 +25,19 @@ import {
   validateTeacherSpacePinHash,
   type GroupQuestion,
   type PromptHistoryItem,
+  type PollResponse,
   type QuestionBankItem,
   type QwtStore,
   type Session,
+  type SessionPoll,
   type Submission,
   type TeacherSpace,
 } from "./qwt-store-model";
 
 type StoreData = {
   groupQuestions: StoredGroupQuestion[];
+  pollResponses: PollResponse[];
+  polls: SessionPoll[];
   promptHistory: PromptHistoryItem[];
   questionBank: QuestionBankItem[];
   sessions: Session[];
@@ -51,6 +58,8 @@ function defaultStore(): StoreData {
 
   return {
     groupQuestions: [],
+    pollResponses: [],
+    polls: [],
     promptHistory: [
       {
         id: promptHistoryId,
@@ -192,6 +201,11 @@ async function readStore(): Promise<StoreData> {
       archivedAt: question.archivedAt ?? null,
       updatedAt: question.updatedAt ?? question.createdAt,
       voterIds: question.voterIds ?? [],
+    })),
+    pollResponses: data.pollResponses ?? [],
+    polls: (data.polls ?? []).map((poll) => ({
+      ...poll,
+      endedAt: poll.endedAt ?? null,
     })),
     teacherSpaces,
     questionBank: (data.questionBank ?? []).map((question) => ({
@@ -785,6 +799,222 @@ export const localStore: QwtStore = {
       archivedAt: question.archivedAt,
       createdAt: question.createdAt,
       updatedAt: question.updatedAt,
+    };
+  },
+
+  async getActivePoll(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+    const currentTime = Date.now();
+
+    return (
+      data.polls
+        .filter(
+          (poll) =>
+            poll.sessionCode === sessionCode &&
+            poll.status === "active" &&
+            new Date(poll.endsAt).getTime() > currentTime,
+        )
+        .sort(
+          (left, right) =>
+            new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime(),
+        )[0] ?? null
+    );
+  },
+
+  async getLatestPoll(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+
+    return (
+      data.polls
+        .filter((poll) => poll.sessionCode === sessionCode)
+        .sort(
+          (left, right) =>
+            new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime(),
+        )[0] ?? null
+    );
+  },
+
+  async getPoll(id) {
+    const data = await readStore();
+    return data.polls.find((poll) => poll.id === id) ?? null;
+  },
+
+  async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {
+    const session = await this.getSession(code);
+
+    if (!session) {
+      return null;
+    }
+
+    if (!session.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
+    const definition = validatePollDefinition(
+      question,
+      selectionMode,
+      optionLabels,
+      durationSeconds,
+    );
+    const data = await readStore();
+    const timestamp = now();
+
+    data.polls = data.polls.map((poll) =>
+      poll.sessionCode === session.code && poll.status === "active"
+        ? { ...poll, status: "ended", endedAt: timestamp, updatedAt: timestamp }
+        : poll,
+    );
+
+    const poll: SessionPoll = {
+      id: randomUUID(),
+      sessionCode: session.code,
+      question: definition.question,
+      selectionMode: definition.selectionMode,
+      options: definition.optionLabels.map((label, position) => ({
+        id: randomUUID(),
+        label,
+        position,
+      })),
+      status: "active",
+      durationSeconds: definition.durationSeconds,
+      startedAt: timestamp,
+      endsAt: new Date(
+        new Date(timestamp).getTime() + definition.durationSeconds * 1000,
+      ).toISOString(),
+      endedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    data.polls.push(poll);
+    await writeStore(data);
+    return poll;
+  },
+
+  async extendPoll(id, seconds) {
+    const extension = validatePollExtension(seconds);
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (poll.status !== "active") {
+      throw new Error("This poll has been ended.");
+    }
+
+    const timestamp = now();
+    const baseTime = Math.max(Date.now(), new Date(poll.endsAt).getTime());
+    poll.endsAt = new Date(baseTime + extension * 1000).toISOString();
+    poll.durationSeconds += extension;
+    poll.updatedAt = timestamp;
+    await writeStore(data);
+    return poll;
+  },
+
+  async endPoll(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (poll.status === "active") {
+      const timestamp = now();
+      poll.status = "ended";
+      poll.endedAt = timestamp;
+      poll.updatedAt = timestamp;
+      await writeStore(data);
+    }
+
+    return poll;
+  },
+
+  async getPollResponse(pollId, participantId) {
+    const normalizedParticipantId = validatePollParticipantId(participantId);
+    const data = await readStore();
+
+    return (
+      data.pollResponses.find(
+        (response) =>
+          response.pollId === pollId &&
+          response.participantId === normalizedParticipantId,
+      ) ?? null
+    );
+  },
+
+  async savePollResponse(pollId, participantId, optionIds) {
+    const normalizedParticipantId = validatePollParticipantId(participantId);
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === pollId);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (
+      poll.status !== "active" ||
+      new Date(poll.endsAt).getTime() <= Date.now()
+    ) {
+      throw new Error("This poll has ended.");
+    }
+
+    const selectedOptionIds = [...new Set(optionIds)];
+    const validOptionIds = new Set(poll.options.map((option) => option.id));
+
+    if (selectedOptionIds.some((optionId) => !validOptionIds.has(optionId))) {
+      throw new Error("That poll answer could not be found.");
+    }
+
+    if (poll.selectionMode === "single" && selectedOptionIds.length > 1) {
+      throw new Error("Choose one answer for this poll.");
+    }
+
+    const response: PollResponse = {
+      pollId: poll.id,
+      participantId: normalizedParticipantId,
+      optionIds: selectedOptionIds,
+      updatedAt: now(),
+    };
+    const existingIndex = data.pollResponses.findIndex(
+      (item) =>
+        item.pollId === poll.id &&
+        item.participantId === normalizedParticipantId,
+    );
+
+    if (existingIndex === -1) {
+      data.pollResponses.push(response);
+    } else {
+      data.pollResponses[existingIndex] = response;
+    }
+
+    await writeStore(data);
+    return response;
+  },
+
+  async getPollResults(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    const responses = data.pollResponses.filter((response) => response.pollId === id);
+
+    return {
+      poll,
+      responseCount: responses.length,
+      options: poll.options.map((option) => ({
+        ...option,
+        responseCount: responses.filter((response) =>
+          response.optionIds.includes(option.id),
+        ).length,
+      })),
     };
   },
 

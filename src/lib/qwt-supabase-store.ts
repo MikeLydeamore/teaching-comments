@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
@@ -12,6 +13,9 @@ import {
   titleFromCode,
   validateGroupQuestionText,
   validateGroupQuestionVoterId,
+  validatePollDefinition,
+  validatePollExtension,
+  validatePollParticipantId,
   validateQuestionTitle,
   validateQuestionText,
   validateSubmissionContent,
@@ -20,10 +24,13 @@ import {
   type DrawingData,
   type GifData,
   type GroupQuestion,
+  type PollOption,
+  type PollResponse,
   type PromptHistoryItem,
   type QuestionBankItem,
   type QwtStore,
   type Session,
+  type SessionPoll,
   type Submission,
   type TeacherSpace,
 } from "./qwt-store-model";
@@ -104,6 +111,28 @@ type SupabaseGroupQuestionVoteRow = {
   question_id: string;
   voter_id: string;
   created_at: string;
+};
+
+type SupabasePollRow = {
+  id: string;
+  session_code: string;
+  question: string;
+  selection_mode: "single" | "multiple";
+  options: PollOption[];
+  status: "active" | "ended";
+  duration_seconds: number;
+  started_at: string;
+  ends_at: string;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupabasePollResponseRow = {
+  poll_id: string;
+  participant_id: string;
+  option_ids: string[];
+  updated_at: string;
 };
 
 class SupabaseStoreError extends Error {
@@ -200,6 +229,14 @@ function groupQuestionVoteSelect() {
   return "question_id,voter_id,created_at";
 }
 
+function pollSelect() {
+  return "id,session_code,question,selection_mode,options,status,duration_seconds,started_at,ends_at,ended_at,created_at,updated_at";
+}
+
+function pollResponseSelect() {
+  return "poll_id,participant_id,option_ids,updated_at";
+}
+
 function sessionFromRow(row: SupabaseSessionRow): Session {
   return {
     code: row.code,
@@ -292,6 +329,32 @@ function groupQuestionFromRow(
       : false,
     archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function pollFromRow(row: SupabasePollRow): SessionPoll {
+  return {
+    id: row.id,
+    sessionCode: row.session_code,
+    question: row.question,
+    selectionMode: row.selection_mode,
+    options: [...row.options].sort((left, right) => left.position - right.position),
+    status: row.status,
+    durationSeconds: row.duration_seconds,
+    startedAt: row.started_at,
+    endsAt: row.ends_at,
+    endedAt: row.ended_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function pollResponseFromRow(row: SupabasePollResponseRow): PollResponse {
+  return {
+    pollId: row.poll_id,
+    participantId: row.participant_id,
+    optionIds: row.option_ids ?? [],
     updatedAt: row.updated_at,
   };
 }
@@ -408,6 +471,14 @@ async function getGroupQuestionFromSupabase(id: string, voterId = "") {
 
   const votes = await listVotesForQuestionIds([question.id]);
   return groupQuestionFromRow(question, votes, voterId);
+}
+
+async function getPollFromSupabase(id: string) {
+  const rows = await supabaseFetch<SupabasePollRow[]>(
+    `/qwt_polls?id=eq.${encodeFilterValue(id)}&select=${pollSelect()}&limit=1`,
+  );
+
+  return rows[0] ? pollFromRow(rows[0]) : null;
 }
 
 export const supabaseStore: QwtStore = {
@@ -991,6 +1062,230 @@ export const supabaseStore: QwtStore = {
     );
 
     return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
+  },
+
+  async getActivePoll(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const params = new URLSearchParams({
+      session_code: `eq.${sessionCode}`,
+      status: "eq.active",
+      ends_at: `gt.${now()}`,
+      select: pollSelect(),
+      order: "started_at.desc",
+      limit: "1",
+    });
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?${params.toString()}`,
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
+  async getLatestPoll(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const params = new URLSearchParams({
+      session_code: `eq.${sessionCode}`,
+      select: pollSelect(),
+      order: "started_at.desc",
+      limit: "1",
+    });
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?${params.toString()}`,
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
+  getPoll: getPollFromSupabase,
+
+  async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    if (!session.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
+    const definition = validatePollDefinition(
+      question,
+      selectionMode,
+      optionLabels,
+      durationSeconds,
+    );
+    const timestamp = now();
+    const options = definition.optionLabels.map((label, position) => ({
+      id: randomUUID(),
+      label,
+      position,
+    }));
+
+    await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?session_code=eq.${encodeFilterValue(session.code)}&status=eq.active&select=${pollSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "ended",
+          ended_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?select=${pollSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          session_code: session.code,
+          question: definition.question,
+          selection_mode: definition.selectionMode,
+          options,
+          status: "active",
+          duration_seconds: definition.durationSeconds,
+          started_at: timestamp,
+          ends_at: new Date(
+            new Date(timestamp).getTime() + definition.durationSeconds * 1000,
+          ).toISOString(),
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
+  async extendPoll(id, seconds) {
+    const extension = validatePollExtension(seconds);
+    const poll = await getPollFromSupabase(id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (poll.status !== "active") {
+      throw new Error("This poll has been ended.");
+    }
+
+    const timestamp = now();
+    const baseTime = Math.max(Date.now(), new Date(poll.endsAt).getTime());
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?id=eq.${encodeFilterValue(id)}&status=eq.active&select=${pollSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          duration_seconds: poll.durationSeconds + extension,
+          ends_at: new Date(baseTime + extension * 1000).toISOString(),
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
+  async endPoll(id) {
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?id=eq.${encodeFilterValue(id)}&select=${pollSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "ended",
+          ended_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
+  async getPollResponse(pollId, participantId) {
+    const normalizedParticipantId = validatePollParticipantId(participantId);
+    const params = new URLSearchParams({
+      poll_id: `eq.${pollId}`,
+      participant_id: `eq.${normalizedParticipantId}`,
+      select: pollResponseSelect(),
+      limit: "1",
+    });
+    const rows = await supabaseFetch<SupabasePollResponseRow[]>(
+      `/qwt_poll_responses?${params.toString()}`,
+    );
+
+    return rows[0] ? pollResponseFromRow(rows[0]) : null;
+  },
+
+  async savePollResponse(pollId, participantId, optionIds) {
+    const normalizedParticipantId = validatePollParticipantId(participantId);
+    const poll = await getPollFromSupabase(pollId);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (
+      poll.status !== "active" ||
+      new Date(poll.endsAt).getTime() <= Date.now()
+    ) {
+      throw new Error("This poll has ended.");
+    }
+
+    const selectedOptionIds = [...new Set(optionIds)];
+    const validOptionIds = new Set(poll.options.map((option) => option.id));
+
+    if (selectedOptionIds.some((optionId) => !validOptionIds.has(optionId))) {
+      throw new Error("That poll answer could not be found.");
+    }
+
+    if (poll.selectionMode === "single" && selectedOptionIds.length > 1) {
+      throw new Error("Choose one answer for this poll.");
+    }
+
+    const rows = await supabaseFetch<SupabasePollResponseRow[]>(
+      `/qwt_poll_responses?on_conflict=poll_id,participant_id&select=${pollResponseSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          poll_id: poll.id,
+          participant_id: normalizedParticipantId,
+          option_ids: selectedOptionIds,
+          updated_at: now(),
+        }),
+        prefer: "resolution=merge-duplicates,return=representation",
+      },
+    );
+
+    return rows[0] ? pollResponseFromRow(rows[0]) : null;
+  },
+
+  async getPollResults(id) {
+    const poll = await getPollFromSupabase(id);
+
+    if (!poll) {
+      return null;
+    }
+
+    const rows = await supabaseFetch<SupabasePollResponseRow[]>(
+      `/qwt_poll_responses?poll_id=eq.${encodeFilterValue(id)}&select=${pollResponseSelect()}`,
+    );
+    const responses = rows.map(pollResponseFromRow);
+
+    return {
+      poll,
+      responseCount: responses.length,
+      options: poll.options.map((option) => ({
+        ...option,
+        responseCount: responses.filter((response) =>
+          response.optionIds.includes(option.id),
+        ).length,
+      })),
+    };
   },
 
   async archiveSessionActivity(code) {

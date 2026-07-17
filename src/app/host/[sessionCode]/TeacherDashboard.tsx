@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
+import { HostPollManager } from "@/components/HostPollManager";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { QrCode } from "@/components/QrCode";
@@ -1243,7 +1244,7 @@ export function TeacherDashboard({
             <h2 className="text-lg font-semibold text-slate-950">
               Live writing stream
             </h2>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <p className="text-sm text-slate-500">
                 {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>
@@ -1254,6 +1255,10 @@ export function TeacherDashboard({
               >
                 {showResultsChart ? "Hide results" : "Visualise results"}
               </button>
+              <HostPollManager
+                dashboardUrl={dashboardUrl}
+                sessionCode={session.code}
+              />
               <button
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                 type="button"

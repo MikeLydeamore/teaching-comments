@@ -5,6 +5,7 @@ import {
   normalizeSessionCode,
   normalizeStudentName,
   type QwtStore,
+  type PollSelectionMode,
   type SessionPatch,
   type SubmissionPatch,
 } from "./qwt-store-model";
@@ -18,10 +19,16 @@ export type {
   DrawingStroke,
   GifData,
   GroupQuestion,
+  ParticipantPoll,
+  PollOption,
+  PollResponse,
+  PollResults,
+  PollSelectionMode,
   ArchiveSessionActivityResult,
   PromptHistoryItem,
   QuestionBankItem,
   Session,
+  SessionPoll,
   SessionPatch,
   SessionStats,
   Submission,
@@ -176,6 +183,58 @@ export async function setGroupQuestionAnswered(id: string, isAnswered: boolean) 
 
 export async function setGroupQuestionVisible(id: string, isVisible: boolean) {
   return getStore().setGroupQuestionVisible(id, isVisible);
+}
+
+export async function getActivePoll(code: string) {
+  return getStore().getActivePoll(code);
+}
+
+export async function getLatestPoll(code: string) {
+  return getStore().getLatestPoll(code);
+}
+
+export async function getPoll(id: string) {
+  return getStore().getPoll(id);
+}
+
+export async function startPoll(
+  code: string,
+  question: string,
+  selectionMode: PollSelectionMode,
+  optionLabels: string[],
+  durationSeconds: number,
+) {
+  return getStore().startPoll(
+    code,
+    question,
+    selectionMode,
+    optionLabels,
+    durationSeconds,
+  );
+}
+
+export async function extendPoll(id: string, seconds: number) {
+  return getStore().extendPoll(id, seconds);
+}
+
+export async function endPoll(id: string) {
+  return getStore().endPoll(id);
+}
+
+export async function getPollResponse(pollId: string, participantId: string) {
+  return getStore().getPollResponse(pollId, participantId);
+}
+
+export async function savePollResponse(
+  pollId: string,
+  participantId: string,
+  optionIds: string[],
+) {
+  return getStore().savePollResponse(pollId, participantId, optionIds);
+}
+
+export async function getPollResults(id: string) {
+  return getStore().getPollResults(id);
 }
 
 export async function archiveSessionActivity(code: string) {

@@ -98,6 +98,46 @@ export type GroupQuestion = {
   updatedAt: string;
 };
 
+export type PollSelectionMode = "single" | "multiple";
+
+export type PollOption = {
+  id: string;
+  label: string;
+  position: number;
+};
+
+export type SessionPoll = {
+  id: string;
+  sessionCode: string;
+  question: string;
+  selectionMode: PollSelectionMode;
+  options: PollOption[];
+  status: "active" | "ended";
+  durationSeconds: number;
+  startedAt: string;
+  endsAt: string;
+  endedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PollResponse = {
+  pollId: string;
+  participantId: string;
+  optionIds: string[];
+  updatedAt: string;
+};
+
+export type PollResults = {
+  poll: SessionPoll;
+  responseCount: number;
+  options: Array<PollOption & { responseCount: number }>;
+};
+
+export type ParticipantPoll = SessionPoll & {
+  selectedOptionIds: string[];
+};
+
 export type SubmissionPatch = Partial<
   Pick<Submission, "text" | "status" | "starred" | "flagged">
 >;
@@ -201,6 +241,28 @@ export type QwtStore = {
     id: string,
     isVisible: boolean,
   ): Promise<GroupQuestion | null>;
+  getActivePoll(code: string): Promise<SessionPoll | null>;
+  getLatestPoll(code: string): Promise<SessionPoll | null>;
+  getPoll(id: string): Promise<SessionPoll | null>;
+  startPoll(
+    code: string,
+    question: string,
+    selectionMode: PollSelectionMode,
+    optionLabels: string[],
+    durationSeconds: number,
+  ): Promise<SessionPoll | null>;
+  extendPoll(id: string, seconds: number): Promise<SessionPoll | null>;
+  endPoll(id: string): Promise<SessionPoll | null>;
+  getPollResponse(
+    pollId: string,
+    participantId: string,
+  ): Promise<PollResponse | null>;
+  savePollResponse(
+    pollId: string,
+    participantId: string,
+    optionIds: string[],
+  ): Promise<PollResponse | null>;
+  getPollResults(id: string): Promise<PollResults | null>;
   archiveSessionActivity(code: string): Promise<ArchiveSessionActivityResult | null>;
   unarchiveSessionActivity(
     code: string,
@@ -500,6 +562,62 @@ export function validateGroupQuestionVoterId(voterId: string) {
   }
 
   return trimmed;
+}
+
+export const validatePollParticipantId = validateGroupQuestionVoterId;
+
+export function validatePollDefinition(
+  question: string,
+  selectionMode: PollSelectionMode,
+  optionLabels: string[],
+  durationSeconds: number,
+) {
+  const normalizedQuestion = question.trim().replace(/\s+/g, " ");
+
+  if (!normalizedQuestion || normalizedQuestion.length > 500) {
+    throw new Error("Poll question must be between 1 and 500 characters.");
+  }
+
+  if (selectionMode !== "single" && selectionMode !== "multiple") {
+    throw new Error("Choose single choice or multiple choice.");
+  }
+
+  if (!Array.isArray(optionLabels) || optionLabels.length < 2 || optionLabels.length > 8) {
+    throw new Error("Polls need between 2 and 8 answers.");
+  }
+
+  const normalizedOptions = optionLabels.map((label) => label.trim().replace(/\s+/g, " "));
+
+  if (normalizedOptions.some((label) => !label || label.length > 160)) {
+    throw new Error("Each poll answer must be between 1 and 160 characters.");
+  }
+
+  if (new Set(normalizedOptions.map((label) => label.toLowerCase())).size !== normalizedOptions.length) {
+    throw new Error("Poll answers must be different from each other.");
+  }
+
+  const normalizedDuration = Math.round(durationSeconds);
+
+  if (!Number.isFinite(normalizedDuration) || normalizedDuration < 5 || normalizedDuration > 3600) {
+    throw new Error("Poll timer must be between 5 seconds and 60 minutes.");
+  }
+
+  return {
+    question: normalizedQuestion,
+    selectionMode,
+    optionLabels: normalizedOptions,
+    durationSeconds: normalizedDuration,
+  };
+}
+
+export function validatePollExtension(seconds: number) {
+  const normalized = Math.round(seconds);
+
+  if (!Number.isFinite(normalized) || normalized < 1 || normalized > 3600) {
+    throw new Error("Poll extension must be between 1 second and 60 minutes.");
+  }
+
+  return normalized;
 }
 
 export function validateSubmissionContent(
