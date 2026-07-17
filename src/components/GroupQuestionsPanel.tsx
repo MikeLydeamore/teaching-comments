@@ -5,6 +5,7 @@ import type { GroupQuestion } from "@/lib/qwt-store";
 
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
+  className?: string;
   sessionCode: string;
   studentName?: string;
   variant?: "student" | "teacher";
@@ -73,6 +74,7 @@ function sortGroupQuestions(questions: GroupQuestion[]) {
 
 export function GroupQuestionsPanel({
   canAsk = false,
+  className = "",
   sessionCode,
   studentName = "",
   variant = "student",
@@ -265,9 +267,7 @@ export function GroupQuestionsPanel({
 
   return (
     <section
-      className={`rounded-md border border-slate-200 bg-white p-4 shadow-sm ${
-        variant === "student" ? "mt-5" : ""
-      }`}
+      className={`rounded-md border border-slate-200 bg-white p-4 shadow-sm ${className}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

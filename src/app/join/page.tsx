@@ -8,6 +8,7 @@ const messages = {
   "space-missing": "Enter the space code from your host.",
   "name-too-long": "Names must be 80 characters or fewer.",
   "not-found": "We could not find that Ed.ie session.",
+  "privacy-required": "Please acknowledge the privacy notice to join.",
 };
 
 export default async function JoinPage({
@@ -70,6 +71,23 @@ export default async function JoinPage({
           <p className="mt-2 text-xs leading-5 text-slate-500">
             Optional. Leave blank to submit as Anonymous.
           </p>
+          <label className="mt-4 flex gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+            <input
+              className="mt-1 size-4 shrink-0 rounded border-slate-300"
+              name="privacyAccepted"
+              required
+              type="checkbox"
+            />
+            <span>
+              I understand my response, timestamp, session code, and any name I
+              provide will be stored for this teaching activity. I will avoid
+              including student IDs or other identifying details.{" "}
+              <Link className="font-semibold text-teal-700 underline" href="/privacy">
+                Read the privacy notice
+              </Link>
+              .
+            </span>
+          </label>
           <PendingSubmitButton
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
             pendingChildren="Joining..."
@@ -83,12 +101,6 @@ export default async function JoinPage({
             {error}
           </p>
         ) : null}
-
-        <div className="mt-5 border-t border-slate-200 pt-4">
-          <Link className="text-sm font-semibold text-teal-700 underline" href="/privacy">
-            Read the privacy notice
-          </Link>
-        </div>
       </section>
     </main>
   );

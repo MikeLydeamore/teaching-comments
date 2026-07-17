@@ -9,11 +9,13 @@ import {
   normalizeStudentName,
 } from "@/lib/qwt-store";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
+import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 
 export async function joinSession(formData: FormData) {
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const sessionCode = normalizeSessionCode(String(formData.get("sessionCode") ?? ""));
   const rawStudentName = String(formData.get("studentName") ?? "");
+  const privacyAccepted = formData.get("privacyAccepted") === "on";
 
   if (!spaceCode) {
     redirect("/join?error=space-missing");
@@ -21,6 +23,12 @@ export async function joinSession(formData: FormData) {
 
   if (!sessionCode) {
     redirect(`/join?error=missing&space=${encodeURIComponent(spaceCode)}`);
+  }
+
+  if (!privacyAccepted) {
+    redirect(
+      `/join?error=privacy-required&space=${encodeURIComponent(spaceCode)}&session=${encodeURIComponent(sessionCode)}`,
+    );
   }
 
   let studentName = "Anonymous";
@@ -59,6 +67,14 @@ export async function joinSession(formData: FormData) {
       sameSite: "lax",
     });
   }
+
+  cookieStore.set(studentConsentCookieName(session.code), "accepted", {
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 
   redirect(`/spaces/${spaceCode}/${session.code}`);
 }

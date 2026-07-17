@@ -330,8 +330,9 @@ html[data-qwt-theme] .qwt-theme-selector {
 
 @media (max-width: 640px) {
   .qwt-theme-selector {
-    left: 0.75rem;
-    right: 0.75rem;
+    position: static !important;
+    width: calc(100% - 2.5rem);
+    margin: 0 auto 1.25rem;
     justify-content: space-between;
   }
 }

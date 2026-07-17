@@ -128,31 +128,31 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
   }
 
   return (
-    <section className="mt-5 border-t border-slate-200 pt-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="quick-draw">
-          Drawing
-        </label>
-        <p className="text-xs text-slate-500">
-          {strokes.length ? `${strokes.length} stroke${strokes.length === 1 ? "" : "s"}` : "Optional"}
-        </p>
-      </div>
+    <details className="group mt-5 rounded-md border border-slate-200 bg-slate-50">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+        <span>Add a drawing</span>
+        <span className="text-xs font-medium text-slate-500">
+          {strokes.length
+            ? `${strokes.length} stroke${strokes.length === 1 ? "" : "s"}`
+            : "Optional"}
+        </span>
+      </summary>
+      <div className="border-t border-slate-200 bg-white p-4">
+        <canvas
+          aria-label="Drawing response"
+          className="block w-full rounded-md border border-slate-300 bg-white shadow-inner [touch-action:none]"
+          height={DRAWING_HEIGHT}
+          id="quick-draw"
+          ref={canvasRef}
+          style={{ aspectRatio: `${DRAWING_WIDTH} / ${DRAWING_HEIGHT}` }}
+          width={DRAWING_WIDTH}
+          onPointerCancel={finishStroke}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishStroke}
+        />
 
-      <canvas
-        aria-label="Drawing response"
-        className="mt-3 block w-full rounded-md border border-slate-300 bg-white shadow-inner [touch-action:none]"
-        height={DRAWING_HEIGHT}
-        id="quick-draw"
-        ref={canvasRef}
-        style={{ aspectRatio: `${DRAWING_WIDTH} / ${DRAWING_HEIGHT}` }}
-        width={DRAWING_WIDTH}
-        onPointerCancel={finishStroke}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishStroke}
-      />
-
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2" role="group" aria-label="Drawing color">
           {COLORS.map((option) => (
             <button
@@ -200,7 +200,8 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
             Clear
           </button>
         </div>
+        </div>
       </div>
-    </section>
+    </details>
   );
 }

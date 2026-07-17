@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getSession } from "@/lib/qwt-store";
+import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "./StudentSubmit";
 
@@ -33,6 +35,15 @@ export default async function StudentPage({
   }
 
   const cookieStore = await cookies();
+
+  if (
+    cookieStore.get(studentConsentCookieName(session.code))?.value !== "accepted"
+  ) {
+    redirect(
+      `/join?space=${encodeURIComponent(session.spaceCode)}&session=${encodeURIComponent(session.code)}`,
+    );
+  }
+
   const studentName =
     cookieStore.get(studentNameCookieName(session.code))?.value ?? "";
 

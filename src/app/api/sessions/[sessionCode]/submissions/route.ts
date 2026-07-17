@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { addSubmission, listSubmissions } from "@/lib/qwt-store";
+import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
@@ -34,7 +36,6 @@ export async function POST(
   const body = (await request.json().catch(() => ({}))) as {
     drawingData?: unknown;
     gifData?: unknown;
-    privacyAccepted?: boolean;
     studentName?: string;
     text?: string;
     website?: string;
@@ -45,10 +46,12 @@ export async function POST(
       return Response.json({ error: "Could not save submission." }, { status: 400 });
     }
 
-    if (!body.privacyAccepted) {
+    const cookieStore = await cookies();
+
+    if (cookieStore.get(studentConsentCookieName(sessionCode))?.value !== "accepted") {
       return Response.json(
-        { error: "Please acknowledge the privacy notice before submitting." },
-        { status: 400 },
+        { error: "Please join the session and acknowledge the privacy notice first." },
+        { status: 403 },
       );
     }
 

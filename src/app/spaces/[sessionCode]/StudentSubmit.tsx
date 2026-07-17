@@ -1,7 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
@@ -48,7 +54,6 @@ export function StudentSubmit({
   const [drawingResetSignal, setDrawingResetSignal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [website, setWebsite] = useState("");
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
 
@@ -106,6 +111,11 @@ export function StudentSubmit({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSaving || !sessionIsOpen || !hasSubmissionContent) {
+      return;
+    }
+
     setError("");
     setIsSaving(true);
 
@@ -115,7 +125,6 @@ export function StudentSubmit({
       body: JSON.stringify({
         drawingData,
         gifData,
-        privacyAccepted,
         studentName,
         text,
         website,
@@ -137,8 +146,24 @@ export function StudentSubmit({
     setDrawingResetSignal((currentSignal) => currentSignal + 1);
   }
 
+  function handleTextKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing ||
+      isSaving ||
+      !sessionIsOpen ||
+      !hasSubmissionContent
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-5 py-8">
+    <main className="mx-auto min-h-screen w-full max-w-6xl px-5 py-8">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
@@ -206,89 +231,79 @@ export function StudentSubmit({
         </p>
       </section>
 
-      <GroupQuestionsPanel
-        canAsk={sessionIsOpen}
-        sessionCode={sessionCode}
-        studentName={studentName}
-      />
-
-      <form className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
-        <label className="block text-sm font-semibold text-slate-700" htmlFor="quick-write">
-          Your writing
-        </label>
-        <input
-          aria-hidden="true"
-          autoComplete="off"
-          className="hidden"
-          name="website"
-          tabIndex={-1}
-          value={website}
-          onChange={(event) => setWebsite(event.target.value)}
-        />
-        <textarea
-          id="quick-write"
-          className="mt-3 min-h-40 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-          maxLength={2000}
-          placeholder="Type your response here..."
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-        <GiphyPicker
-          disabled={!sessionIsOpen || isSaving}
-          gifData={gifData}
-          onChange={setGifData}
-        />
-        <DrawingPad
-          disabled={!sessionIsOpen || isSaving}
-          key={drawingResetSignal}
-          onChange={setDrawingData}
-        />
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <p className={`text-sm ${remaining < 100 ? "text-amber-700" : "text-slate-500"}`}>
-            {remaining} characters remaining
-          </p>
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-md bg-amber-300 px-5 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSaving || !sessionIsOpen || !hasSubmissionContent}
-            type="submit"
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div>
+          <form
+            className="rounded-md border border-slate-200 bg-white p-5 shadow-sm"
+            onSubmit={handleSubmit}
           >
-            {isSaving ? "Submitting..." : "Submit"}
-          </button>
-        </div>
-        <label className="mt-4 flex gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
-          <input
-            checked={privacyAccepted}
-            className="mt-1 size-4 rounded border-slate-300"
-            type="checkbox"
-            onChange={(event) => setPrivacyAccepted(event.target.checked)}
-          />
-          <span>
-            I understand my writing, drawing, or selected GIF, timestamp, and
-            session code will be stored for this teaching activity. If I
-            provide a name, that name will also be stored and visible to
-            teaching staff. I will avoid including student IDs or other
-            identifying details.{" "}
-            <Link className="font-semibold text-teal-700 underline" href="/privacy">
-              Read the privacy notice
-            </Link>
-            .
-          </span>
-        </label>
-        {error ? (
-          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </form>
+            <label className="block text-sm font-semibold text-slate-700" htmlFor="quick-write">
+              Your writing
+            </label>
+            <input
+              aria-hidden="true"
+              autoComplete="off"
+              className="hidden"
+              name="website"
+              tabIndex={-1}
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
+            />
+            <textarea
+              id="quick-write"
+              className="mt-3 min-h-40 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              maxLength={2000}
+              placeholder="Type your response here..."
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={handleTextKeyDown}
+            />
+            <GiphyPicker
+              disabled={!sessionIsOpen || isSaving}
+              gifData={gifData}
+              onChange={setGifData}
+            />
+            <DrawingPad
+              disabled={!sessionIsOpen || isSaving}
+              key={drawingResetSignal}
+              onChange={setDrawingData}
+            />
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className={`text-sm ${remaining < 100 ? "text-amber-700" : "text-slate-500"}`}>
+                {remaining} characters remaining
+              </p>
+              <button
+                className="inline-flex h-11 items-center justify-center rounded-md bg-amber-300 px-5 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSaving || !sessionIsOpen || !hasSubmissionContent}
+                type="submit"
+              >
+                {isSaving ? "Submitting..." : "Submit (Enter)"}
+              </button>
+            </div>
+            {error ? (
+              <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </form>
 
-      {saved ? (
-        <aside className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4 text-teal-950" role="status">
-          <p className="font-semibold">Saved. Thanks.</p>
-          <p className="mt-1 text-sm">
-            Submitted at {new Date(saved.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
-          </p>
-        </aside>
-      ) : null}
+          {saved ? (
+            <aside className="mt-5 rounded-md border border-teal-200 bg-teal-50 p-4 text-teal-950" role="status">
+              <p className="font-semibold">Saved. Thanks.</p>
+              <p className="mt-1 text-sm">
+                Submitted at {new Date(saved.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+              </p>
+            </aside>
+          ) : null}
+        </div>
+
+        <GroupQuestionsPanel
+          canAsk={sessionIsOpen}
+          className="lg:sticky lg:top-5"
+          sessionCode={sessionCode}
+          studentName={studentName}
+        />
+      </div>
     </main>
   );
 }
