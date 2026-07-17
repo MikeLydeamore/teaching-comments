@@ -151,6 +151,7 @@ export function StudentSubmit({
       event.key !== "Enter" ||
       event.shiftKey ||
       event.nativeEvent.isComposing ||
+      window.matchMedia("(pointer: coarse)").matches ||
       isSaving ||
       !sessionIsOpen ||
       !hasSubmissionContent
