@@ -679,6 +679,13 @@ export const localStore: QwtStore = {
     }
 
     const question = data.groupQuestions[index];
+    const session = data.sessions.find(
+      (storedSession) => storedSession.code === question.sessionCode,
+    );
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
+    }
 
     if (!question.voterIds.includes(normalizedVoterId)) {
       question.voterIds.push(normalizedVoterId);
@@ -712,6 +719,14 @@ export const localStore: QwtStore = {
     }
 
     const question = data.groupQuestions[index];
+    const session = data.sessions.find(
+      (storedSession) => storedSession.code === question.sessionCode,
+    );
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
     const nextVoterIds = question.voterIds.filter(
       (storedVoterId) => storedVoterId !== normalizedVoterId,
     );
@@ -954,6 +969,14 @@ export const localStore: QwtStore = {
 
     if (!poll) {
       return null;
+    }
+
+    const session = data.sessions.find(
+      (storedSession) => storedSession.code === poll.sessionCode,
+    );
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
     }
 
     if (

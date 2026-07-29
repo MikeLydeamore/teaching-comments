@@ -982,6 +982,12 @@ export const supabaseStore: QwtStore = {
       return null;
     }
 
+    const session = await getSessionFromSupabase(currentQuestion.sessionCode);
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
     if (currentQuestion.hasVoted) {
       return currentQuestion;
     }
@@ -1013,6 +1019,12 @@ export const supabaseStore: QwtStore = {
 
     if (!currentQuestion) {
       return null;
+    }
+
+    const session = await getSessionFromSupabase(currentQuestion.sessionCode);
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
     }
 
     if (!currentQuestion.hasVoted) {
@@ -1227,6 +1239,12 @@ export const supabaseStore: QwtStore = {
 
     if (!poll) {
       return null;
+    }
+
+    const session = await getSessionFromSupabase(poll.sessionCode);
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
     }
 
     if (

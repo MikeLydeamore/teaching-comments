@@ -317,6 +317,7 @@ export function StudentSubmit({
 
         <GroupQuestionsPanel
           canAsk={sessionIsOpen}
+          canVote={sessionIsOpen}
           className="lg:sticky lg:top-5"
           sessionCode={sessionCode}
           studentName={studentName}

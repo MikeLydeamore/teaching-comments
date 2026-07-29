@@ -5,6 +5,7 @@ import type { GroupQuestion } from "@/lib/qwt-store";
 
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
+  canVote?: boolean;
   className?: string;
   sessionCode: string;
   studentName?: string;
@@ -74,6 +75,7 @@ function sortGroupQuestions(questions: GroupQuestion[]) {
 
 export function GroupQuestionsPanel({
   canAsk = false,
+  canVote = true,
   className = "",
   sessionCode,
   studentName = "",
@@ -193,7 +195,7 @@ export function GroupQuestionsPanel({
   }
 
   async function toggleVote(question: GroupQuestion) {
-    if (!voterId || pendingVotesRef.current.has(question.id)) {
+    if (!canVote || !voterId || pendingVotesRef.current.has(question.id)) {
       return;
     }
 
@@ -486,9 +488,11 @@ export function GroupQuestionsPanel({
                         ? "border-teal-300 bg-teal-50 text-teal-800 hover:border-teal-500"
                         : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
                     }`}
-                    disabled={votingQuestionIds.has(question.id)}
+                    disabled={!canVote || votingQuestionIds.has(question.id)}
                     title={
-                      votingQuestionIds.has(question.id)
+                      !canVote
+                        ? "Session closed"
+                        : votingQuestionIds.has(question.id)
                         ? "Saving vote"
                         : question.hasVoted
                           ? "Remove upvote"

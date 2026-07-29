@@ -63,7 +63,7 @@ export function TeacherSpaceDashboard({
                 defaultValue={initialSessionCode}
                 id="sessionCode"
                 name="sessionCode"
-                placeholder="week-1"
+                placeholder="enter-or-create-code"
               />
             </div>
             <div className="flex items-end">
@@ -103,9 +103,20 @@ export function TeacherSpaceDashboard({
                   statusClassName="mt-3 block text-sm font-semibold text-teal-700"
                   statusText="Open dashboard"
                 >
-                  <p className="font-semibold text-slate-950">
-                    {session.title}
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-950">
+                      {session.title}
+                    </p>
+                    <span
+                      className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-[0.1em] ${
+                        session.isOpen
+                          ? "bg-teal-100 text-teal-900"
+                          : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      {session.isOpen ? "Session open" : "Session closed"}
+                    </span>
+                  </div>
                   <p className="mt-1 text-sm text-slate-500">{session.code}</p>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
                     {session.prompt}

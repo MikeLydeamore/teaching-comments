@@ -45,7 +45,7 @@ export default async function JoinPage({
             defaultValue={query.space ?? ""}
             id="spaceCode"
             name="spaceCode"
-            placeholder="stats-101"
+            placeholder="Enter Space Code"
           />
           <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="sessionCode">
             Session code
@@ -55,7 +55,7 @@ export default async function JoinPage({
             defaultValue={query.session ?? ""}
             id="sessionCode"
             name="sessionCode"
-            placeholder="week-1"
+            placeholder="Enter Session Code"
           />
           <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="studentName">
             Name

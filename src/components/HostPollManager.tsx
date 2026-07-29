@@ -10,6 +10,7 @@ import type {
 
 type HostPollManagerProps = {
   dashboardUrl: string;
+  sessionIsOpen: boolean;
   sessionCode: string;
 };
 
@@ -18,6 +19,7 @@ const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 
 export function HostPollManager({
   dashboardUrl,
+  sessionIsOpen,
   sessionCode,
 }: HostPollManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -87,6 +89,7 @@ export function HostPollManager({
     [results],
   );
   const canStart =
+    sessionIsOpen &&
     !pollIsLive &&
     question.trim().length > 0 &&
     options.length >= 2 &&
@@ -212,11 +215,14 @@ export function HostPollManager({
             ? "border-teal-400 bg-teal-50 text-teal-900 hover:bg-teal-100"
             : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
         }`}
+        disabled={!sessionIsOpen && !pollIsLive}
         type="button"
         onClick={openManager}
       >
         {pollIsLive
           ? `Poll live (${results?.responseCount ?? 0})`
+          : !sessionIsOpen
+            ? "Session closed"
           : "Run poll"}
       </button>
 
@@ -395,6 +401,11 @@ export function HostPollManager({
                 )
               ) : (
                 <div>
+                  {!sessionIsOpen ? (
+                    <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                      Reopen the session before starting a poll.
+                    </p>
+                  ) : null}
                   {pollIsLive ? (
                     <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
                       End the current poll before starting another.

@@ -25,6 +25,7 @@ type Session = {
   code: string;
   title: string;
   prompt: string;
+  isOpen: boolean;
   promptUpdatedAt: string;
   groupQuestionsScreeningEnabled: boolean;
   submissionsScreeningEnabled: boolean;
@@ -354,6 +355,8 @@ export function TeacherDashboard({
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
+  const [sessionAccessStatus, setSessionAccessStatus] = useState("");
+  const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
   const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
@@ -587,6 +590,38 @@ export function TeacherDashboard({
 
     setSessionDetails(payload.session);
     setStats(payload.stats ?? stats);
+  }
+
+  async function setSessionOpen(isOpen: boolean) {
+    if (isUpdatingSessionAccess) {
+      return;
+    }
+
+    setIsUpdatingSessionAccess(true);
+    setSessionAccessStatus(isOpen ? "Reopening session..." : "Closing session...");
+
+    try {
+      const response = await fetch(`/api/sessions/${session.code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOpen }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setSessionAccessStatus(payload.error ?? "Could not update session access.");
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setStats(payload.stats ?? stats);
+      setQuestionsPanelKey((currentKey) => currentKey + 1);
+      setSessionAccessStatus(isOpen ? "Session reopened." : "Session closed.");
+    } catch {
+      setSessionAccessStatus("Could not update session access.");
+    } finally {
+      setIsUpdatingSessionAccess(false);
+    }
   }
 
   function setTimerDraftDuration(seconds: number) {
@@ -928,9 +963,20 @@ export function TeacherDashboard({
             <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
               Host view
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-normal text-slate-950">
-              {sessionDetails.title}
-            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-semibold tracking-normal text-slate-950">
+                {sessionDetails.title}
+              </h1>
+              <span
+                className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-[0.1em] ${
+                  sessionDetails.isOpen
+                    ? "bg-teal-100 text-teal-900"
+                    : "bg-amber-100 text-amber-900"
+                }`}
+              >
+                {sessionDetails.isOpen ? "Session open" : "Session closed"}
+              </span>
+            </div>
           </div>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
@@ -1257,6 +1303,7 @@ export function TeacherDashboard({
               </button>
               <HostPollManager
                 dashboardUrl={dashboardUrl}
+                sessionIsOpen={sessionDetails.isOpen}
                 sessionCode={session.code}
               />
               <button
@@ -1310,6 +1357,46 @@ export function TeacherDashboard({
                 className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-4"
                 id="teacher-room-controls"
               >
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-slate-200 bg-slate-50 p-3 md:col-span-2 xl:col-span-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Participant access
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Closed sessions remain available at the same link, but do not accept responses.
+                    </p>
+                    {sessionAccessStatus ? (
+                      <p className="mt-1 text-xs font-medium text-slate-600" aria-live="polite">
+                        {sessionAccessStatus}
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    aria-checked={sessionDetails.isOpen}
+                    className="grid min-h-11 grid-cols-[auto_auto] items-center gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-400 disabled:cursor-wait disabled:opacity-60"
+                    disabled={isUpdatingSessionAccess}
+                    role="switch"
+                    type="button"
+                    onClick={() => {
+                      void setSessionOpen(!sessionDetails.isOpen);
+                    }}
+                  >
+                    <span>{sessionDetails.isOpen ? "Session open" : "Session closed"}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
+                        sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                          sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </span>
+                  </button>
+                </div>
+
                 <div>
                   <label
                     className="block text-sm font-medium text-slate-700"
@@ -1517,6 +1604,7 @@ export function TeacherDashboard({
 
           <div className="mb-4">
             <GroupQuestionsPanel
+              canVote={sessionDetails.isOpen}
               key={questionsPanelKey}
               sessionCode={session.code}
               variant="teacher"

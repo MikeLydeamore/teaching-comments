@@ -20,19 +20,20 @@ export async function GET(
   }
 
   const participantId = new URL(request.url).searchParams.get("participantId") ?? "";
-  let activePoll: ParticipantPoll | null = poll
-    ? { ...poll, selectedOptionIds: [] }
+  const availablePoll = session.isOpen ? poll : null;
+  let activePoll: ParticipantPoll | null = availablePoll
+    ? { ...availablePoll, selectedOptionIds: [] }
     : null;
 
-  if (poll && participantId) {
+  if (availablePoll && participantId) {
     try {
-      const response = await getPollResponse(poll.id, participantId);
+      const response = await getPollResponse(availablePoll.id, participantId);
       activePoll = {
-        ...poll,
+        ...availablePoll,
         selectedOptionIds: response?.optionIds ?? [],
       };
     } catch {
-      activePoll = { ...poll, selectedOptionIds: [] };
+      activePoll = { ...availablePoll, selectedOptionIds: [] };
     }
   }
 
