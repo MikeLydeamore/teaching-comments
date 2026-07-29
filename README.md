@@ -130,6 +130,9 @@ If you already ran the schema before clear/archive support was added, run
 If you already ran the schema before live polls were added, run
 `supabase/add-live-polls.sql` in the Supabase SQL editor.
 
+If you already ran the schema before poll question banks were added, run
+`supabase/add-poll-question-bank.sql` in the Supabase SQL editor.
+
 ## Sessions
 
 Students join with a space code and session code on `/join` or by opening

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SessionTimer } from "@/components/SessionTimer";
 import type {
+  PollQuestionBankItem,
   PollResults,
   PollSelectionMode,
   SessionPoll,
@@ -16,6 +17,12 @@ type HostPollManagerProps = {
 
 const pollExtensions = [15, 30, 60];
 const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
+
+function sortPollQuestionBank(questions: PollQuestionBankItem[]) {
+  return [...questions].sort((left, right) =>
+    left.title.localeCompare(right.title),
+  );
+}
 
 export function HostPollManager({
   dashboardUrl,
@@ -31,6 +38,14 @@ export function HostPollManager({
   const [selectionMode, setSelectionMode] =
     useState<PollSelectionMode>("single");
   const [options, setOptions] = useState(["", ""]);
+  const [pollQuestionBank, setPollQuestionBank] = useState<
+    PollQuestionBankItem[]
+  >([]);
+  const [selectedBankQuestionId, setSelectedBankQuestionId] = useState("");
+  const [bankStatus, setBankStatus] = useState("");
+  const [isBankSaving, setIsBankSaving] = useState(false);
+  const [isBankTitleDialogOpen, setIsBankTitleDialogOpen] = useState(false);
+  const [bankTitleDraft, setBankTitleDraft] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(30);
   const [durationWasMinClamped, setDurationWasMinClamped] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,6 +64,28 @@ export function HostPollManager({
       setResults(payload.results ?? null);
     } catch {
       return;
+    }
+  }, [sessionCode]);
+
+  const refreshPollQuestionBank = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/poll-questions`,
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setBankStatus(
+          payload.error ?? "Could not load the poll question bank.",
+        );
+        return;
+      }
+
+      setPollQuestionBank(
+        sortPollQuestionBank(payload.pollQuestionBank ?? []),
+      );
+    } catch {
+      setBankStatus("Could not load the poll question bank.");
     }
   }, [sessionCode]);
 
@@ -96,12 +133,24 @@ export function HostPollManager({
     options.every((option) => option.trim().length > 0) &&
     durationSeconds >= 5 &&
     durationSeconds <= 3600;
+  const normalizedBankOptions = options.map((option) => option.trim());
+  const canAddToBank =
+    question.trim().length >= 1 &&
+    question.trim().length <= 500 &&
+    normalizedBankOptions.length >= 2 &&
+    normalizedBankOptions.length <= 8 &&
+    normalizedBankOptions.every(
+      (option) => option.length >= 1 && option.length <= 160,
+    ) &&
+    new Set(normalizedBankOptions.map((option) => option.toLowerCase())).size ===
+      normalizedBankOptions.length;
 
   function openManager() {
     setTab(poll ? "current" : "new");
     setStatus("");
     setIsOpen(true);
     void refreshPoll();
+    void refreshPollQuestionBank();
   }
 
   async function startPoll() {
@@ -134,6 +183,8 @@ export function HostPollManager({
       setResults(payload.results);
       setQuestion("");
       setOptions(["", ""]);
+      setSelectedBankQuestionId("");
+      setBankStatus("");
       setTab("current");
       setStatus("Poll started.");
     } catch {
@@ -175,11 +226,111 @@ export function HostPollManager({
   }
 
   function updateOption(index: number, value: string) {
+    setSelectedBankQuestionId("");
+    setBankStatus("");
     setOptions((currentOptions) =>
       currentOptions.map((option, optionIndex) =>
         optionIndex === index ? value : option,
       ),
     );
+  }
+
+  function loadBankQuestion(id: string) {
+    setSelectedBankQuestionId(id);
+    setBankStatus("");
+
+    if (!id) {
+      return;
+    }
+
+    const bankQuestion = pollQuestionBank.find((item) => item.id === id);
+
+    if (!bankQuestion) {
+      return;
+    }
+
+    setQuestion(bankQuestion.question);
+    setSelectionMode(bankQuestion.selectionMode);
+    setOptions([...bankQuestion.options]);
+  }
+
+  async function addCurrentPollToBank() {
+    const title = bankTitleDraft.trim();
+
+    if (
+      !canAddToBank ||
+      !title ||
+      title.length > 500 ||
+      isBankSaving
+    ) {
+      return;
+    }
+
+    setIsBankSaving(true);
+    setBankStatus("Adding poll question...");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/poll-questions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ options, question, selectionMode, title }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setBankStatus(payload.error ?? "Could not add poll question.");
+        return;
+      }
+
+      const bankQuestion = payload.bankQuestion as PollQuestionBankItem;
+      setPollQuestionBank((currentBank) =>
+        sortPollQuestionBank([...currentBank, bankQuestion]),
+      );
+      setSelectedBankQuestionId(bankQuestion.id);
+      setBankStatus("Poll question added to bank.");
+      setIsBankTitleDialogOpen(false);
+    } catch {
+      setBankStatus("Could not add poll question.");
+    } finally {
+      setIsBankSaving(false);
+    }
+  }
+
+  async function deleteSelectedBankQuestion() {
+    if (!selectedBankQuestionId || isBankSaving) {
+      return;
+    }
+
+    setIsBankSaving(true);
+    setBankStatus("Deleting poll question...");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/poll-questions/${encodeURIComponent(selectedBankQuestionId)}`,
+        { method: "DELETE" },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setBankStatus(payload.error ?? "Could not delete poll question.");
+        return;
+      }
+
+      setPollQuestionBank((currentBank) =>
+        currentBank.filter(
+          (bankQuestion) => bankQuestion.id !== selectedBankQuestionId,
+        ),
+      );
+      setSelectedBankQuestionId("");
+      setBankStatus("Poll question deleted.");
+    } catch {
+      setBankStatus("Could not delete poll question.");
+    } finally {
+      setIsBankSaving(false);
+    }
   }
 
   function setPollDuration(seconds: number) {
@@ -249,7 +400,10 @@ export function HostPollManager({
               <button
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setIsBankTitleDialogOpen(false);
+                  setIsOpen(false);
+                }}
               >
                 Close
               </button>
@@ -412,6 +566,66 @@ export function HostPollManager({
                     </p>
                   ) : null}
 
+                  <section className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+                    <label
+                      className="block text-sm font-semibold text-slate-700"
+                      htmlFor="poll-question-bank"
+                    >
+                      Poll question bank
+                    </label>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                      <select
+                        className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                        id="poll-question-bank"
+                        value={selectedBankQuestionId}
+                        onChange={(event) => loadBankQuestion(event.target.value)}
+                      >
+                        <option value="">Select a saved poll question</option>
+                        {pollQuestionBank.map((bankQuestion) => (
+                          <option key={bankQuestion.id} value={bankQuestion.id}>
+                            {bankQuestion.title} (
+                            {bankQuestion.selectionMode === "single"
+                              ? "single"
+                              : "multiple"}
+                            )
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!canAddToBank || isBankSaving}
+                        type="button"
+                        onClick={() => {
+                          setBankTitleDraft(question);
+                          setBankStatus("");
+                          setIsBankTitleDialogOpen(true);
+                        }}
+                      >
+                        Add to bank
+                      </button>
+                      <button
+                        className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!selectedBankQuestionId || isBankSaving}
+                        type="button"
+                        onClick={() => void deleteSelectedBankQuestion()}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    {bankStatus ? (
+                      <p
+                        aria-live="polite"
+                        className={`mt-2 text-sm font-medium ${
+                          bankStatus.startsWith("Could not")
+                            ? "text-red-700"
+                            : "text-slate-600"
+                        }`}
+                      >
+                        {bankStatus}
+                      </p>
+                    ) : null}
+                  </section>
+
                   <label className="block text-sm font-semibold text-slate-700" htmlFor="poll-question">
                     Question
                   </label>
@@ -423,6 +637,8 @@ export function HostPollManager({
                     value={question}
                     onChange={(event) => {
                       setQuestion(event.target.value);
+                      setSelectedBankQuestionId("");
+                      setBankStatus("");
                       setStatus("");
                     }}
                   />
@@ -438,7 +654,11 @@ export function HostPollManager({
                         }`}
                         key={mode}
                         type="button"
-                        onClick={() => setSelectionMode(mode)}
+                        onClick={() => {
+                          setSelectionMode(mode);
+                          setSelectedBankQuestionId("");
+                          setBankStatus("");
+                        }}
                       >
                         {mode === "single" ? "Single choice" : "Multiple choice"}
                       </button>
@@ -451,7 +671,11 @@ export function HostPollManager({
                       className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:opacity-50"
                       disabled={options.length >= 8}
                       type="button"
-                      onClick={() => setOptions((currentOptions) => [...currentOptions, ""])}
+                      onClick={() => {
+                        setOptions((currentOptions) => [...currentOptions, ""]);
+                        setSelectedBankQuestionId("");
+                        setBankStatus("");
+                      }}
                     >
                       Add answer
                     </button>
@@ -476,9 +700,13 @@ export function HostPollManager({
                           title={`Remove answer ${index + 1}`}
                           type="button"
                           onClick={() =>
-                            setOptions((currentOptions) =>
-                              currentOptions.filter((_, optionIndex) => optionIndex !== index),
-                            )
+                            {
+                              setOptions((currentOptions) =>
+                                currentOptions.filter((_, optionIndex) => optionIndex !== index),
+                              );
+                              setSelectedBankQuestionId("");
+                              setBankStatus("");
+                            }
                           }
                         >
                           Remove
@@ -550,6 +778,100 @@ export function HostPollManager({
                   {status}
                 </p>
               ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {isBankTitleDialogOpen ? (
+        <div
+          aria-labelledby="poll-bank-title-dialog-heading"
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-5"
+          role="dialog"
+        >
+          <section className="w-full max-w-lg rounded-md bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.12em] text-teal-700">
+                  Poll question bank
+                </p>
+                <h2
+                  className="mt-1 text-xl font-semibold text-slate-950"
+                  id="poll-bank-title-dialog-heading"
+                >
+                  Add a title
+                </h2>
+              </div>
+              <button
+                aria-label="Close title dialog"
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:opacity-50"
+                disabled={isBankSaving}
+                type="button"
+                onClick={() => setIsBankTitleDialogOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <label
+              className="mt-5 block text-sm font-semibold text-slate-700"
+              htmlFor="poll-bank-title"
+            >
+              Title
+            </label>
+            <input
+              autoFocus
+              className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              id="poll-bank-title"
+              maxLength={500}
+              value={bankTitleDraft}
+              onChange={(event) => {
+                setBankTitleDraft(event.target.value);
+                setBankStatus("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void addCurrentPollToBank();
+                }
+              }}
+            />
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              This title appears in the bank. The full question is still
+              stored.
+            </p>
+            {bankStatus ? (
+              <p
+                aria-live="polite"
+                className={`mt-3 text-sm font-medium ${
+                  bankStatus.startsWith("Could not")
+                    ? "text-red-700"
+                    : "text-slate-600"
+                }`}
+              >
+                {bankStatus}
+              </p>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500 disabled:opacity-50"
+                disabled={isBankSaving}
+                type="button"
+                onClick={() => setIsBankTitleDialogOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  !bankTitleDraft.trim() ||
+                  bankTitleDraft.trim().length > 500 ||
+                  isBankSaving
+                }
+                type="button"
+                onClick={() => void addCurrentPollToBank()}
+              >
+                {isBankSaving ? "Adding..." : "Add to bank"}
+              </button>
             </div>
           </section>
         </div>

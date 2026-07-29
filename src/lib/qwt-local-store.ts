@@ -18,6 +18,8 @@ import {
   validatePollDefinition,
   validatePollExtension,
   validatePollParticipantId,
+  validatePollQuestionDefinition,
+  validatePollQuestionTitle,
   validateQuestionTitle,
   validateSubmissionContent,
   validateQuestionText,
@@ -26,6 +28,7 @@ import {
   type GroupQuestion,
   type PromptHistoryItem,
   type PollResponse,
+  type PollQuestionBankItem,
   type QuestionBankItem,
   type QwtStore,
   type Session,
@@ -37,6 +40,7 @@ import {
 type StoreData = {
   groupQuestions: StoredGroupQuestion[];
   pollResponses: PollResponse[];
+  pollQuestionBank: PollQuestionBankItem[];
   polls: SessionPoll[];
   promptHistory: PromptHistoryItem[];
   questionBank: QuestionBankItem[];
@@ -59,6 +63,7 @@ function defaultStore(): StoreData {
   return {
     groupQuestions: [],
     pollResponses: [],
+    pollQuestionBank: [],
     polls: [],
     promptHistory: [
       {
@@ -203,6 +208,11 @@ async function readStore(): Promise<StoreData> {
       voterIds: question.voterIds ?? [],
     })),
     pollResponses: data.pollResponses ?? [],
+    pollQuestionBank: (data.pollQuestionBank ?? []).map((question) => ({
+      ...question,
+      title: question.title ?? question.question,
+      updatedAt: question.updatedAt ?? question.createdAt,
+    })),
     polls: (data.polls ?? []).map((poll) => ({
       ...poll,
       endedAt: poll.endedAt ?? null,
@@ -596,6 +606,61 @@ export const localStore: QwtStore = {
     }
 
     data.questionBank = nextQuestionBank;
+    await writeStore(data);
+    return true;
+  },
+
+  async listPollQuestionBank(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+
+    return data.pollQuestionBank
+      .filter((question) => question.sessionCode === sessionCode)
+      .sort((left, right) => left.question.localeCompare(right.question));
+  },
+
+  async addPollQuestionToBank(code, title, question, selectionMode, options) {
+    const session = await this.getSession(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const definition = validatePollQuestionDefinition(
+      question,
+      selectionMode,
+      options,
+    );
+    const data = await readStore();
+    const timestamp = now();
+    const bankQuestion: PollQuestionBankItem = {
+      id: randomUUID(),
+      sessionCode: session.code,
+      title: validatePollQuestionTitle(title, definition.question),
+      question: definition.question,
+      selectionMode: definition.selectionMode,
+      options: definition.optionLabels,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    data.pollQuestionBank.push(bankQuestion);
+    await writeStore(data);
+    return bankQuestion;
+  },
+
+  async deletePollQuestionFromBank(code, id) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+    const nextBank = data.pollQuestionBank.filter(
+      (question) => question.id !== id || question.sessionCode !== sessionCode,
+    );
+
+    if (nextBank.length === data.pollQuestionBank.length) {
+      return false;
+    }
+
+    data.pollQuestionBank = nextBank;
     await writeStore(data);
     return true;
   },

@@ -21,6 +21,7 @@ export type {
   GroupQuestion,
   ParticipantPoll,
   PollOption,
+  PollQuestionBankItem,
   PollResponse,
   PollResults,
   PollSelectionMode,
@@ -147,6 +148,30 @@ export async function addQuestionToBank(code: string, text: string, title?: stri
 
 export async function deleteQuestionFromBank(id: string) {
   return getStore().deleteQuestionFromBank(id);
+}
+
+export async function listPollQuestionBank(code: string) {
+  return getStore().listPollQuestionBank(code);
+}
+
+export async function addPollQuestionToBank(
+  code: string,
+  title: string,
+  question: string,
+  selectionMode: PollSelectionMode,
+  options: string[],
+) {
+  return getStore().addPollQuestionToBank(
+    code,
+    title,
+    question,
+    selectionMode,
+    options,
+  );
+}
+
+export async function deletePollQuestionFromBank(code: string, id: string) {
+  return getStore().deletePollQuestionFromBank(code, id);
 }
 
 export async function listGroupQuestions(

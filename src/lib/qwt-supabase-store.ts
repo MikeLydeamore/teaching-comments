@@ -16,6 +16,8 @@ import {
   validatePollDefinition,
   validatePollExtension,
   validatePollParticipantId,
+  validatePollQuestionDefinition,
+  validatePollQuestionTitle,
   validateQuestionTitle,
   validateQuestionText,
   validateSubmissionContent,
@@ -25,6 +27,7 @@ import {
   type GifData,
   type GroupQuestion,
   type PollOption,
+  type PollQuestionBankItem,
   type PollResponse,
   type PromptHistoryItem,
   type QuestionBankItem,
@@ -83,6 +86,17 @@ type SupabaseQuestionBankRow = {
   session_code: string;
   title: string;
   text: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupabasePollQuestionBankRow = {
+  id: string;
+  session_code: string;
+  title: string;
+  question: string;
+  selection_mode: "single" | "multiple";
+  options: string[];
   created_at: string;
   updated_at: string;
 };
@@ -217,6 +231,10 @@ function questionBankSelect() {
   return "id,session_code,title,text,created_at,updated_at";
 }
 
+function pollQuestionBankSelect() {
+  return "id,session_code,title,question,selection_mode,options,created_at,updated_at";
+}
+
 function promptHistorySelect() {
   return "id,session_code,prompt,started_at,ended_at";
 }
@@ -294,6 +312,21 @@ function questionBankItemFromRow(row: SupabaseQuestionBankRow): QuestionBankItem
     sessionCode: row.session_code,
     title: row.title ?? row.text,
     text: row.text,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function pollQuestionBankItemFromRow(
+  row: SupabasePollQuestionBankRow,
+): PollQuestionBankItem {
+  return {
+    id: row.id,
+    sessionCode: row.session_code,
+    title: row.title ?? row.question,
+    question: row.question,
+    selectionMode: row.selection_mode,
+    options: row.options,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -911,6 +944,66 @@ export const supabaseStore: QwtStore = {
   async deleteQuestionFromBank(id) {
     const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
       `/qwt_question_bank?id=eq.${encodeFilterValue(id)}&select=${questionBankSelect()}`,
+      {
+        method: "DELETE",
+        prefer: "return=representation",
+      },
+    );
+
+    return rows.length > 0;
+  },
+
+  async listPollQuestionBank(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const params = new URLSearchParams({
+      session_code: `eq.${sessionCode}`,
+      select: pollQuestionBankSelect(),
+      order: "title.asc",
+    });
+    const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(
+      `/qwt_poll_question_bank?${params.toString()}`,
+    );
+
+    return rows.map(pollQuestionBankItemFromRow);
+  },
+
+  async addPollQuestionToBank(code, title, question, selectionMode, options) {
+    const session = await getSessionFromSupabase(code);
+
+    if (!session) {
+      return null;
+    }
+
+    const definition = validatePollQuestionDefinition(
+      question,
+      selectionMode,
+      options,
+    );
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(
+      `/qwt_poll_question_bank?select=${pollQuestionBankSelect()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          session_code: session.code,
+          title: validatePollQuestionTitle(title, definition.question),
+          question: definition.question,
+          selection_mode: definition.selectionMode,
+          options: definition.optionLabels,
+          created_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollQuestionBankItemFromRow(rows[0]) : null;
+  },
+
+  async deletePollQuestionFromBank(code, id) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(
+      `/qwt_poll_question_bank?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${pollQuestionBankSelect()}`,
       {
         method: "DELETE",
         prefer: "return=representation",

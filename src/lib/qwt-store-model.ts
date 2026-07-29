@@ -76,6 +76,17 @@ export type QuestionBankItem = {
   updatedAt: string;
 };
 
+export type PollQuestionBankItem = {
+  id: string;
+  sessionCode: string;
+  title: string;
+  question: string;
+  selectionMode: PollSelectionMode;
+  options: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PromptHistoryItem = {
   id: string;
   sessionCode: string;
@@ -217,6 +228,15 @@ export type QwtStore = {
     title?: string,
   ): Promise<QuestionBankItem | null>;
   deleteQuestionFromBank(id: string): Promise<boolean>;
+  listPollQuestionBank(code: string): Promise<PollQuestionBankItem[]>;
+  addPollQuestionToBank(
+    code: string,
+    title: string,
+    question: string,
+    selectionMode: PollSelectionMode,
+    options: string[],
+  ): Promise<PollQuestionBankItem | null>;
+  deletePollQuestionFromBank(code: string, id: string): Promise<boolean>;
   listGroupQuestions(
     code: string,
     voterId?: string,
@@ -540,6 +560,23 @@ export function validateQuestionTitle(title: string | undefined, fallbackText: s
   return trimmed;
 }
 
+export function validatePollQuestionTitle(
+  title: string | undefined,
+  fallbackQuestion: string,
+) {
+  const trimmed = title?.trim() || fallbackQuestion.trim();
+
+  if (trimmed.length < 1) {
+    throw new Error("Poll question title is required.");
+  }
+
+  if (trimmed.length > 500) {
+    throw new Error("Poll question title must be 500 characters or fewer.");
+  }
+
+  return trimmed;
+}
+
 export function validateGroupQuestionText(text: string) {
   const trimmed = text.trim();
 
@@ -566,11 +603,10 @@ export function validateGroupQuestionVoterId(voterId: string) {
 
 export const validatePollParticipantId = validateGroupQuestionVoterId;
 
-export function validatePollDefinition(
+export function validatePollQuestionDefinition(
   question: string,
   selectionMode: PollSelectionMode,
   optionLabels: string[],
-  durationSeconds: number,
 ) {
   const normalizedQuestion = question.trim().replace(/\s+/g, " ");
 
@@ -596,6 +632,24 @@ export function validatePollDefinition(
     throw new Error("Poll answers must be different from each other.");
   }
 
+  return {
+    question: normalizedQuestion,
+    selectionMode,
+    optionLabels: normalizedOptions,
+  };
+}
+
+export function validatePollDefinition(
+  question: string,
+  selectionMode: PollSelectionMode,
+  optionLabels: string[],
+  durationSeconds: number,
+) {
+  const definition = validatePollQuestionDefinition(
+    question,
+    selectionMode,
+    optionLabels,
+  );
   const normalizedDuration = Math.round(durationSeconds);
 
   if (!Number.isFinite(normalizedDuration) || normalizedDuration < 5 || normalizedDuration > 3600) {
@@ -603,9 +657,7 @@ export function validatePollDefinition(
   }
 
   return {
-    question: normalizedQuestion,
-    selectionMode,
-    optionLabels: normalizedOptions,
+    ...definition,
     durationSeconds: normalizedDuration,
   };
 }
