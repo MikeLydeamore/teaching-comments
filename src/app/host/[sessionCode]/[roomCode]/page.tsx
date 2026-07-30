@@ -59,9 +59,9 @@ export default async function TeacherSpaceSessionPage({
     );
   }
 
-  const stats = await getSessionStats(session.code);
-  const promptHistory = await listPromptHistory(session.code);
-  const questionBank = await listQuestionBank(session.code);
+  const stats = await getSessionStats(session.id);
+  const promptHistory = await listPromptHistory(session.id);
+  const questionBank = await listQuestionBank(session.id);
 
   return (
     <TeacherDashboard

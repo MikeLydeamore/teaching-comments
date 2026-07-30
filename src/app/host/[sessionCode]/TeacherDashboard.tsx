@@ -22,6 +22,7 @@ import type {
 import { logoutTeacher } from "../actions";
 
 type Session = {
+  id: string;
   code: string;
   title: string;
   prompt: string;
@@ -383,8 +384,8 @@ export function TeacherDashboard({
     }
 
     const [submissionsResponse, sessionResponse] = await Promise.all([
-      fetch(`/api/sessions/${session.code}/submissions?${query}`),
-      fetch(`/api/sessions/${session.code}`),
+      fetch(`/api/sessions/${session.id}/submissions?${query}`),
+      fetch(`/api/sessions/${session.id}`),
     ]);
 
     const submissionsPayload = await submissionsResponse.json();
@@ -410,13 +411,13 @@ export function TeacherDashboard({
     initialStats,
     minutes,
     selectedPromptHistoryId,
-    session.code,
+    session.id,
     submissionSortOrder,
   ]);
 
   async function savePrompt() {
     setPromptStatus("Saving...");
-    const response = await fetch(`/api/sessions/${session.code}`, {
+    const response = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: promptDraft }),
@@ -455,7 +456,7 @@ export function TeacherDashboard({
     const questionTitle = questionTitleDraft.trim() || promptText;
 
     setQuestionBankStatus("Adding question...");
-    const response = await fetch(`/api/sessions/${session.code}/questions`, {
+    const response = await fetch(`/api/sessions/${session.id}/questions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: promptText, title: questionTitle }),
@@ -520,7 +521,7 @@ export function TeacherDashboard({
 
   async function patchSession(patch: Record<string, unknown>, loadingMessage: string) {
     setTimerStatus(loadingMessage);
-    const response = await fetch(`/api/sessions/${session.code}`, {
+    const response = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -561,7 +562,7 @@ export function TeacherDashboard({
   }
 
   async function setGroupQuestionsScreeningMode(isEnabled: boolean) {
-    const response = await fetch(`/api/sessions/${session.code}`, {
+    const response = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ groupQuestionsScreeningEnabled: isEnabled }),
@@ -577,7 +578,7 @@ export function TeacherDashboard({
   }
 
   async function setSubmissionsScreeningMode(isEnabled: boolean) {
-    const response = await fetch(`/api/sessions/${session.code}`, {
+    const response = await fetch(`/api/sessions/${session.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ submissionsScreeningEnabled: isEnabled }),
@@ -601,7 +602,7 @@ export function TeacherDashboard({
     setSessionAccessStatus(isOpen ? "Reopening session..." : "Closing session...");
 
     try {
-      const response = await fetch(`/api/sessions/${session.code}`, {
+      const response = await fetch(`/api/sessions/${session.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOpen }),
@@ -749,7 +750,7 @@ export function TeacherDashboard({
     setIsArchiving(true);
     setArchiveStatus("Archiving room...");
 
-    const response = await fetch(`/api/sessions/${session.code}/archive`, {
+    const response = await fetch(`/api/sessions/${session.id}/archive`, {
       method: "POST",
     });
     const payload = await response.json().catch(() => ({}));
@@ -785,7 +786,7 @@ export function TeacherDashboard({
     setIsUnarchiving(true);
     setArchiveStatus("Restoring archive...");
 
-    const response = await fetch(`/api/sessions/${session.code}/archive`, {
+    const response = await fetch(`/api/sessions/${session.id}/archive`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archivedAt: lastArchive.archivedAt }),
@@ -1304,7 +1305,7 @@ export function TeacherDashboard({
               <HostPollManager
                 dashboardUrl={dashboardUrl}
                 sessionIsOpen={sessionDetails.isOpen}
-                sessionCode={session.code}
+                sessionCode={session.id}
               />
               <button
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
@@ -1548,7 +1549,7 @@ export function TeacherDashboard({
                     <a
                       className="flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                       download
-                      href={`/api/sessions/${session.code}/export`}
+                      href={`/api/sessions/${session.id}/export`}
                     >
                       Export CSV
                     </a>
@@ -1606,7 +1607,7 @@ export function TeacherDashboard({
             <GroupQuestionsPanel
               canVote={sessionDetails.isOpen}
               key={questionsPanelKey}
-              sessionCode={session.code}
+              sessionCode={session.id}
               variant="teacher"
             />
           </div>

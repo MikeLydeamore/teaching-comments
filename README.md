@@ -133,6 +133,10 @@ If you already ran the schema before live polls were added, run
 If you already ran the schema before poll question banks were added, run
 `supabase/add-poll-question-bank.sql` in the Supabase SQL editor.
 
+If you already ran the schema before session codes were scoped to teaching
+spaces, run `supabase/scope-session-codes-to-spaces.sql` in the Supabase SQL
+editor.
+
 ## Sessions
 
 Students join with a space code and session code on `/join` or by opening
@@ -140,8 +144,8 @@ Students join with a space code and session code on `/join` or by opening
 accept existing open sessions. Teachers create sessions by opening a session
 from `/host/<space-code>` after entering that space's teacher PIN.
 
-For now, session codes are still globally unique internally even
-though access and navigation are scoped by teaching space.
+Session codes are unique within a teaching space. Different spaces can use the
+same session code without sharing responses, questions, or polls.
 
 ## Teacher Spaces And PINs
 

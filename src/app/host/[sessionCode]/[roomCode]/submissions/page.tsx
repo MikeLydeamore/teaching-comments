@@ -95,11 +95,11 @@ export default async function TeacherSpaceSubmissionsPage({
     );
   }
 
-  const promptHistory = await listPromptHistory(session.code);
+  const promptHistory = await listPromptHistory(session.id);
   const selectedPromptHistory = promptHistory.find(
     (item) => item.id === promptHistoryId,
   );
-  const submissions = await listSubmissions(session.code, {
+  const submissions = await listSubmissions(session.id, {
     includeHidden,
     minutes,
     promptHistoryId: selectedPromptHistory?.id,
@@ -116,7 +116,7 @@ export default async function TeacherSpaceSubmissionsPage({
       minutes={minutes}
       promptHistoryId={selectedPromptHistory?.id}
       promptText={selectedPromptHistory?.prompt}
-      sessionCode={session.code}
+      sessionCode={session.id}
       sessionTitle={session.title}
       sortOrder={sortOrder}
       starredOnly={starredOnly}

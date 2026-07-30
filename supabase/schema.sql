@@ -8,7 +8,8 @@ create table if not exists public.qwt_teacher_spaces (
 );
 
 create table if not exists public.qwt_sessions (
-  code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  id text primary key default gen_random_uuid()::text,
+  code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   space_code text not null default 'default' references public.qwt_teacher_spaces(code) on delete restrict,
   title text not null check (char_length(title) between 1 and 120),
   prompt text not null check (char_length(prompt) between 5 and 1200),
@@ -23,7 +24,7 @@ create table if not exists public.qwt_sessions (
 
 create table if not exists public.qwt_question_bank (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   title text not null check (char_length(title) between 1 and 1200),
   text text not null check (char_length(text) between 5 and 1200),
   created_at timestamptz not null default now(),
@@ -32,7 +33,7 @@ create table if not exists public.qwt_question_bank (
 
 create table if not exists public.qwt_poll_question_bank (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   title text not null check (char_length(title) between 1 and 500),
   question text not null check (char_length(question) between 1 and 500),
   selection_mode text not null check (selection_mode in ('single', 'multiple')),
@@ -46,7 +47,7 @@ create table if not exists public.qwt_poll_question_bank (
 
 create table if not exists public.qwt_prompt_history (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   prompt text not null check (char_length(prompt) between 5 and 1200),
   started_at timestamptz not null,
   ended_at timestamptz,
@@ -55,7 +56,7 @@ create table if not exists public.qwt_prompt_history (
 
 create table if not exists public.qwt_group_questions (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null check (char_length(text) between 5 and 500),
   is_answered boolean not null default false,
@@ -74,7 +75,7 @@ create table if not exists public.qwt_group_question_votes (
 
 create table if not exists public.qwt_polls (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   question text not null check (char_length(question) between 1 and 500),
   selection_mode text not null check (selection_mode in ('single', 'multiple')),
   options jsonb not null check (
@@ -115,7 +116,7 @@ alter table public.qwt_poll_responses enable row level security;
 
 create table if not exists public.qwt_submissions (
   id uuid primary key default gen_random_uuid(),
-  session_code text not null references public.qwt_sessions(code) on delete cascade,
+  session_code text not null references public.qwt_sessions(id) on delete cascade,
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80),
   text text not null default '' check (char_length(text) <= 2000),
   drawing_data jsonb,
@@ -187,14 +188,16 @@ insert into public.qwt_teacher_spaces (code, name, pin_hash)
 values ('default', 'Default Space', 'plain:teach123')
 on conflict (code) do nothing;
 
-insert into public.qwt_sessions (code, title, prompt, is_open)
+insert into public.qwt_sessions (id, code, space_code, title, prompt, is_open)
 values (
   'demo-lecture',
+  'demo-lecture',
+  'default',
   'Demo Lecture',
   'In one or two sentences, explain what the p-value tells us in this setting.',
   true
 )
-on conflict (code) do nothing;
+on conflict (space_code, code) do nothing;
 
 insert into public.qwt_prompt_history (
   id,
@@ -205,12 +208,13 @@ insert into public.qwt_prompt_history (
 )
 select
   '44444444-4444-4444-8444-444444444444',
-  session.code,
+  session.id,
   session.prompt,
   session.prompt_updated_at,
   null
 from public.qwt_sessions as session
 where session.code = 'demo-lecture'
+  and session.space_code = 'default'
 on conflict (id) do nothing;
 
 insert into public.qwt_question_bank (

@@ -17,7 +17,7 @@ export async function GET(
     return authorization.response;
   }
 
-  const poll = await getLatestPoll(authorization.session.code);
+  const poll = await getLatestPoll(authorization.session.id);
   const results = poll ? await getPollResults(poll.id) : null;
   return Response.json({ poll, results });
 }
@@ -42,7 +42,7 @@ export async function POST(
 
   try {
     const poll = await startPoll(
-      authorization.session.code,
+      authorization.session.id,
       String(body.question ?? ""),
       body.selectionMode ?? "single",
       Array.isArray(body.options) ? body.options.map(String) : [],

@@ -56,7 +56,7 @@ export async function joinSession(formData: FormData) {
   }
 
   const cookieStore = await cookies();
-  const cookieName = studentNameCookieName(session.code);
+  const cookieName = studentNameCookieName(session.id);
 
   if (studentName === "Anonymous") {
     cookieStore.delete(cookieName);
@@ -68,7 +68,7 @@ export async function joinSession(formData: FormData) {
     });
   }
 
-  cookieStore.set(studentConsentCookieName(session.code), "accepted", {
+  cookieStore.set(studentConsentCookieName(session.id), "accepted", {
     httpOnly: true,
     maxAge: 60 * 60 * 24 * 30,
     path: "/",

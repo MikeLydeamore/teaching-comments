@@ -30,7 +30,7 @@ export default async function TeacherPollPage({
   }
 
   const session = await getOrCreateSession(sessionCode);
-  const poll = await getLatestPoll(session.code);
+  const poll = await getLatestPoll(session.id);
   const results = poll ? await getPollResults(poll.id) : null;
 
   return (
@@ -38,7 +38,7 @@ export default async function TeacherPollPage({
       dashboardUrl={`/host/${session.code}`}
       initialPoll={poll}
       initialResults={results}
-      sessionCode={session.code}
+      sessionCode={session.id}
       sessionTitle={session.title}
     />
   );

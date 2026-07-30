@@ -15,8 +15,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[s
   }
 
   const { session } = authorization;
-  const stats = await getSessionStats(session.code);
-  const promptHistory = await listPromptHistory(session.code);
+  const stats = await getSessionStats(session.id);
+  const promptHistory = await listPromptHistory(session.id);
 
   return Response.json({ promptHistory, session, stats });
 }
@@ -78,8 +78,8 @@ export async function PATCH(
       return Response.json({ error: "Session not found." }, { status: 404 });
     }
 
-    const stats = await getSessionStats(session.code);
-    const promptHistory = await listPromptHistory(session.code);
+    const stats = await getSessionStats(session.id);
+    const promptHistory = await listPromptHistory(session.id);
     return Response.json({ promptHistory, session, stats });
   } catch (error) {
     return Response.json(

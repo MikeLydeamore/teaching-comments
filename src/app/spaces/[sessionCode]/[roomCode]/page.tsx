@@ -40,7 +40,7 @@ export default async function StudentSpacePage({
   const cookieStore = await cookies();
 
   if (
-    cookieStore.get(studentConsentCookieName(session.code))?.value !== "accepted"
+    cookieStore.get(studentConsentCookieName(session.id))?.value !== "accepted"
   ) {
     redirect(
       `/join?space=${encodeURIComponent(spaceCode)}&session=${encodeURIComponent(session.code)}`,
@@ -48,12 +48,13 @@ export default async function StudentSpacePage({
   }
 
   const studentName =
-    cookieStore.get(studentNameCookieName(session.code))?.value ?? "";
+    cookieStore.get(studentNameCookieName(session.id))?.value ?? "";
 
   return (
     <StudentSubmit
       initialStudentName={studentName}
       prompt={session.prompt}
+      sessionId={session.id}
       sessionCode={session.code}
       spaceCode={spaceCode}
       spaceName={space?.name ?? spaceCode}

@@ -17,7 +17,7 @@ export async function GET(
   }
 
   const pollQuestionBank = await listPollQuestionBank(
-    authorization.session.code,
+    authorization.session.id,
   );
   return Response.json({ pollQuestionBank });
 }
@@ -42,7 +42,7 @@ export async function POST(
 
   try {
     const bankQuestion = await addPollQuestionToBank(
-      authorization.session.code,
+      authorization.session.id,
       String(body.title ?? ""),
       String(body.question ?? ""),
       body.selectionMode ?? "single",

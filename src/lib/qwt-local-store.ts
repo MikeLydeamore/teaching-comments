@@ -85,6 +85,7 @@ function defaultStore(): StoreData {
     ],
     sessions: [
       {
+        id: "demo-lecture",
         code: "demo-lecture",
         spaceCode: DEFAULT_SPACE_CODE,
         title: "Demo Lecture",
@@ -144,7 +145,7 @@ async function ensureStore() {
 }
 
 function legacyPromptHistoryId(session: Session) {
-  return `legacy-${session.code}-${session.promptUpdatedAt.replace(/[^a-zA-Z0-9]/g, "")}`;
+  return `legacy-${session.id}-${session.promptUpdatedAt.replace(/[^a-zA-Z0-9]/g, "")}`;
 }
 
 function promptHistoryContainsSubmission(
@@ -183,6 +184,7 @@ async function readStore(): Promise<StoreData> {
       ];
   const sessions = (data.sessions ?? []).map((session) => ({
     ...session,
+    id: session.id ?? session.code,
     spaceCode: session.spaceCode ?? DEFAULT_SPACE_CODE,
     groupQuestionsScreeningEnabled:
       session.groupQuestionsScreeningEnabled ?? false,
@@ -230,10 +232,10 @@ async function readStore(): Promise<StoreData> {
         startedAt: item.startedAt,
       })),
       ...sessions
-        .filter((session) => !sessionCodesWithHistory.has(session.code))
+        .filter((session) => !sessionCodesWithHistory.has(session.id))
         .map((session) => ({
           id: legacyPromptHistoryId(session),
-          sessionCode: session.code,
+          sessionCode: session.id,
           prompt: session.prompt,
           startedAt: session.promptUpdatedAt ?? session.createdAt,
           endedAt: null,
@@ -328,7 +330,7 @@ export const localStore: QwtStore = {
     }
 
     const data = await readStore();
-    return data.sessions.find((session) => session.code === sessionCode) ?? null;
+    return data.sessions.find((session) => session.id === sessionCode) ?? null;
   },
 
   async getSessionInSpace(spaceCode, code) {
@@ -385,6 +387,7 @@ export const localStore: QwtStore = {
 
     const timestamp = now();
     const session: Session = {
+      id: randomUUID(),
       code: sessionCode,
       spaceCode: normalizedSpaceCode,
       title: titleFromCode(sessionCode) || "Ed.ie Session",
@@ -401,7 +404,7 @@ export const localStore: QwtStore = {
     data.sessions.push(session);
     data.promptHistory.push({
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       prompt: session.prompt,
       startedAt: timestamp,
       endedAt: null,
@@ -427,7 +430,7 @@ export const localStore: QwtStore = {
   async updateSession(code, patch) {
     const sessionCode = normalizeSessionCode(code);
     const data = await readStore();
-    const index = data.sessions.findIndex((session) => session.code === sessionCode);
+    const index = data.sessions.findIndex((session) => session.id === sessionCode);
 
     if (index === -1) {
       return null;
@@ -441,13 +444,13 @@ export const localStore: QwtStore = {
 
     if (promptChanged) {
       data.promptHistory = data.promptHistory.map((item) =>
-        item.sessionCode === nextSession.code && !item.endedAt
+        item.sessionCode === nextSession.id && !item.endedAt
           ? { ...item, endedAt: nextSession.promptUpdatedAt }
           : item,
       );
       data.promptHistory.push({
         id: randomUUID(),
-        sessionCode: nextSession.code,
+        sessionCode: nextSession.id,
         prompt: nextSession.prompt,
         startedAt: nextSession.promptUpdatedAt,
         endedAt: null,
@@ -511,7 +514,7 @@ export const localStore: QwtStore = {
     const timestamp = now();
     const submission: Submission = {
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       studentName: normalizeStudentName(studentName ?? ""),
       text: submissionContent.text,
       drawingData: submissionContent.drawingData,
@@ -585,7 +588,7 @@ export const localStore: QwtStore = {
     const timestamp = now();
     const question: QuestionBankItem = {
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       title: questionTitle,
       text: questionText,
       createdAt: timestamp,
@@ -635,7 +638,7 @@ export const localStore: QwtStore = {
     const timestamp = now();
     const bankQuestion: PollQuestionBankItem = {
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       title: validatePollQuestionTitle(title, definition.question),
       question: definition.question,
       selectionMode: definition.selectionMode,
@@ -713,7 +716,7 @@ export const localStore: QwtStore = {
     const timestamp = now();
     const question: StoredGroupQuestion = {
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       studentName: normalizeStudentName(studentName ?? ""),
       text: validateGroupQuestionText(text),
       isAnswered: false,
@@ -745,7 +748,7 @@ export const localStore: QwtStore = {
 
     const question = data.groupQuestions[index];
     const session = data.sessions.find(
-      (storedSession) => storedSession.code === question.sessionCode,
+      (storedSession) => storedSession.id === question.sessionCode,
     );
 
     if (!session?.isOpen) {
@@ -785,7 +788,7 @@ export const localStore: QwtStore = {
 
     const question = data.groupQuestions[index];
     const session = data.sessions.find(
-      (storedSession) => storedSession.code === question.sessionCode,
+      (storedSession) => storedSession.id === question.sessionCode,
     );
 
     if (!session?.isOpen) {
@@ -942,14 +945,14 @@ export const localStore: QwtStore = {
     const timestamp = now();
 
     data.polls = data.polls.map((poll) =>
-      poll.sessionCode === session.code && poll.status === "active"
+      poll.sessionCode === session.id && poll.status === "active"
         ? { ...poll, status: "ended", endedAt: timestamp, updatedAt: timestamp }
         : poll,
     );
 
     const poll: SessionPoll = {
       id: randomUUID(),
-      sessionCode: session.code,
+      sessionCode: session.id,
       question: definition.question,
       selectionMode: definition.selectionMode,
       options: definition.optionLabels.map((label, position) => ({
@@ -1037,7 +1040,7 @@ export const localStore: QwtStore = {
     }
 
     const session = data.sessions.find(
-      (storedSession) => storedSession.code === poll.sessionCode,
+      (storedSession) => storedSession.id === poll.sessionCode,
     );
 
     if (!session?.isOpen) {
@@ -1120,7 +1123,7 @@ export const localStore: QwtStore = {
     let groupQuestions = 0;
 
     data.submissions = data.submissions.map((submission) => {
-      if (submission.sessionCode !== session.code || submission.archivedAt) {
+      if (submission.sessionCode !== session.id || submission.archivedAt) {
         return submission;
       }
 
@@ -1133,7 +1136,7 @@ export const localStore: QwtStore = {
     });
 
     data.groupQuestions = data.groupQuestions.map((question) => {
-      if (question.sessionCode !== session.code || question.archivedAt) {
+      if (question.sessionCode !== session.id || question.archivedAt) {
         return question;
       }
 
@@ -1175,7 +1178,7 @@ export const localStore: QwtStore = {
 
     data.submissions = data.submissions.map((submission) => {
       if (
-        submission.sessionCode !== session.code ||
+        submission.sessionCode !== session.id ||
         submission.archivedAt !== archivedAt
       ) {
         return submission;
@@ -1191,7 +1194,7 @@ export const localStore: QwtStore = {
 
     data.groupQuestions = data.groupQuestions.map((question) => {
       if (
-        question.sessionCode !== session.code ||
+        question.sessionCode !== session.id ||
         question.archivedAt !== archivedAt
       ) {
         return question;

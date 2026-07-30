@@ -52,6 +52,7 @@ type SupabaseTeacherSpaceSummaryRow = {
 };
 
 type SupabaseSessionRow = {
+  id: string;
   code: string;
   space_code: string;
   title: string;
@@ -212,7 +213,7 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "code,space_code,title,prompt,is_open,group_questions_screening_enabled,submissions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+  return "id,code,space_code,title,prompt,is_open,group_questions_screening_enabled,submissions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
 }
 
 function teacherSpaceSelect() {
@@ -257,6 +258,7 @@ function pollResponseSelect() {
 
 function sessionFromRow(row: SupabaseSessionRow): Session {
   return {
+    id: row.id,
     code: row.code,
     spaceCode: row.space_code ?? DEFAULT_SPACE_CODE,
     title: row.title,
@@ -400,7 +402,7 @@ async function getSessionFromSupabase(code: string) {
   }
 
   const rows = await supabaseFetch<SupabaseSessionRow[]>(
-    `/qwt_sessions?code=eq.${encodeFilterValue(sessionCode)}&select=${sessionSelect()}&limit=1`,
+    `/qwt_sessions?id=eq.${encodeFilterValue(sessionCode)}&select=${sessionSelect()}&limit=1`,
   );
 
   return rows[0] ? sessionFromRow(rows[0]) : null;
@@ -461,7 +463,7 @@ async function listPromptHistoryRows(sessionCode: string) {
 }
 
 async function ensurePromptHistoryForSession(session: Session) {
-  const existingRows = await listPromptHistoryRows(session.code);
+  const existingRows = await listPromptHistoryRows(session.id);
 
   if (existingRows.length) {
     return existingRows;
@@ -472,7 +474,7 @@ async function ensurePromptHistoryForSession(session: Session) {
     {
       method: "POST",
       body: JSON.stringify({
-        session_code: session.code,
+        session_code: session.id,
         prompt: session.prompt,
         started_at: session.promptUpdatedAt ?? session.createdAt,
         ended_at: null,
@@ -616,6 +618,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
+          id: randomUUID(),
           code: sessionCode,
           space_code: normalizedSpaceCode,
           title: titleFromCode(sessionCode) || "Ed.ie Session",
@@ -632,10 +635,14 @@ export const supabaseStore: QwtStore = {
       },
     ).catch(async (error) => {
       if (error instanceof SupabaseStoreError && error.status === 409) {
-        const session = await getSessionFromSupabase(sessionCode);
-        if (session?.spaceCode === normalizedSpaceCode) {
+        const session = await getSessionInSpaceFromSupabase(
+          normalizedSpaceCode,
+          sessionCode,
+        );
+        if (session) {
           return [
             {
+              id: session.id,
               code: session.code,
               space_code: session.spaceCode,
               title: session.title,
@@ -653,7 +660,7 @@ export const supabaseStore: QwtStore = {
           ];
         }
 
-        throw new Error("That session code is already used in another space.");
+        throw error;
       }
 
       throw error;
@@ -692,7 +699,7 @@ export const supabaseStore: QwtStore = {
     const next = applySessionPatch(current, patch);
     const promptChanged = next.prompt !== current.prompt;
     const rows = await supabaseFetch<SupabaseSessionRow[]>(
-      `/qwt_sessions?code=eq.${encodeFilterValue(current.code)}&select=${sessionSelect()}`,
+      `/qwt_sessions?id=eq.${encodeFilterValue(current.id)}&select=${sessionSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -715,7 +722,7 @@ export const supabaseStore: QwtStore = {
     if (session && promptChanged) {
       await ensurePromptHistoryForSession(current);
       await supabaseFetch<SupabasePromptHistoryRow[]>(
-        `/qwt_prompt_history?session_code=eq.${encodeFilterValue(current.code)}&ended_at=is.null&select=${promptHistorySelect()}`,
+        `/qwt_prompt_history?session_code=eq.${encodeFilterValue(current.id)}&ended_at=is.null&select=${promptHistorySelect()}`,
         {
           method: "PATCH",
           body: JSON.stringify({ ended_at: session.promptUpdatedAt }),
@@ -727,7 +734,7 @@ export const supabaseStore: QwtStore = {
         {
           method: "POST",
           body: JSON.stringify({
-            session_code: session.code,
+            session_code: session.id,
             prompt: session.prompt,
             started_at: session.promptUpdatedAt,
             ended_at: null,
@@ -832,7 +839,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
-          session_code: session.code,
+          session_code: session.id,
           student_name: normalizeStudentName(studentName ?? ""),
           text: submissionContent.text,
           drawing_data: submissionContent.drawingData,
@@ -928,7 +935,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
-          session_code: session.code,
+          session_code: session.id,
           title: validateQuestionTitle(title, text),
           text: validateQuestionText(text),
           created_at: timestamp,
@@ -985,7 +992,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
-          session_code: session.code,
+          session_code: session.id,
           title: validatePollQuestionTitle(title, definition.question),
           question: definition.question,
           selection_mode: definition.selectionMode,
@@ -1051,7 +1058,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
-          session_code: session.code,
+          session_code: session.id,
           student_name: normalizeStudentName(studentName ?? ""),
           text: validateGroupQuestionText(text),
           is_answered: false,
@@ -1228,7 +1235,7 @@ export const supabaseStore: QwtStore = {
     }));
 
     await supabaseFetch<SupabasePollRow[]>(
-      `/qwt_polls?session_code=eq.${encodeFilterValue(session.code)}&status=eq.active&select=${pollSelect()}`,
+      `/qwt_polls?session_code=eq.${encodeFilterValue(session.id)}&status=eq.active&select=${pollSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -1245,7 +1252,7 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
-          session_code: session.code,
+          session_code: session.id,
           question: definition.question,
           selection_mode: definition.selectionMode,
           options,
@@ -1409,7 +1416,7 @@ export const supabaseStore: QwtStore = {
     const archivedAt = now();
     const [submissionRows, questionRows] = await Promise.all([
       supabaseFetch<SupabaseSubmissionRow[]>(
-        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=is.null&select=${submissionSelect()}`,
+        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.id)}&archived_at=is.null&select=${submissionSelect()}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -1420,7 +1427,7 @@ export const supabaseStore: QwtStore = {
         },
       ),
       supabaseFetch<SupabaseGroupQuestionRow[]>(
-        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=is.null&select=${groupQuestionSelect()}`,
+        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.id)}&archived_at=is.null&select=${groupQuestionSelect()}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -1456,7 +1463,7 @@ export const supabaseStore: QwtStore = {
     const archivedAtFilter = encodeFilterValue(archivedAt);
     const [submissionRows, questionRows] = await Promise.all([
       supabaseFetch<SupabaseSubmissionRow[]>(
-        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=eq.${archivedAtFilter}&select=${submissionSelect()}`,
+        `/qwt_submissions?session_code=eq.${encodeFilterValue(session.id)}&archived_at=eq.${archivedAtFilter}&select=${submissionSelect()}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -1467,7 +1474,7 @@ export const supabaseStore: QwtStore = {
         },
       ),
       supabaseFetch<SupabaseGroupQuestionRow[]>(
-        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.code)}&archived_at=eq.${archivedAtFilter}&select=${groupQuestionSelect()}`,
+        `/qwt_group_questions?session_code=eq.${encodeFilterValue(session.id)}&archived_at=eq.${archivedAtFilter}&select=${groupQuestionSelect()}`,
         {
           method: "PATCH",
           body: JSON.stringify({

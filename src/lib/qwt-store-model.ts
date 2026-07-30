@@ -38,6 +38,7 @@ export type TeacherSpace = {
 export type TeacherSpaceSummary = Omit<TeacherSpace, "pinHash">;
 
 export type Session = {
+  id: string;
   code: string;
   spaceCode: string;
   title: string;

@@ -18,6 +18,7 @@ import type { DrawingData, GifData, ParticipantPoll } from "@/lib/qwt-store";
 
 type StudentSubmitProps = {
   initialStudentName: string;
+  sessionId: string;
   sessionCode: string;
   spaceCode?: string;
   spaceName?: string;
@@ -36,6 +37,7 @@ type SavedSubmission = {
 
 export function StudentSubmit({
   initialStudentName,
+  sessionId,
   sessionCode,
   spaceCode,
   spaceName,
@@ -71,7 +73,7 @@ export function StudentSubmit({
     const query = pollParticipantId
       ? `?participantId=${encodeURIComponent(pollParticipantId)}`
       : "";
-    const response = await fetch(`/api/sessions/${sessionCode}/student${query}`);
+    const response = await fetch(`/api/sessions/${sessionId}/student${query}`);
 
     if (!response.ok) {
       return;
@@ -103,7 +105,7 @@ export function StudentSubmit({
     if (typeof nextTimerDurationSeconds === "number") {
       setCurrentTimerDurationSeconds(nextTimerDurationSeconds);
     }
-  }, [pollParticipantId, sessionCode]);
+  }, [pollParticipantId, sessionId]);
 
   useEffect(() => {
     const firstRefresh = window.setTimeout(() => {
@@ -129,7 +131,7 @@ export function StudentSubmit({
     setError("");
     setIsSaving(true);
 
-    const response = await fetch(`/api/sessions/${sessionCode}/submissions`, {
+    const response = await fetch(`/api/sessions/${sessionId}/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -319,7 +321,7 @@ export function StudentSubmit({
           canAsk={sessionIsOpen}
           canVote={sessionIsOpen}
           className="lg:sticky lg:top-5"
-          sessionCode={sessionCode}
+          sessionCode={sessionId}
           studentName={studentName}
         />
       </div>

@@ -67,8 +67,8 @@ export async function GET(
   const { session } = authorization;
 
   const [submissions, groupQuestions] = await Promise.all([
-    listSubmissions(session.code, { includeArchived: true, includeHidden: true }),
-    listGroupQuestions(session.code, undefined, {
+    listSubmissions(session.id, { includeArchived: true, includeHidden: true }),
+    listGroupQuestions(session.id, undefined, {
       includeAnswered: true,
       includeArchived: true,
       includeHidden: true,
@@ -80,7 +80,7 @@ export async function GET(
     ...submissions.map((submission) =>
       csvRow([
         "submission",
-        session.code,
+        session.id,
         session.title,
         session.prompt,
         session.promptUpdatedAt,
@@ -108,7 +108,7 @@ export async function GET(
     ...groupQuestions.map((question) =>
       csvRow([
         "group_question",
-        session.code,
+        session.id,
         session.title,
         session.prompt,
         session.promptUpdatedAt,

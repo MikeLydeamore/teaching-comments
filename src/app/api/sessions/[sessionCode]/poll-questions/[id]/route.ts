@@ -13,7 +13,7 @@ export async function DELETE(
   }
 
   const deleted = await deletePollQuestionFromBank(
-    authorization.session.code,
+    authorization.session.id,
     id,
   );
 
