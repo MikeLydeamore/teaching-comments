@@ -964,6 +964,34 @@ export const localStore: QwtStore = {
     );
   },
 
+  async getPollHistory(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const data = await readStore();
+    const polls = data.polls
+      .filter((poll) => poll.sessionCode === sessionCode)
+      .sort(
+        (left, right) =>
+          new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime(),
+      );
+
+    return polls.map((poll) => {
+      const responses = data.pollResponses.filter(
+        (response) => response.pollId === poll.id,
+      );
+
+      return {
+        poll,
+        responseCount: responses.length,
+        options: poll.options.map((option) => ({
+          ...option,
+          responseCount: responses.filter((response) =>
+            response.optionIds.includes(option.id),
+          ).length,
+        })),
+      };
+    });
+  },
+
   async getPoll(id) {
     const data = await readStore();
     return data.polls.find((poll) => poll.id === id) ?? null;

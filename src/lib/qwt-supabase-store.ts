@@ -1226,6 +1226,45 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? pollFromRow(rows[0]) : null;
   },
 
+  async getPollHistory(code) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const params = new URLSearchParams({
+      session_code: `eq.${sessionCode}`,
+      select: pollSelect(),
+      order: "started_at.desc",
+    });
+    const pollRows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?${params.toString()}`,
+    );
+    const polls = pollRows.map(pollFromRow);
+
+    if (!polls.length) {
+      return [];
+    }
+
+    const responseRows = await supabaseFetch<SupabasePollResponseRow[]>(
+      `/qwt_poll_responses?poll_id=in.(${polls.map((poll) => poll.id).join(",")})&select=${pollResponseSelect()}`,
+    );
+    const responses = responseRows.map(pollResponseFromRow);
+
+    return polls.map((poll) => {
+      const pollResponses = responses.filter(
+        (response) => response.pollId === poll.id,
+      );
+
+      return {
+        poll,
+        responseCount: pollResponses.length,
+        options: poll.options.map((option) => ({
+          ...option,
+          responseCount: pollResponses.filter((response) =>
+            response.optionIds.includes(option.id),
+          ).length,
+        })),
+      };
+    });
+  },
+
   getPoll: getPollFromSupabase,
 
   async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {

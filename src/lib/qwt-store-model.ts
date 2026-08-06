@@ -273,6 +273,7 @@ export type QwtStore = {
   ): Promise<GroupQuestion | null>;
   getActivePoll(code: string): Promise<SessionPoll | null>;
   getLatestPoll(code: string): Promise<SessionPoll | null>;
+  getPollHistory(code: string): Promise<PollResults[]>;
   getPoll(id: string): Promise<SessionPoll | null>;
   startPoll(
     code: string,

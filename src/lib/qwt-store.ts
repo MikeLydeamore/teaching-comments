@@ -242,6 +242,10 @@ export async function getLatestPoll(code: string) {
   return getStore().getLatestPoll(code);
 }
 
+export async function getPollHistory(code: string) {
+  return getStore().getPollHistory(code);
+}
+
 export async function getPoll(id: string) {
   return getStore().getPoll(id);
 }

@@ -18,6 +18,55 @@ type HostPollManagerProps = {
 const pollExtensions = [15, 30, 60];
 const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 
+function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
+  return (
+    poll.status === "active" && new Date(poll.endsAt).getTime() > nowMs
+  );
+}
+
+function csvCell(value: string | number) {
+  let text = String(value);
+
+  if (/^\s*[=+\-@]/.test(text)) {
+    text = `'${text}`;
+  }
+
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function downloadPollResults(results: PollResults) {
+  const { poll } = results;
+  const rows: Array<Array<string | number>> = [
+    ["Poll question", poll.question],
+    ["Selection mode", poll.selectionMode],
+    ["Started at", poll.startedAt],
+    ["Ended at", poll.endedAt ?? poll.endsAt],
+    ["Respondents", results.responseCount],
+    [],
+    ["Answer", "Responses", "Percent of respondents"],
+    ...results.options.map((option) => [
+      option.label,
+      option.responseCount,
+      results.responseCount
+        ? `${((option.responseCount / results.responseCount) * 100).toFixed(1)}%`
+        : "0.0%",
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const downloadUrl = URL.createObjectURL(
+    new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }),
+  );
+  const link = document.createElement("a");
+  const timestamp = poll.startedAt.replaceAll(":", "-").replace(".000Z", "Z");
+
+  link.href = downloadUrl;
+  link.download = `poll-results-${timestamp}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+}
+
 function sortPollQuestionBank(questions: PollQuestionBankItem[]) {
   return [...questions].sort((left, right) =>
     left.title.localeCompare(right.title),
@@ -30,9 +79,13 @@ export function HostPollManager({
   sessionCode,
 }: HostPollManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [tab, setTab] = useState<"current" | "new">("new");
+  const [tab, setTab] = useState<"current" | "history" | "new">("new");
   const [poll, setPoll] = useState<SessionPoll | null>(null);
   const [results, setResults] = useState<PollResults | null>(null);
+  const [history, setHistory] = useState<PollResults[]>([]);
+  const [selectedHistoryPollId, setSelectedHistoryPollId] = useState("");
+  const [historyStatus, setHistoryStatus] = useState("");
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [question, setQuestion] = useState("");
   const [selectionMode, setSelectionMode] =
@@ -89,6 +142,45 @@ export function HostPollManager({
     }
   }, [sessionCode]);
 
+  const refreshHistory = useCallback(async () => {
+    setIsHistoryLoading(true);
+    setHistoryStatus("");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/polls/history`,
+        { cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setHistoryStatus(payload.error ?? "Could not load past polls.");
+        return;
+      }
+
+      const nextHistory = (payload.history ?? []) as PollResults[];
+      const currentTime = Date.now();
+      const firstPastPoll = nextHistory.find(
+        (item) => !pollIsCurrentlyLive(item.poll, currentTime),
+      );
+
+      setHistory(nextHistory);
+      setSelectedHistoryPollId((currentId) =>
+        nextHistory.some(
+          (item) =>
+            item.poll.id === currentId &&
+            !pollIsCurrentlyLive(item.poll, currentTime),
+        )
+          ? currentId
+          : (firstPastPoll?.poll.id ?? ""),
+      );
+    } catch {
+      setHistoryStatus("Could not load past polls.");
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [sessionCode]);
+
   useEffect(() => {
     const firstRefresh = window.setTimeout(() => {
       void refreshPoll();
@@ -115,10 +207,24 @@ export function HostPollManager({
   }, []);
 
   const pollIsLive = Boolean(
-    poll &&
-      poll.status === "active" &&
-      nowMs > 0 &&
-      new Date(poll.endsAt).getTime() > nowMs,
+    poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs),
+  );
+  const pastPollResults = useMemo(
+    () =>
+      history.filter(
+        (item) => nowMs > 0 && !pollIsCurrentlyLive(item.poll, nowMs),
+      ),
+    [history, nowMs],
+  );
+  const selectedHistoryResults =
+    pastPollResults.find(
+      (item) => item.poll.id === selectedHistoryPollId,
+    ) ?? pastPollResults[0] ?? null;
+  const maxHistoryResultCount = Math.max(
+    1,
+    ...(selectedHistoryResults?.options.map(
+      (option) => option.responseCount,
+    ) ?? []),
   );
   const maxResultCount = useMemo(
     () =>
@@ -150,6 +256,7 @@ export function HostPollManager({
     setStatus("");
     setIsOpen(true);
     void refreshPoll();
+    void refreshHistory();
     void refreshPollQuestionBank();
   }
 
@@ -187,6 +294,7 @@ export function HostPollManager({
       setBankStatus("");
       setTab("current");
       setStatus("Poll started.");
+      void refreshHistory();
     } catch {
       setStatus("Could not start poll.");
     } finally {
@@ -218,6 +326,9 @@ export function HostPollManager({
       setPoll(payload.poll);
       setResults(payload.results);
       setStatus(action === "end" ? "Poll ended." : `Added ${seconds} seconds.`);
+      if (action === "end") {
+        void refreshHistory();
+      }
     } catch {
       setStatus("Could not update poll.");
     } finally {
@@ -409,8 +520,8 @@ export function HostPollManager({
               </button>
             </header>
 
-            <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 p-1">
-              {(["current", "new"] as const).map((tabOption) => (
+            <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50 p-1">
+              {(["current", "history", "new"] as const).map((tabOption) => (
                 <button
                   className={`h-10 rounded text-sm font-semibold transition ${
                     tab === tabOption
@@ -422,9 +533,16 @@ export function HostPollManager({
                   onClick={() => {
                     setTab(tabOption);
                     setStatus("");
+                    if (tabOption === "history") {
+                      void refreshHistory();
+                    }
                   }}
                 >
-                  {tabOption === "current" ? "Current poll" : "New poll"}
+                  {tabOption === "current"
+                    ? "Current poll"
+                    : tabOption === "history"
+                      ? "Past polls"
+                      : "New poll"}
                 </button>
               ))}
             </div>
@@ -507,6 +625,13 @@ export function HostPollManager({
                         >
                           Pop out results
                         </button>
+                        <button
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                          type="button"
+                          onClick={() => downloadPollResults(results)}
+                        >
+                          Download CSV
+                        </button>
                         {poll.status === "active" ? (
                           <>
                           {pollExtensions.map((seconds) => (
@@ -553,6 +678,123 @@ export function HostPollManager({
                     </button>
                   </div>
                 )
+              ) : tab === "history" ? (
+                <div>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <label
+                        className="block text-sm font-semibold text-slate-700"
+                        htmlFor="past-poll"
+                      >
+                        Poll
+                      </label>
+                      <select
+                        className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                        disabled={!pastPollResults.length || isHistoryLoading}
+                        id="past-poll"
+                        value={selectedHistoryResults?.poll.id ?? ""}
+                        onChange={(event) =>
+                          setSelectedHistoryPollId(event.target.value)
+                        }
+                      >
+                        {!pastPollResults.length ? (
+                          <option value="">No past polls</option>
+                        ) : null}
+                        {pastPollResults.map((item) => (
+                          <option key={item.poll.id} value={item.poll.id}>
+                            {new Date(item.poll.startedAt).toLocaleString()} — {item.poll.question}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      className="h-11 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isHistoryLoading}
+                      type="button"
+                      onClick={() => void refreshHistory()}
+                    >
+                      {isHistoryLoading ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  {historyStatus ? (
+                    <p
+                      aria-live="polite"
+                      className="mt-3 text-sm font-medium text-red-700"
+                    >
+                      {historyStatus}
+                    </p>
+                  ) : null}
+
+                  {selectedHistoryResults ? (
+                    <section className="mt-6 border-t border-slate-200 pt-5">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                            <span>
+                              {selectedHistoryResults.poll.selectionMode === "single"
+                                ? "Single choice"
+                                : "Multiple choice"}
+                            </span>
+                            <span aria-hidden="true">•</span>
+                            <time dateTime={selectedHistoryResults.poll.startedAt}>
+                              {new Date(
+                                selectedHistoryResults.poll.startedAt,
+                              ).toLocaleString()}
+                            </time>
+                          </div>
+                          <h3 className="mt-2 text-xl font-semibold leading-7 text-slate-950">
+                            {selectedHistoryResults.poll.question}
+                          </h3>
+                        </div>
+                        <button
+                          className="h-10 shrink-0 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                          type="button"
+                          onClick={() =>
+                            downloadPollResults(selectedHistoryResults)
+                          }
+                        >
+                          Download CSV
+                        </button>
+                      </div>
+
+                      <div className="mt-6 space-y-4">
+                        {selectedHistoryResults.options.map((option) => (
+                          <div key={option.id}>
+                            <div className="flex items-end justify-between gap-4 text-sm">
+                              <span className="min-w-0 break-words font-medium text-slate-800">
+                                {option.label}
+                              </span>
+                              <span className="shrink-0 font-semibold tabular-nums text-slate-700">
+                                {option.responseCount}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-4 overflow-hidden rounded bg-slate-100">
+                              <div
+                                className="h-full rounded bg-teal-600"
+                                style={{
+                                  width: `${(option.responseCount / maxHistoryResultCount) * 100}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="mt-6 border-t border-slate-200 pt-4 text-sm font-semibold text-slate-700">
+                        {selectedHistoryResults.responseCount} response
+                        {selectedHistoryResults.responseCount === 1 ? "" : "s"}
+                      </p>
+                    </section>
+                  ) : !isHistoryLoading && !historyStatus ? (
+                    <div className="py-12 text-center">
+                      <p className="text-sm text-slate-500">
+                        No past polls yet. End the current poll or run another
+                        poll to build the history.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               ) : (
                 <div>
                   {!sessionIsOpen ? (
