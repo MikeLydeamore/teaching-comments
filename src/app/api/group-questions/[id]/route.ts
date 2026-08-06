@@ -1,21 +1,29 @@
 import {
+  getGroupQuestion,
   setGroupQuestionAnswered,
   setGroupQuestionVisible,
 } from "@/lib/qwt-store";
-import {
-  isAnyTeacherAuthenticated,
-  teacherUnauthorizedResponse,
-} from "@/lib/teacher-session-auth";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PATCH(
   request: Request,
   ctx: RouteContext<"/api/group-questions/[id]">,
 ) {
-  if (!(await isAnyTeacherAuthenticated())) {
-    return teacherUnauthorizedResponse();
+  const { id } = await ctx.params;
+  const currentQuestion = await getGroupQuestion(id);
+
+  if (!currentQuestion) {
+    return Response.json({ error: "Question not found." }, { status: 404 });
   }
 
-  const { id } = await ctx.params;
+  const authorization = await getAuthorizedTeacherSession(
+    currentQuestion.sessionCode,
+  );
+
+  if (authorization.response) {
+    return authorization.response;
+  }
+
   const body = (await request.json().catch(() => ({}))) as {
     isAnswered?: boolean;
     isVisible?: boolean;
@@ -34,11 +42,19 @@ export async function PATCH(
   let question = null;
 
   if (typeof body.isAnswered === "boolean") {
-    question = await setGroupQuestionAnswered(id, body.isAnswered);
+    question = await setGroupQuestionAnswered(
+      currentQuestion.sessionCode,
+      id,
+      body.isAnswered,
+    );
   }
 
   if (typeof body.isVisible === "boolean") {
-    question = await setGroupQuestionVisible(id, body.isVisible);
+    question = await setGroupQuestionVisible(
+      currentQuestion.sessionCode,
+      id,
+      body.isVisible,
+    );
   }
 
   if (!question) {

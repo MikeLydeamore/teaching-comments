@@ -220,7 +220,12 @@ export type QwtStore = {
     gifData?: unknown,
     studentName?: string,
   ): Promise<Submission>;
-  updateSubmission(id: string, patch: SubmissionPatch): Promise<Submission | null>;
+  getSubmission(id: string): Promise<Submission | null>;
+  updateSubmission(
+    sessionCode: string,
+    id: string,
+    patch: SubmissionPatch,
+  ): Promise<Submission | null>;
   getSessionStats(code: string): Promise<SessionStats>;
   listQuestionBank(code: string): Promise<QuestionBankItem[]>;
   addQuestionToBank(
@@ -228,7 +233,8 @@ export type QwtStore = {
     text: string,
     title?: string,
   ): Promise<QuestionBankItem | null>;
-  deleteQuestionFromBank(id: string): Promise<boolean>;
+  getQuestionFromBank(id: string): Promise<QuestionBankItem | null>;
+  deleteQuestionFromBank(sessionCode: string, id: string): Promise<boolean>;
   listPollQuestionBank(code: string): Promise<PollQuestionBankItem[]>;
   addPollQuestionToBank(
     code: string,
@@ -252,13 +258,16 @@ export type QwtStore = {
     text: string,
     studentName?: string,
   ): Promise<GroupQuestion | null>;
+  getGroupQuestion(id: string): Promise<GroupQuestion | null>;
   upvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
   unvoteGroupQuestion(id: string, voterId: string): Promise<GroupQuestion | null>;
   setGroupQuestionAnswered(
+    sessionCode: string,
     id: string,
     isAnswered: boolean,
   ): Promise<GroupQuestion | null>;
   setGroupQuestionVisible(
+    sessionCode: string,
     id: string,
     isVisible: boolean,
   ): Promise<GroupQuestion | null>;

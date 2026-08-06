@@ -1,7 +1,6 @@
 import { getSession, getTeacherSpace, type Session } from "@/lib/qwt-store";
 import { DEFAULT_SPACE_CODE } from "@/lib/qwt-store-model";
 import {
-  getAuthenticatedTeacherSpaceCode,
   isTeacherAuthenticated,
   isTeacherSpaceCookieValid,
   teacherUnauthorizedResponse,
@@ -45,18 +44,4 @@ export async function getAuthorizedTeacherSession(
   }
 
   return { session };
-}
-
-export async function isAnyTeacherAuthenticated() {
-  if (await isTeacherAuthenticated()) {
-    return true;
-  }
-
-  const spaceCode = await getAuthenticatedTeacherSpaceCode();
-
-  if (!spaceCode) {
-    return false;
-  }
-
-  return isTeacherAuthenticatedForSpaceCode(spaceCode);
 }

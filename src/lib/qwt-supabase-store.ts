@@ -859,9 +859,17 @@ export const supabaseStore: QwtStore = {
     return submissionFromRow(rows[0]);
   },
 
-  async updateSubmission(id, patch) {
-    const currentRows = await supabaseFetch<SupabaseSubmissionRow[]>(
+  async getSubmission(id) {
+    const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?id=eq.${encodeFilterValue(id)}&select=${submissionSelect()}&limit=1`,
+    );
+
+    return rows[0] ? submissionFromRow(rows[0]) : null;
+  },
+
+  async updateSubmission(sessionCode, id, patch) {
+    const currentRows = await supabaseFetch<SupabaseSubmissionRow[]>(
+      `/qwt_submissions?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${submissionSelect()}&limit=1`,
     );
     const current = currentRows[0];
 
@@ -876,7 +884,7 @@ export const supabaseStore: QwtStore = {
     assertSubmissionHasContent(nextText, current.drawing_data ?? null, current.gif_data ?? null);
 
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
-      `/qwt_submissions?id=eq.${encodeFilterValue(id)}&select=${submissionSelect()}`,
+      `/qwt_submissions?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${submissionSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -948,9 +956,17 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? questionBankItemFromRow(rows[0]) : null;
   },
 
-  async deleteQuestionFromBank(id) {
+  async getQuestionFromBank(id) {
     const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
-      `/qwt_question_bank?id=eq.${encodeFilterValue(id)}&select=${questionBankSelect()}`,
+      `/qwt_question_bank?id=eq.${encodeFilterValue(id)}&select=${questionBankSelect()}&limit=1`,
+    );
+
+    return rows[0] ? questionBankItemFromRow(rows[0]) : null;
+  },
+
+  async deleteQuestionFromBank(sessionCode, id) {
+    const rows = await supabaseFetch<SupabaseQuestionBankRow[]>(
+      `/qwt_question_bank?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${questionBankSelect()}`,
       {
         method: "DELETE",
         prefer: "return=representation",
@@ -1074,6 +1090,8 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
   },
 
+  getGroupQuestion: getGroupQuestionFromSupabase,
+
   async upvoteGroupQuestion(id, voterId) {
     const normalizedVoterId = validateGroupQuestionVoterId(voterId);
     const currentQuestion = await getGroupQuestionFromSupabase(id, normalizedVoterId);
@@ -1142,10 +1160,10 @@ export const supabaseStore: QwtStore = {
     return getGroupQuestionFromSupabase(id, normalizedVoterId);
   },
 
-  async setGroupQuestionAnswered(id, isAnswered) {
+  async setGroupQuestionAnswered(sessionCode, id, isAnswered) {
     const timestamp = now();
     const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
-      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&select=${groupQuestionSelect()}`,
+      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${groupQuestionSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -1159,10 +1177,10 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? groupQuestionFromRow(rows[0], []) : null;
   },
 
-  async setGroupQuestionVisible(id, isVisible) {
+  async setGroupQuestionVisible(sessionCode, id, isVisible) {
     const timestamp = now();
     const rows = await supabaseFetch<SupabaseGroupQuestionRow[]>(
-      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&select=${groupQuestionSelect()}`,
+      `/qwt_group_questions?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${groupQuestionSelect()}`,
       {
         method: "PATCH",
         body: JSON.stringify({

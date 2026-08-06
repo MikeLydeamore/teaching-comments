@@ -130,8 +130,16 @@ export async function addSubmission(
   return getStore().addSubmission(code, text, drawingData, gifData, studentName);
 }
 
-export async function updateSubmission(id: string, patch: SubmissionPatch) {
-  return getStore().updateSubmission(id, patch);
+export async function getSubmission(id: string) {
+  return getStore().getSubmission(id);
+}
+
+export async function updateSubmission(
+  sessionCode: string,
+  id: string,
+  patch: SubmissionPatch,
+) {
+  return getStore().updateSubmission(sessionCode, id, patch);
 }
 
 export async function getSessionStats(code: string) {
@@ -146,8 +154,12 @@ export async function addQuestionToBank(code: string, text: string, title?: stri
   return getStore().addQuestionToBank(code, text, title);
 }
 
-export async function deleteQuestionFromBank(id: string) {
-  return getStore().deleteQuestionFromBank(id);
+export async function getQuestionFromBank(id: string) {
+  return getStore().getQuestionFromBank(id);
+}
+
+export async function deleteQuestionFromBank(sessionCode: string, id: string) {
+  return getStore().deleteQuestionFromBank(sessionCode, id);
 }
 
 export async function listPollQuestionBank(code: string) {
@@ -194,6 +206,10 @@ export async function addGroupQuestion(
   return getStore().addGroupQuestion(code, text, studentName);
 }
 
+export async function getGroupQuestion(id: string) {
+  return getStore().getGroupQuestion(id);
+}
+
 export async function upvoteGroupQuestion(id: string, voterId: string) {
   return getStore().upvoteGroupQuestion(id, voterId);
 }
@@ -202,12 +218,20 @@ export async function unvoteGroupQuestion(id: string, voterId: string) {
   return getStore().unvoteGroupQuestion(id, voterId);
 }
 
-export async function setGroupQuestionAnswered(id: string, isAnswered: boolean) {
-  return getStore().setGroupQuestionAnswered(id, isAnswered);
+export async function setGroupQuestionAnswered(
+  sessionCode: string,
+  id: string,
+  isAnswered: boolean,
+) {
+  return getStore().setGroupQuestionAnswered(sessionCode, id, isAnswered);
 }
 
-export async function setGroupQuestionVisible(id: string, isVisible: boolean) {
-  return getStore().setGroupQuestionVisible(id, isVisible);
+export async function setGroupQuestionVisible(
+  sessionCode: string,
+  id: string,
+  isVisible: boolean,
+) {
+  return getStore().setGroupQuestionVisible(sessionCode, id, isVisible);
 }
 
 export async function getActivePoll(code: string) {

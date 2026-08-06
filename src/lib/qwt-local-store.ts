@@ -533,9 +533,17 @@ export const localStore: QwtStore = {
     return submission;
   },
 
-  async updateSubmission(id, patch) {
+  async getSubmission(id) {
     const data = await readStore();
-    const index = data.submissions.findIndex((submission) => submission.id === id);
+    return data.submissions.find((submission) => submission.id === id) ?? null;
+  },
+
+  async updateSubmission(sessionCode, id, patch) {
+    const data = await readStore();
+    const index = data.submissions.findIndex(
+      (submission) =>
+        submission.id === id && submission.sessionCode === sessionCode,
+    );
 
     if (index === -1) {
       return null;
@@ -600,9 +608,17 @@ export const localStore: QwtStore = {
     return question;
   },
 
-  async deleteQuestionFromBank(id) {
+  async getQuestionFromBank(id) {
     const data = await readStore();
-    const nextQuestionBank = data.questionBank.filter((question) => question.id !== id);
+    return data.questionBank.find((question) => question.id === id) ?? null;
+  },
+
+  async deleteQuestionFromBank(sessionCode, id) {
+    const data = await readStore();
+    const nextQuestionBank = data.questionBank.filter(
+      (question) =>
+        question.id !== id || question.sessionCode !== sessionCode,
+    );
 
     if (nextQuestionBank.length === data.questionBank.length) {
       return false;
@@ -737,6 +753,29 @@ export const localStore: QwtStore = {
     };
   },
 
+  async getGroupQuestion(id) {
+    const data = await readStore();
+    const question = data.groupQuestions.find((item) => item.id === id);
+
+    if (!question) {
+      return null;
+    }
+
+    return {
+      id: question.id,
+      sessionCode: question.sessionCode,
+      studentName: question.studentName,
+      text: question.text,
+      isAnswered: question.isAnswered,
+      isVisible: question.isVisible,
+      voteCount: question.voterIds.length,
+      hasVoted: false,
+      archivedAt: question.archivedAt,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+    };
+  },
+
   async upvoteGroupQuestion(id, voterId) {
     const normalizedVoterId = validateGroupQuestionVoterId(voterId);
     const data = await readStore();
@@ -821,9 +860,12 @@ export const localStore: QwtStore = {
     };
   },
 
-  async setGroupQuestionAnswered(id, isAnswered) {
+  async setGroupQuestionAnswered(sessionCode, id, isAnswered) {
     const data = await readStore();
-    const index = data.groupQuestions.findIndex((question) => question.id === id);
+    const index = data.groupQuestions.findIndex(
+      (question) =>
+        question.id === id && question.sessionCode === sessionCode,
+    );
 
     if (index === -1) {
       return null;
@@ -853,9 +895,12 @@ export const localStore: QwtStore = {
     };
   },
 
-  async setGroupQuestionVisible(id, isVisible) {
+  async setGroupQuestionVisible(sessionCode, id, isVisible) {
     const data = await readStore();
-    const index = data.groupQuestions.findIndex((question) => question.id === id);
+    const index = data.groupQuestions.findIndex(
+      (question) =>
+        question.id === id && question.sessionCode === sessionCode,
+    );
 
     if (index === -1) {
       return null;
