@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PinInput } from "@/components/PinInput";
 import { listTeacherSpaces } from "@/lib/qwt-store";
 import { isAdminAuthenticated, isDefaultAdminPin } from "@/lib/teacher-auth";
 import { createTeachingSpace } from "@/app/host/actions";
@@ -108,22 +109,22 @@ export default async function AdminSpacesPage({
               <label className="text-sm font-semibold text-slate-700" htmlFor="spacePin">
                 Space PIN
               </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              <PinInput
+                className="h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                 id="spacePin"
                 name="spacePin"
-                type="password"
+                wrapperClassName="mt-2"
               />
             </div>
             <div>
               <label className="text-sm font-semibold text-slate-700" htmlFor="adminPin">
                 Admin PIN
               </label>
-              <input
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              <PinInput
+                className="h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                 id="adminPin"
                 name="adminPin"
-                type="password"
+                wrapperClassName="mt-2"
               />
             </div>
             <div className="md:col-span-2">
@@ -216,12 +217,12 @@ export default async function AdminSpacesPage({
                             <label className="sr-only" htmlFor={`new-pin-${space.code}`}>
                               New PIN for {space.name}
                             </label>
-                            <input
+                            <PinInput
                               className="h-9 min-w-36 flex-1 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                               id={`new-pin-${space.code}`}
                               name="newPin"
                               placeholder="New PIN"
-                              type="password"
+                              wrapperClassName="min-w-36 flex-1"
                             />
                             <button
                               className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
@@ -247,11 +248,11 @@ export default async function AdminSpacesPage({
                 <label className="text-sm font-semibold text-slate-700" htmlFor="spacesAdminPin">
                   Admin PIN
                 </label>
-                <input
-                  className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                <PinInput
+                  className="h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                   id="spacesAdminPin"
                   name="adminPin"
-                  type="password"
+                  wrapperClassName="mt-2"
                 />
               </div>
               <div className="flex items-end">

@@ -1,4 +1,5 @@
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import { PinInput } from "@/components/PinInput";
 import { loginTeacher } from "../actions";
 
 type TeacherLoginProps = {
@@ -44,12 +45,12 @@ export function TeacherLogin({
           <label className="text-sm font-semibold text-slate-700" htmlFor="pin">
             {spaceCode ? "Space PIN" : "PIN"}
           </label>
-          <input
+          <PinInput
             autoFocus
-            className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+            className="h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
             id="pin"
             name="pin"
-            type="password"
+            wrapperClassName="mt-2"
           />
           <PendingSubmitButton
             className="mt-4 h-11 w-full rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
