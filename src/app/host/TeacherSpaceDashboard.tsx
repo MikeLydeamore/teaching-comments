@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { enterTeacherSession, logoutTeacher } from "./actions";
@@ -119,7 +120,7 @@ export function TeacherSpaceDashboard({
                   </div>
                   <p className="mt-1 text-sm text-slate-500">{session.code}</p>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
-                    {session.prompt}
+                    <InlineCodeText>{session.prompt}</InlineCodeText>
                   </p>
                 </PendingLink>
               ))}

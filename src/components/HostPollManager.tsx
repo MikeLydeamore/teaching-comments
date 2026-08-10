@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
 import type {
   PollQuestionBankItem,
@@ -574,7 +575,7 @@ export function HostPollManager({
                           </span>
                         </div>
                         <h3 className="mt-3 text-xl font-semibold leading-7 text-slate-950">
-                          {poll.question}
+                          <InlineCodeText>{poll.question}</InlineCodeText>
                         </h3>
                       </div>
                       {poll.status === "active" ? (
@@ -594,7 +595,7 @@ export function HostPollManager({
                         <div key={option.id}>
                           <div className="flex items-end justify-between gap-4 text-sm">
                             <span className="min-w-0 break-words font-medium text-slate-800">
-                              {option.label}
+                              <InlineCodeText>{option.label}</InlineCodeText>
                             </span>
                             <span className="shrink-0 font-semibold tabular-nums text-slate-700">
                               {option.responseCount}
@@ -744,7 +745,9 @@ export function HostPollManager({
                             </time>
                           </div>
                           <h3 className="mt-2 text-xl font-semibold leading-7 text-slate-950">
-                            {selectedHistoryResults.poll.question}
+                            <InlineCodeText>
+                              {selectedHistoryResults.poll.question}
+                            </InlineCodeText>
                           </h3>
                         </div>
                         <button
@@ -763,7 +766,7 @@ export function HostPollManager({
                           <div key={option.id}>
                             <div className="flex items-end justify-between gap-4 text-sm">
                               <span className="min-w-0 break-words font-medium text-slate-800">
-                                {option.label}
+                                <InlineCodeText>{option.label}</InlineCodeText>
                               </span>
                               <span className="shrink-0 font-semibold tabular-nums text-slate-700">
                                 {option.responseCount}

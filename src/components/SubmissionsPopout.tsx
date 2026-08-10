@@ -10,6 +10,7 @@ import {
 } from "react";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import type { Submission } from "@/lib/qwt-store";
 
 type SubmissionsPopoutProps = {
@@ -159,7 +160,7 @@ export function SubmissionsPopout({
         </div>
         {promptText ? (
           <p className="mt-4 max-w-5xl rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-base leading-7 text-slate-700">
-            {promptText}
+            <InlineCodeText>{promptText}</InlineCodeText>
           </p>
         ) : null}
         <p className="mt-3 text-sm text-slate-500">
