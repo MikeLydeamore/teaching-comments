@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
 import type { PollResults, SessionPoll } from "@/lib/qwt-store";
 
@@ -86,7 +87,7 @@ export function PollResultsPopout({
         <section className="mx-auto mt-8 w-full max-w-6xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <h2 className="max-w-5xl text-3xl font-semibold leading-tight sm:text-5xl">
-              {poll.question}
+              <InlineCodeText>{poll.question}</InlineCodeText>
             </h2>
             <p className="shrink-0 rounded-md border border-slate-300 bg-white px-4 py-3 text-lg font-semibold tabular-nums text-slate-700">
               {results.responseCount} response
@@ -99,7 +100,7 @@ export function PollResultsPopout({
               <div key={option.id}>
                 <div className="flex items-end justify-between gap-5">
                   <p className="min-w-0 break-words text-2xl font-semibold sm:text-3xl">
-                    {option.label}
+                    <InlineCodeText>{option.label}</InlineCodeText>
                   </p>
                   <p className="shrink-0 text-3xl font-semibold tabular-nums text-slate-700 sm:text-4xl">
                     {option.responseCount}

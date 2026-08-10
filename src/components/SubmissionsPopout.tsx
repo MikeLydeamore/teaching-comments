@@ -10,6 +10,7 @@ import {
 } from "react";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import type { Submission } from "@/lib/qwt-store";
 
 type SubmissionsPopoutProps = {
@@ -159,7 +160,7 @@ export function SubmissionsPopout({
         </div>
         {promptText ? (
           <p className="mt-4 max-w-5xl rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-base leading-7 text-slate-700">
-            {promptText}
+            <InlineCodeText>{promptText}</InlineCodeText>
           </p>
         ) : null}
         <p className="mt-3 text-sm text-slate-500">
@@ -198,7 +199,7 @@ export function SubmissionsPopout({
 
               {submission.text ? (
                 <p className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-xl leading-8 text-slate-950">
-                  {submission.text}
+                  <InlineCodeText>{submission.text}</InlineCodeText>
                 </p>
               ) : !submission.drawingData && !submission.gifData ? (
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-600">

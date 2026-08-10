@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
@@ -117,7 +118,7 @@ export default async function TeacherResultsPage({
           </p>
           {selectedPromptHistory ? (
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              {selectedPromptHistory.prompt}
+              <InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText>
             </p>
           ) : null}
         </div>

@@ -6,6 +6,7 @@ import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { HostPollManager } from "@/components/HostPollManager";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { QrCode } from "@/components/QrCode";
@@ -1576,7 +1577,7 @@ export function TeacherDashboard({
                   </p>
                   {selectedPromptHistory ? (
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                      {selectedPromptHistory.prompt}
+                      <InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText>
                     </p>
                   ) : null}
                 </div>
@@ -1841,7 +1842,9 @@ export function TeacherDashboard({
                       >
                         <CopyStatusIcon isCopied={copiedSubmissionId === submission.id} />
                       </button>
-                      <p className="whitespace-pre-wrap">{submission.text}</p>
+                      <p className="whitespace-pre-wrap">
+                        <InlineCodeText>{submission.text}</InlineCodeText>
+                      </p>
                     </div>
                   ) : !submission.drawingData && !submission.gifData ? (
                     <p

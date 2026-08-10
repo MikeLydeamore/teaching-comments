@@ -11,6 +11,7 @@ import {
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
@@ -219,7 +220,9 @@ export function StudentSubmit({
             variant="student"
           />
         </div>
-        <p className="mt-2 text-lg leading-7 text-slate-900">{currentPrompt}</p>
+        <p className="mt-2 text-lg leading-7 text-slate-900">
+          <InlineCodeText>{currentPrompt}</InlineCodeText>
+        </p>
         {currentTimerDurationSeconds > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
             Timer length: {formatTimerSeconds(currentTimerDurationSeconds)}

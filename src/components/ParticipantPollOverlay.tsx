@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { InlineCodeText } from "@/components/InlineCodeText";
 import { formatTimerSeconds } from "@/components/SessionTimer";
 import type { ParticipantPoll } from "@/lib/qwt-store";
 
@@ -169,7 +170,7 @@ export function ParticipantPollOverlay({
           className="mt-5 text-2xl font-semibold leading-8 text-slate-950"
           id="participant-poll-question"
         >
-          {poll.question}
+          <InlineCodeText>{poll.question}</InlineCodeText>
         </h2>
 
         <div className="mt-5 space-y-3">
@@ -192,7 +193,9 @@ export function ParticipantPollOverlay({
                   type={poll.selectionMode === "single" ? "radio" : "checkbox"}
                   onChange={() => toggleOption(option.id)}
                 />
-                <span className="min-w-0 break-words">{option.label}</span>
+                <span className="min-w-0 break-words">
+                  <InlineCodeText>{option.label}</InlineCodeText>
+                </span>
               </label>
             );
           })}
