@@ -619,7 +619,7 @@ export function validatePollQuestionDefinition(
   selectionMode: PollSelectionMode,
   optionLabels: string[],
 ) {
-  const normalizedQuestion = question.trim().replace(/\s+/g, " ");
+  const normalizedQuestion = question.trim();
 
   if (!normalizedQuestion || normalizedQuestion.length > 500) {
     throw new Error("Poll question must be between 1 and 500 characters.");
@@ -633,7 +633,7 @@ export function validatePollQuestionDefinition(
     throw new Error("Polls need between 2 and 8 answers.");
   }
 
-  const normalizedOptions = optionLabels.map((label) => label.trim().replace(/\s+/g, " "));
+  const normalizedOptions = optionLabels.map((label) => label.trim());
 
   if (normalizedOptions.some((label) => !label || label.length > 160)) {
     throw new Error("Each poll answer must be between 1 and 160 characters.");

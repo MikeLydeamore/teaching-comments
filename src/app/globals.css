@@ -353,6 +353,18 @@ html[data-qwt-theme] .qwt-theme-selector {
   color: var(--qwt-code-text);
 }
 
+.qwt-code-block {
+  display: block;
+  margin-block: 0.75rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background-color: var(--qwt-code-bg);
+  color: var(--qwt-code-text);
+}
+
 @media (max-width: 640px) {
   .qwt-theme-selector {
     position: static !important;
