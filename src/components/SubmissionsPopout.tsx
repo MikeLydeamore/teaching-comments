@@ -199,7 +199,7 @@ export function SubmissionsPopout({
 
               {submission.text ? (
                 <p className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-xl leading-8 text-slate-950">
-                  {submission.text}
+                  <InlineCodeText>{submission.text}</InlineCodeText>
                 </p>
               ) : !submission.drawingData && !submission.gifData ? (
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-600">

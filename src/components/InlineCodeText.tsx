@@ -12,7 +12,7 @@ export function InlineCodeText({ children, className = "" }: InlineCodeTextProps
         if (part.length >= 2 && part.startsWith("`") && part.endsWith("`")) {
           return (
             <code
-              className={`rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.9em] font-medium text-slate-800 ${className}`}
+              className={`qwt-inline-code rounded px-1 py-0.5 font-mono text-[0.9em] font-medium ${className}`}
               key={`${part}-${index}`}
             >
               {part.slice(1, -1)}

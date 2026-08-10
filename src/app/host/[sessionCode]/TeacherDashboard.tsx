@@ -1842,7 +1842,9 @@ export function TeacherDashboard({
                       >
                         <CopyStatusIcon isCopied={copiedSubmissionId === submission.id} />
                       </button>
-                      <p className="whitespace-pre-wrap">{submission.text}</p>
+                      <p className="whitespace-pre-wrap">
+                        <InlineCodeText>{submission.text}</InlineCodeText>
+                      </p>
                     </div>
                   ) : !submission.drawingData && !submission.gifData ? (
                     <p
