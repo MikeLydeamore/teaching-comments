@@ -104,6 +104,17 @@ function minutesAgo(value: string) {
   return `${minutes} min ago`;
 }
 
+function refreshStatus(value: Date | null) {
+  if (!value) return "Waiting for first refresh";
+
+  const seconds = Math.max(0, Math.floor((Date.now() - value.getTime()) / 1000));
+  if (seconds < 5) return "Updated just now";
+  if (seconds < 60) return `Updated ${seconds}s ago`;
+
+  const minutes = Math.floor(seconds / 60);
+  return `Updated ${minutes}m ago`;
+}
+
 function CopyStatusIcon({ isCopied }: { isCopied: boolean }) {
   if (isCopied) {
     return (
@@ -1360,9 +1371,7 @@ export function TeacherDashboard({
                   Room controls
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {lastRefresh
-                    ? `Updated ${lastRefresh.toLocaleTimeString()}`
-                    : "Waiting for first refresh"}
+                  {refreshStatus(lastRefresh)}
                 </p>
               </div>
               <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -1384,11 +1393,8 @@ export function TeacherDashboard({
               </span>
             </button>
             {showLiveControls ? (
-              <div
-                className="grid gap-4 border-t border-slate-200 p-4 md:grid-cols-2 xl:grid-cols-4"
-                id="teacher-room-controls"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-slate-200 bg-slate-50 p-3 md:col-span-2 xl:col-span-4">
+              <div className="border-t border-slate-200" id="teacher-room-controls">
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
                       Participant access
@@ -1404,7 +1410,7 @@ export function TeacherDashboard({
                   </div>
                   <button
                     aria-checked={sessionDetails.isOpen}
-                    className="grid min-h-11 grid-cols-[auto_auto] items-center gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-400 disabled:cursor-wait disabled:opacity-60"
+                    className="grid min-h-11 grid-cols-[auto_auto] items-center gap-3 rounded-md px-2 py-2 text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
                     disabled={isUpdatingSessionAccess}
                     role="switch"
                     type="button"
@@ -1428,97 +1434,56 @@ export function TeacherDashboard({
                   </button>
                 </div>
 
-                <div>
-                  <label
-                    className="block text-sm font-medium text-slate-700"
-                    htmlFor="minutes"
-                  >
-                    Show writings from last
-                  </label>
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      className="h-10 w-20 rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                      id="minutes"
-                      max={500}
-                      min={1}
-                      type="number"
-                      value={minutes}
-                      onChange={(event) => setMinutes(Number(event.target.value))}
-                    />
-                    <span className="text-sm text-slate-600">minutes</span>
-                    <button
-                      className="ml-auto h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-                      type="button"
-                      onClick={refresh}
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  <label
-                    className="mt-3 block text-sm font-medium text-slate-700"
-                    htmlFor="prompt-history-filter"
-                  >
-                    Prompt
-                  </label>
-                  <select
-                    className="mt-2 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                    id="prompt-history-filter"
-                    value={selectedPromptHistoryId}
-                    onChange={(event) => {
-                      setSelectedPromptHistoryId(event.target.value);
-                      setOrderedSubmissionIds([]);
-                    }}
-                  >
-                    <option value="">All prompts</option>
-                    {promptHistory.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {promptHistoryOptionLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Card order</p>
-                  <div
-                    aria-label="Card order"
-                    className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1"
-                  >
-                    {submissionSortOptions.map((option) => (
-                      <button
-                        className={`h-9 rounded px-2 text-sm font-semibold transition ${
-                          submissionSortOrder === option.value
-                            ? "bg-white text-slate-950 shadow-sm"
-                            : "text-slate-600 hover:text-teal-800"
-                        }`}
-                        key={option.value}
-                        type="button"
-                        onClick={() => changeSubmissionSortOrder(option.value)}
-                      >
-                        {option.label}
+                <div className="grid divide-y divide-slate-200 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-3">
+                  <section className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Display &amp; filters</h3>
+                      <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800" role="status">
+                        {displayedSubmissions.length} shown
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="prompt-history-filter">
+                        Prompt
+                        <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100" id="prompt-history-filter" value={selectedPromptHistoryId} onChange={(event) => { setSelectedPromptHistoryId(event.target.value); setOrderedSubmissionIds([]); }}>
+                          <option value="">All prompts</option>
+                          {promptHistory.map((item) => <option key={item.id} value={item.id}>{promptHistoryOptionLabel(item)}</option>)}
+                        </select>
+                      </label>
+                      <div className="flex items-end gap-2">
+                        <label className="min-w-0 flex-1 text-sm font-medium text-slate-700" htmlFor="minutes">
+                          Time range
+                          <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100" id="minutes" value={minutes} onChange={(event) => setMinutes(Number(event.target.value))}>
+                            <option value={1}>Last minute</option>
+                            <option value={3}>Last 3 minutes</option>
+                            <option value={5}>Last 5 minutes</option>
+                            <option value={10}>Last 10 minutes</option>
+                            <option value={0}>All time</option>
+                          </select>
+                        </label>
+                        <button aria-label="Refresh responses" className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-800" type="button" onClick={refresh}>
+                          <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" /></svg>
+                        </button>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Card order</p>
+                        <div aria-label="Card order" className="mt-1.5 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1">
+                          {submissionSortOptions.map((option) => <button className={`h-8 rounded px-2 text-sm font-semibold transition ${submissionSortOrder === option.value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-teal-800"}`} key={option.value} type="button" onClick={() => changeSubmissionSortOrder(option.value)}>{option.label}</button>)}
+                        </div>
+                      </div>
+                      <button aria-pressed={starredOnly} className={`inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition ${starredOnly ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50" : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"}`} type="button" onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}>
+                        {starredOnly ? "Starred only" : "Show starred only"}
                       </button>
-                    ))}
-                  </div>
-                  <button
-                    className={`mt-3 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
-                      starredOnly
-                        ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
-                        : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
-                    }`}
-                    type="button"
-                    onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}
-                  >
-                    {starredOnly ? "Showing starred only" : "Show starred only"}
-                  </button>
-                </div>
+                    </div>
+                    {selectedPromptHistory ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500"><InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText></p> : null}
+                  </section>
 
-                <div>
-                  <p className="text-sm font-medium text-slate-700">
-                    Screening
-                  </p>
+                  <section className="p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Moderation &amp; screening</h3>
+                    <div className="mt-3 divide-y divide-slate-200">
                   <button
                     aria-checked={sessionDetails.groupQuestionsScreeningEnabled}
-                    className="mt-2 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
                     role="switch"
                     type="button"
                     onClick={() => {
@@ -1543,7 +1508,7 @@ export function TeacherDashboard({
                   </button>
                   <button
                     aria-checked={sessionDetails.submissionsScreeningEnabled}
-                    className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
                     role="switch"
                     type="button"
                     onClick={() => {
@@ -1568,7 +1533,7 @@ export function TeacherDashboard({
                   </button>
                   <button
                     aria-checked={includeHidden}
-                    className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
                     role="switch"
                     type="button"
                     onClick={toggleHiddenSubmissions}
@@ -1587,21 +1552,23 @@ export function TeacherDashboard({
                       />
                     </span>
                   </button>
-                </div>
+                    </div>
+                  </section>
 
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Response inputs</p>
+                  <section className="p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Participant inputs</h3>
+                  <div className="mt-3 divide-y divide-slate-200">
                   {([
-                    ["textInputEnabled", "Allow text responses"],
-                    ["gifInputEnabled", "Allow GIF responses"],
-                    ["drawingInputEnabled", "Allow drawings"],
-                    ["imageInputEnabled", "Allow image uploads"],
+                    ["textInputEnabled", "Text responses"],
+                    ["gifInputEnabled", "GIF responses"],
+                    ["drawingInputEnabled", "Drawings"],
+                    ["imageInputEnabled", "Image uploads"],
                   ] as const).map(([input, label]) => {
                     const isEnabled = sessionDetails[input];
                     return (
                       <button
                         aria-checked={isEnabled}
-                        className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                        className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
                         key={input}
                         role="switch"
                         type="button"
@@ -1614,46 +1581,19 @@ export function TeacherDashboard({
                       </button>
                     );
                   })}
+                  </div>
                   {inputSettingsStatus ? <p className="mt-2 text-xs text-slate-600" role="status">{inputSettingsStatus}</p> : null}
+                  </section>
                 </div>
-
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Data</p>
-                  <div className="mt-2">
-                    <a
-                      className="flex h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                      download
-                      href={`/api/sessions/${session.id}/export`}
-                    >
-                      Export CSV
-                    </a>
-                    <div aria-hidden="true" className="h-1.5" />
-                    <button
-                      className="mt-3 h-10 w-full rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isArchiving || isUnarchiving}
-                      type="button"
-                      onClick={() => {
-                        void archiveRoom();
-                      }}
-                    >
+                <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Data actions</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a className="flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800" download href={`/api/sessions/${session.id}/export`}>Export CSV</a>
+                    <button className="h-10 rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isArchiving || isUnarchiving} type="button" onClick={() => { void archiveRoom(); }}>
                       {isArchiving ? "Archiving..." : "Clear / archive room"}
                     </button>
                   </div>
-                </div>
-
-                <div className="h-full rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Current view
-                  </p>
-                  <p className="mt-2 text-sm text-slate-700">
-                    {displayedSubmissions.length} shown
-                  </p>
-                  {selectedPromptHistory ? (
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
-                      <InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText>
-                    </p>
-                  ) : null}
-                </div>
+                </footer>
               </div>
             ) : null}
             {showLiveControls && archiveStatus ? (
