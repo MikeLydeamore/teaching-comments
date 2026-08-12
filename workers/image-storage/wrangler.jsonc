@@ -33,6 +33,6 @@
 		}
 	],
 	"vars": {
-		"ALLOWED_ORIGINS": "http://localhost:3000,https://teaching-comments-xi.vercel.app"
+		"ALLOWED_ORIGINS": "http://localhost:3000,https://teaching-comments-xi.vercel.app,https://www.ed-ie.com,https://ed-ie.com"
 	}
 }
