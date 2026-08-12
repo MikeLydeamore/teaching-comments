@@ -10,6 +10,7 @@ const COLORS = [
   { label: "Red", value: "#dc2626" },
   { label: "Teal", value: "#0f766e" },
 ];
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 type DrawingPadProps = {
   disabled?: boolean;
@@ -24,6 +25,7 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointerIdRef = useRef<number | null>(null);
   const [color, setColor] = useState(COLORS[0].value);
+  const [hexColor, setHexColor] = useState(COLORS[0].value);
   const [size, setSize] = useState(4);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
 
@@ -62,6 +64,11 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
       x: ((event.clientX - rect.left) / rect.width) * DRAWING_WIDTH,
       y: ((event.clientY - rect.top) / rect.height) * DRAWING_HEIGHT,
     };
+  }
+
+  function selectColor(value: string) {
+    setColor(value);
+    setHexColor(value);
   }
 
   function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
@@ -164,20 +171,43 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
               key={option.value}
               style={{ backgroundColor: option.value }}
               type="button"
-              onClick={() => setColor(option.value)}
+              onClick={() => selectColor(option.value)}
             />
           ))}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <span>More colours</span>
+          <span>Colour</span>
           <input
             aria-label="Choose a custom RGB drawing colour"
             className="size-8 cursor-pointer rounded border border-slate-300 bg-white p-0.5 disabled:cursor-not-allowed"
             disabled={disabled}
             type="color"
             value={color}
-            onChange={(event) => setColor(event.target.value)}
+            onChange={(event) => selectColor(event.target.value)}
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <span>Hex</span>
+          <input
+            aria-label="Custom drawing colour as a hexadecimal value"
+            className="h-8 w-20 rounded border border-slate-300 px-2 font-mono text-sm uppercase disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={disabled}
+            inputMode="text"
+            maxLength={7}
+            spellCheck={false}
+            type="text"
+            value={hexColor}
+            onBlur={() => setHexColor(color)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setHexColor(value);
+
+              if (HEX_COLOR.test(value)) {
+                setColor(value.toLowerCase());
+              }
+            }}
           />
         </label>
 
