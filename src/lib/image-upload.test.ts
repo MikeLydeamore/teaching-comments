@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assertSubmissionHasContent, normalizeSubmissionImageData } from "./qwt-store-model";
+import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeSubmissionImageData, type Session } from "./qwt-store-model";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, isUuid, postInsertRecovery, sessionHash, signImageTicket, verifyImageTicket } from "./image-upload";
 import { toSubmissionDto } from "./qwt-store";
 import { collectSupabaseReferences, collectWorkerObjects, parseContentRange, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
@@ -87,6 +87,20 @@ it("fails closed for malformed persisted image metadata", () => {
 it("rejects browser-supplied internal image metadata", () => {
   expect(hasForbiddenImageFields({ imageData: {} })).toBe(true);
   expect(hasForbiddenImageFields({ finalizeTicket: "signed", uploadEtag: "raw" })).toBe(false);
+});
+
+it("applies and enforces per-input session controls", () => {
+  const session: Session = {
+    id: sessionId, code: sessionId, spaceCode: "default", title: "Test", prompt: "A valid prompt.", isOpen: true,
+    groupQuestionsScreeningEnabled: false, submissionsScreeningEnabled: false,
+    textInputEnabled: true, gifInputEnabled: true, drawingInputEnabled: true, imageInputEnabled: true,
+    createdAt: "2026-01-01T00:00:00.000Z", promptUpdatedAt: "2026-01-01T00:00:00.000Z", timerDurationSeconds: 0, timerEndsAt: null,
+  };
+  const disabledText = applySessionPatch(session, { textInputEnabled: false });
+  expect(disabledText.textInputEnabled).toBe(false);
+  expect(disabledText.gifInputEnabled).toBe(true);
+  expect(() => assertSubmissionUsesEnabledInputs(disabledText, "Response", null, null)).toThrow("Text responses are disabled");
+  expect(() => assertSubmissionUsesEnabledInputs({ ...disabledText, textInputEnabled: true, drawingInputEnabled: false }, "", { version: 1, width: 100, height: 100, strokes: [] }, null)).toThrow("Drawing responses are disabled");
 });
 
 it("keeps ambiguous post-insert outcomes and only cleans deterministic mismatches", () => {

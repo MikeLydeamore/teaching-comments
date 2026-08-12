@@ -72,6 +72,10 @@ export type Session = {
   isOpen: boolean;
   groupQuestionsScreeningEnabled: boolean;
   submissionsScreeningEnabled: boolean;
+  textInputEnabled: boolean;
+  gifInputEnabled: boolean;
+  drawingInputEnabled: boolean;
+  imageInputEnabled: boolean;
   createdAt: string;
   promptUpdatedAt: string;
   timerDurationSeconds: number;
@@ -202,6 +206,10 @@ export type SessionPatch = Partial<
     | "isOpen"
     | "groupQuestionsScreeningEnabled"
     | "submissionsScreeningEnabled"
+    | "textInputEnabled"
+    | "gifInputEnabled"
+    | "drawingInputEnabled"
+    | "imageInputEnabled"
     | "timerDurationSeconds"
     | "timerEndsAt"
   >
@@ -747,6 +755,30 @@ export function assertSubmissionHasContent(
   }
 }
 
+export function assertSubmissionUsesEnabledInputs(
+  session: Pick<Session, "textInputEnabled" | "gifInputEnabled" | "drawingInputEnabled" | "imageInputEnabled">,
+  text: string,
+  drawingData: DrawingData | null,
+  gifData: GifData | null,
+  imageData: SubmissionImageData | null = null,
+) {
+  if (!session.textInputEnabled && text.trim()) {
+    throw new Error("Text responses are disabled for this session.");
+  }
+
+  if (!session.gifInputEnabled && gifData) {
+    throw new Error("GIF responses are disabled for this session.");
+  }
+
+  if (!session.drawingInputEnabled && drawingData) {
+    throw new Error("Drawing responses are disabled for this session.");
+  }
+
+  if (!session.imageInputEnabled && imageData) {
+    throw new Error("Image responses are disabled for this session.");
+  }
+}
+
 export function applySessionPatch(current: Session, patch: SessionPatch) {
   const nextPrompt =
     typeof patch.prompt === "string" ? patch.prompt.trim() : current.prompt;
@@ -809,6 +841,22 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
       typeof patch.submissionsScreeningEnabled === "boolean"
         ? patch.submissionsScreeningEnabled
         : current.submissionsScreeningEnabled,
+    textInputEnabled:
+      typeof patch.textInputEnabled === "boolean"
+        ? patch.textInputEnabled
+        : current.textInputEnabled,
+    gifInputEnabled:
+      typeof patch.gifInputEnabled === "boolean"
+        ? patch.gifInputEnabled
+        : current.gifInputEnabled,
+    drawingInputEnabled:
+      typeof patch.drawingInputEnabled === "boolean"
+        ? patch.drawingInputEnabled
+        : current.drawingInputEnabled,
+    imageInputEnabled:
+      typeof patch.imageInputEnabled === "boolean"
+        ? patch.imageInputEnabled
+        : current.imageInputEnabled,
     timerDurationSeconds: nextTimerDurationSeconds,
     timerEndsAt: nextTimerEndsAt,
   };

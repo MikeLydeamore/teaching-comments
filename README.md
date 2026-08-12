@@ -135,6 +135,9 @@ If you already ran the schema before the classroom timer was added, run
 If you already ran the schema before GIF support was added, run
 `supabase/add-gif-data.sql` in the Supabase SQL editor.
 
+If you already ran the schema before per-input submission controls were added,
+run `supabase/add-submission-input-controls.sql` in the Supabase SQL editor.
+
 If you already ran the schema before question banks were added, run
 `supabase/add-question-bank.sql` in the Supabase SQL editor.
 

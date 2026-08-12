@@ -33,6 +33,10 @@ type Session = {
   promptUpdatedAt: string;
   groupQuestionsScreeningEnabled: boolean;
   submissionsScreeningEnabled: boolean;
+  textInputEnabled: boolean;
+  gifInputEnabled: boolean;
+  drawingInputEnabled: boolean;
+  imageInputEnabled: boolean;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
 };
@@ -361,6 +365,7 @@ export function TeacherDashboard({
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
   const [sessionAccessStatus, setSessionAccessStatus] = useState("");
+  const [inputSettingsStatus, setInputSettingsStatus] = useState("");
   const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
   const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
@@ -595,6 +600,27 @@ export function TeacherDashboard({
 
     setSessionDetails(payload.session);
     setStats(payload.stats ?? stats);
+  }
+
+  async function setSubmissionInputEnabled(
+    input: "textInputEnabled" | "gifInputEnabled" | "drawingInputEnabled" | "imageInputEnabled",
+    isEnabled: boolean,
+  ) {
+    setInputSettingsStatus("Saving...");
+    const response = await fetch(`/api/sessions/${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [input]: isEnabled }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setInputSettingsStatus(payload.error ?? "Could not update response inputs.");
+      return;
+    }
+
+    setSessionDetails(payload.session);
+    setInputSettingsStatus("");
   }
 
   async function setSessionOpen(isOpen: boolean) {
@@ -1491,11 +1517,9 @@ export function TeacherDashboard({
                     Screening
                   </p>
                   <button
-                    className={`mt-2 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
-                      sessionDetails.groupQuestionsScreeningEnabled
-                        ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50"
-                        : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"
-                    }`}
+                    aria-checked={sessionDetails.groupQuestionsScreeningEnabled}
+                    className="mt-2 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    role="switch"
                     type="button"
                     onClick={() => {
                       void setGroupQuestionsScreeningMode(
@@ -1503,16 +1527,24 @@ export function TeacherDashboard({
                       );
                     }}
                   >
-                    {sessionDetails.groupQuestionsScreeningEnabled
-                      ? "Group Questions On"
-                      : "Group Questions Off"}
+                    <span className="leading-5">Screen group questions</span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+                        sessionDetails.groupQuestionsScreeningEnabled ? "bg-teal-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                          sessionDetails.groupQuestionsScreeningEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </span>
                   </button>
                   <button
-                    className={`mt-3 h-10 w-full rounded-md border px-3 text-sm font-semibold transition ${
-                      sessionDetails.submissionsScreeningEnabled
-                        ? "border-teal-300 bg-teal-100 text-teal-950 hover:bg-teal-50"
-                        : "border-slate-300 bg-white text-slate-700 hover:border-teal-400 hover:text-teal-900"
-                    }`}
+                    aria-checked={sessionDetails.submissionsScreeningEnabled}
+                    className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                    role="switch"
                     type="button"
                     onClick={() => {
                       void setSubmissionsScreeningMode(
@@ -1520,9 +1552,19 @@ export function TeacherDashboard({
                       );
                     }}
                   >
-                    {sessionDetails.submissionsScreeningEnabled
-                      ? "Submissions On"
-                      : "Submissions Off"}
+                    <span className="leading-5">Screen submissions</span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+                        sessionDetails.submissionsScreeningEnabled ? "bg-teal-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                          sessionDetails.submissionsScreeningEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </span>
                   </button>
                   <button
                     aria-checked={includeHidden}
@@ -1545,6 +1587,34 @@ export function TeacherDashboard({
                       />
                     </span>
                   </button>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Response inputs</p>
+                  {([
+                    ["textInputEnabled", "Allow text responses"],
+                    ["gifInputEnabled", "Allow GIF responses"],
+                    ["drawingInputEnabled", "Allow drawings"],
+                    ["imageInputEnabled", "Allow image uploads"],
+                  ] as const).map(([input, label]) => {
+                    const isEnabled = sessionDetails[input];
+                    return (
+                      <button
+                        aria-checked={isEnabled}
+                        className="mt-3 grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-300"
+                        key={input}
+                        role="switch"
+                        type="button"
+                        onClick={() => void setSubmissionInputEnabled(input, !isEnabled)}
+                      >
+                        <span className="leading-5">{label}</span>
+                        <span aria-hidden="true" className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${isEnabled ? "bg-teal-600" : "bg-slate-300"}`}>
+                          <span className={`block size-5 rounded-full bg-white shadow-sm transition ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {inputSettingsStatus ? <p className="mt-2 text-xs text-slate-600" role="status">{inputSettingsStatus}</p> : null}
                 </div>
 
                 <div>

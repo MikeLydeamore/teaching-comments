@@ -55,6 +55,10 @@ export default async function StudentPage({
       prompt={session.prompt}
       sessionId={session.id}
       sessionCode={session.code}
+      textInputEnabled={session.textInputEnabled}
+      gifInputEnabled={session.gifInputEnabled}
+      drawingInputEnabled={session.drawingInputEnabled}
+      imageInputEnabled={session.imageInputEnabled}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
       imageUploadsEnabled={imageUploadsEnabled()}

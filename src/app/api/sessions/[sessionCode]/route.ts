@@ -38,6 +38,10 @@ export async function PATCH(
     isOpen?: boolean;
     prompt?: string;
     submissionsScreeningEnabled?: boolean;
+    textInputEnabled?: boolean;
+    gifInputEnabled?: boolean;
+    drawingInputEnabled?: boolean;
+    imageInputEnabled?: boolean;
     timerDurationSeconds?: number;
     title?: string;
   };
@@ -47,6 +51,10 @@ export async function PATCH(
       isOpen: body.isOpen,
       groupQuestionsScreeningEnabled: body.groupQuestionsScreeningEnabled,
       submissionsScreeningEnabled: body.submissionsScreeningEnabled,
+      textInputEnabled: body.textInputEnabled,
+      gifInputEnabled: body.gifInputEnabled,
+      drawingInputEnabled: body.drawingInputEnabled,
+      imageInputEnabled: body.imageInputEnabled,
       prompt: body.prompt,
       title: body.title,
     };

@@ -12,6 +12,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/sessions/[s
   if (!IMAGE_CONTENT_TYPES.includes(body.contentType as ImageContentType) || !Number.isSafeInteger(body.byteSize) || (body.byteSize as number) < 1 || (body.byteSize as number) > MAX_IMAGE_BYTES) return Response.json({ error: "Choose a PNG, JPEG, or WebP image up to 10 MiB." }, { status: 400 });
   const session = await getSession(sessionCode);
   if (!session || !session.isOpen) return Response.json({ error: "This Ed.ie session is closed or unavailable." }, { status: 400 });
+  if (!session.imageInputEnabled) return Response.json({ error: "Image responses are disabled for this session." }, { status: 400 });
   const cookieStore = await cookies();
   if (cookieStore.get(studentConsentCookieName(session.id))?.value !== "accepted") return Response.json({ error: "Please join the session and acknowledge the privacy notice first." }, { status: 403 });
   let clientId = cookieStore.get(uploadClientCookieName(session.id))?.value;

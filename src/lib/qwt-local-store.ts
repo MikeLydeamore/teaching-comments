@@ -5,6 +5,7 @@ import {
   DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
   applySessionPatch,
+  assertSubmissionUsesEnabledInputs,
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
@@ -94,6 +95,10 @@ function defaultStore(): StoreData {
         isOpen: true,
         groupQuestionsScreeningEnabled: false,
         submissionsScreeningEnabled: false,
+        textInputEnabled: true,
+        gifInputEnabled: true,
+        drawingInputEnabled: true,
+        imageInputEnabled: true,
         createdAt,
         promptUpdatedAt: createdAt,
         timerDurationSeconds: 0,
@@ -192,6 +197,10 @@ async function readStore(): Promise<StoreData> {
     groupQuestionsScreeningEnabled:
       session.groupQuestionsScreeningEnabled ?? false,
     submissionsScreeningEnabled: session.submissionsScreeningEnabled ?? false,
+    textInputEnabled: session.textInputEnabled ?? true,
+    gifInputEnabled: session.gifInputEnabled ?? true,
+    drawingInputEnabled: session.drawingInputEnabled ?? true,
+    imageInputEnabled: session.imageInputEnabled ?? true,
     promptUpdatedAt: session.promptUpdatedAt ?? session.createdAt,
     timerDurationSeconds: session.timerDurationSeconds ?? 0,
     timerEndsAt: session.timerEndsAt ?? null,
@@ -399,6 +408,10 @@ export const localStore: QwtStore = {
       isOpen: true,
       groupQuestionsScreeningEnabled: false,
       submissionsScreeningEnabled: false,
+      textInputEnabled: true,
+      gifInputEnabled: true,
+      drawingInputEnabled: true,
+      imageInputEnabled: true,
       createdAt: timestamp,
       promptUpdatedAt: timestamp,
       timerDurationSeconds: 0,
@@ -518,6 +531,14 @@ export const localStore: QwtStore = {
     if (!session.isOpen) {
       throw new Error("This Ed.ie session is closed.");
     }
+
+    assertSubmissionUsesEnabledInputs(
+      session,
+      submissionContent.text,
+      submissionContent.drawingData,
+      submissionContent.gifData,
+      normalizeSubmissionImageData(input.imageData),
+    );
 
     const data = await readStore();
     const timestamp = now();

@@ -3,6 +3,7 @@ import {
   DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
   applySessionPatch,
+  assertSubmissionUsesEnabledInputs,
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
@@ -61,6 +62,10 @@ type SupabaseSessionRow = {
   is_open: boolean;
   group_questions_screening_enabled: boolean;
   submissions_screening_enabled: boolean;
+  text_input_enabled: boolean;
+  gif_input_enabled: boolean;
+  drawing_input_enabled: boolean;
+  image_input_enabled: boolean;
   created_at: string;
   prompt_updated_at: string;
   timer_duration_seconds: number;
@@ -215,7 +220,7 @@ function encodeFilterValue(value: string) {
 }
 
 function sessionSelect() {
-  return "id,code,space_code,title,prompt,is_open,group_questions_screening_enabled,submissions_screening_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
+  return "id,code,space_code,title,prompt,is_open,group_questions_screening_enabled,submissions_screening_enabled,text_input_enabled,gif_input_enabled,drawing_input_enabled,image_input_enabled,created_at,prompt_updated_at,timer_duration_seconds,timer_ends_at";
 }
 
 function teacherSpaceSelect() {
@@ -268,6 +273,10 @@ function sessionFromRow(row: SupabaseSessionRow): Session {
     isOpen: row.is_open,
     groupQuestionsScreeningEnabled: row.group_questions_screening_enabled ?? false,
     submissionsScreeningEnabled: row.submissions_screening_enabled ?? false,
+    textInputEnabled: row.text_input_enabled ?? true,
+    gifInputEnabled: row.gif_input_enabled ?? true,
+    drawingInputEnabled: row.drawing_input_enabled ?? true,
+    imageInputEnabled: row.image_input_enabled ?? true,
     createdAt: row.created_at,
     promptUpdatedAt: row.prompt_updated_at ?? row.created_at,
     timerDurationSeconds: row.timer_duration_seconds ?? 0,
@@ -629,6 +638,10 @@ export const supabaseStore: QwtStore = {
           is_open: true,
           group_questions_screening_enabled: false,
           submissions_screening_enabled: false,
+          text_input_enabled: true,
+          gif_input_enabled: true,
+          drawing_input_enabled: true,
+          image_input_enabled: true,
           created_at: timestamp,
           prompt_updated_at: timestamp,
           timer_duration_seconds: 0,
@@ -655,6 +668,10 @@ export const supabaseStore: QwtStore = {
                 session.groupQuestionsScreeningEnabled,
               submissions_screening_enabled:
                 session.submissionsScreeningEnabled,
+              text_input_enabled: session.textInputEnabled,
+              gif_input_enabled: session.gifInputEnabled,
+              drawing_input_enabled: session.drawingInputEnabled,
+              image_input_enabled: session.imageInputEnabled,
               created_at: session.createdAt,
               prompt_updated_at: session.promptUpdatedAt,
               timer_duration_seconds: session.timerDurationSeconds,
@@ -715,6 +732,10 @@ export const supabaseStore: QwtStore = {
           group_questions_screening_enabled:
             next.groupQuestionsScreeningEnabled,
           submissions_screening_enabled: next.submissionsScreeningEnabled,
+          text_input_enabled: next.textInputEnabled,
+          gif_input_enabled: next.gifInputEnabled,
+          drawing_input_enabled: next.drawingInputEnabled,
+          image_input_enabled: next.imageInputEnabled,
         }),
         prefer: "return=representation",
       },
@@ -840,6 +861,14 @@ export const supabaseStore: QwtStore = {
     if (!session.isOpen) {
       throw new Error("This Ed.ie session is closed.");
     }
+
+    assertSubmissionUsesEnabledInputs(
+      session,
+      submissionContent.text,
+      submissionContent.drawingData,
+      submissionContent.gifData,
+      normalizeSubmissionImageData(input.imageData),
+    );
 
     const timestamp = now();
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(

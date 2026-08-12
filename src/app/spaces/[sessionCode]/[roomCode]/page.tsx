@@ -59,6 +59,10 @@ export default async function StudentSpacePage({
       sessionCode={session.code}
       spaceCode={spaceCode}
       spaceName={space?.name ?? spaceCode}
+      textInputEnabled={session.textInputEnabled}
+      gifInputEnabled={session.gifInputEnabled}
+      drawingInputEnabled={session.drawingInputEnabled}
+      imageInputEnabled={session.imageInputEnabled}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
       imageUploadsEnabled={imageUploadsEnabled()}

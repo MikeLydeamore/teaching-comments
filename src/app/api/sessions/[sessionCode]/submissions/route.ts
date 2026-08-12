@@ -4,7 +4,7 @@ import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, postInsertRecovery, sessionHash, uploadClientCookieName, verifyImageTicket, type ImageContentType } from "@/lib/image-upload";
 import type { SubmissionImageData } from "@/lib/qwt-store";
-import { validateSubmissionContent, normalizeStudentName } from "@/lib/qwt-store-model";
+import { assertSubmissionUsesEnabledInputs, validateSubmissionContent, normalizeStudentName } from "@/lib/qwt-store-model";
 
 class ImageReceiptError extends Error {
   constructor(message: string, readonly invalidReceipt: boolean) { super(message); }
@@ -99,11 +99,19 @@ export async function POST(
     let suppliedId: string | undefined;
     if (hasFinalize) {
       if (!imageUploadsEnabled()) return Response.json({ error: "Image uploads are unavailable." }, { status: 400 });
+      if (!canonicalSession.imageInputEnabled) return Response.json({ error: "Image responses are disabled for this session." }, { status: 400 });
       const clientId = cookieStore.get(uploadClientCookieName(canonicalSession.id))?.value;
       const ticket = await verifyImageTicket(body.finalizeTicket, { op: "finalize", sessionHash: await sessionHash(canonicalSession.id), clientId });
       suppliedId = ticket.submissionId;
       // Validate all deterministic form inputs before committing an uploaded object.
-      validateSubmissionContent(body.text ?? "", body.drawingData, body.gifData, {
+      const submissionContent = validateSubmissionContent(body.text ?? "", body.drawingData, body.gifData, {
+        version: 1,
+        objectKey: committedObjectKey(ticket.sessionHash, ticket.submissionId, ticket.contentType),
+        contentType: ticket.contentType,
+        byteSize: ticket.byteSize,
+        etag: "preflight",
+      });
+      assertSubmissionUsesEnabledInputs(canonicalSession, submissionContent.text, submissionContent.drawingData, submissionContent.gifData, {
         version: 1,
         objectKey: committedObjectKey(ticket.sessionHash, ticket.submissionId, ticket.contentType),
         contentType: ticket.contentType,
@@ -116,6 +124,10 @@ export async function POST(
       const data = await finalized.json() as { objectKey?: unknown; contentType?: unknown; byteSize?: unknown; etag?: unknown };
       if (typeof data.objectKey !== "string" || data.objectKey !== committedObjectKey(ticket.sessionHash, ticket.submissionId, ticket.contentType) || data.contentType !== ticket.contentType || !Number.isSafeInteger(data.byteSize) || data.byteSize !== ticket.byteSize || data.byteSize < 1 || data.byteSize > 10 * 1024 * 1024 || typeof data.etag !== "string" || !data.etag || data.etag.length > 256) throw new Error("The image service returned invalid metadata.");
       imageData = { version: 1 as const, objectKey: data.objectKey, contentType: data.contentType as ImageContentType, byteSize: data.byteSize, etag: data.etag };
+    }
+    if (!hasFinalize) {
+      const submissionContent = validateSubmissionContent(body.text ?? "", body.drawingData, body.gifData);
+      assertSubmissionUsesEnabledInputs(canonicalSession, submissionContent.text, submissionContent.drawingData, submissionContent.gifData);
     }
     try {
       const submission = await addSubmission(canonicalSession.id, { id: suppliedId, text: body.text ?? "", drawingData: body.drawingData, gifData: body.gifData, imageData, studentName: body.studentName });

@@ -28,6 +28,10 @@ type StudentSubmitProps = {
   timerDurationSeconds: number;
   timerEndsAt: string | null;
   imageUploadsEnabled: boolean;
+  textInputEnabled: boolean;
+  gifInputEnabled: boolean;
+  drawingInputEnabled: boolean;
+  imageInputEnabled: boolean;
 };
 
 type SavedSubmission = {
@@ -71,6 +75,10 @@ export function StudentSubmit({
   timerDurationSeconds,
   timerEndsAt,
   imageUploadsEnabled,
+  textInputEnabled: initialTextInputEnabled,
+  gifInputEnabled: initialGifInputEnabled,
+  drawingInputEnabled: initialDrawingInputEnabled,
+  imageInputEnabled: initialImageInputEnabled,
 }: StudentSubmitProps) {
   const [currentPrompt, setCurrentPrompt] = useState(prompt);
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
@@ -87,6 +95,10 @@ export function StudentSubmit({
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
   const [gifData, setGifData] = useState<GifData | null>(null);
   const [image, setImage] = useState<PreparedImage | null>(null);
+  const [textInputEnabled, setTextInputEnabled] = useState(initialTextInputEnabled);
+  const [gifInputEnabled, setGifInputEnabled] = useState(initialGifInputEnabled);
+  const [drawingInputEnabled, setDrawingInputEnabled] = useState(initialDrawingInputEnabled);
+  const [imageInputEnabled, setImageInputEnabled] = useState(initialImageInputEnabled);
   const [imageStatus, setImageStatus] = useState("");
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [uploadReceipt, setUploadReceipt] = useState<UploadReceipt | null>(null);
@@ -97,8 +109,12 @@ export function StudentSubmit({
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
 
   const remaining = useMemo(() => 2000 - text.length, [text]);
+  const activeText = textInputEnabled ? text : "";
+  const activeGifData = gifInputEnabled ? gifData : null;
+  const activeDrawingData = drawingInputEnabled ? drawingData : null;
+  const activeImage = imageInputEnabled ? image : null;
   const hasSubmissionContent =
-    text.trim().length >= 1 || drawingData !== null || gifData !== null || image !== null;
+    activeText.trim().length >= 1 || activeDrawingData !== null || activeGifData !== null || activeImage !== null;
 
   const refreshSession = useCallback(async () => {
     const query = pollParticipantId
@@ -115,6 +131,10 @@ export function StudentSubmit({
     const nextIsOpen = payload.session?.isOpen;
     const nextTimerEndsAt = payload.session?.timerEndsAt;
     const nextTimerDurationSeconds = payload.session?.timerDurationSeconds;
+    const nextTextInputEnabled = payload.session?.textInputEnabled;
+    const nextGifInputEnabled = payload.session?.gifInputEnabled;
+    const nextDrawingInputEnabled = payload.session?.drawingInputEnabled;
+    const nextImageInputEnabled = payload.session?.imageInputEnabled;
     setActivePoll(payload.activePoll ?? null);
 
     if (typeof nextPrompt === "string") {
@@ -136,6 +156,10 @@ export function StudentSubmit({
     if (typeof nextTimerDurationSeconds === "number") {
       setCurrentTimerDurationSeconds(nextTimerDurationSeconds);
     }
+    if (typeof nextTextInputEnabled === "boolean") setTextInputEnabled(nextTextInputEnabled);
+    if (typeof nextGifInputEnabled === "boolean") setGifInputEnabled(nextGifInputEnabled);
+    if (typeof nextDrawingInputEnabled === "boolean") setDrawingInputEnabled(nextDrawingInputEnabled);
+    if (typeof nextImageInputEnabled === "boolean") setImageInputEnabled(nextImageInputEnabled);
   }, [pollParticipantId, sessionId]);
 
   useEffect(() => {
@@ -155,7 +179,7 @@ export function StudentSubmit({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isSaving || isImageProcessing || !sessionIsOpen || !hasSubmissionContent) {
+    if (isSaving || (activeImage && isImageProcessing) || !sessionIsOpen || !hasSubmissionContent) {
       return;
     }
 
@@ -165,24 +189,24 @@ export function StudentSubmit({
     let finalizeTicket: string | undefined;
     let uploadEtag: string | undefined;
     try {
-    if (image && uploadReceipt?.image === image) {
+    if (activeImage && uploadReceipt?.image === activeImage) {
       finalizeTicket = uploadReceipt.finalizeTicket;
       uploadEtag = uploadReceipt.uploadEtag;
       setImageStatus("Saving your response…");
-    } else if (image) {
+    } else if (activeImage) {
       setImageStatus("Preparing secure upload…");
-      const allocation = await fetch(`/api/sessions/${sessionId}/image-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: image.contentType, byteSize: image.blob.size }) });
+      const allocation = await fetch(`/api/sessions/${sessionId}/image-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: activeImage.contentType, byteSize: activeImage.blob.size }) });
       const allocated = await allocation.json().catch(() => ({}));
       if (!allocation.ok) { setIsSaving(false); setImageStatus(""); setError(allocated.error ?? "Could not prepare the image upload."); return; }
       setImageStatus("Uploading image… 0%");
       try {
-        uploadEtag = await uploadImage(allocated.uploadUrl, image, (percent) => setImageStatus(`Uploading image… ${percent}%`));
+        uploadEtag = await uploadImage(allocated.uploadUrl, activeImage, (percent) => setImageStatus(`Uploading image… ${percent}%`));
       } catch (uploadError) {
         setIsSaving(false); setImageStatus(""); setError(`${uploadError instanceof Error ? uploadError.message : "Could not upload the image."} Your response is still here to retry.`); return;
       }
       if (typeof allocated.finalizeTicket !== "string" || typeof allocated.submissionId !== "string" || !uploadEtag) { setIsSaving(false); setImageStatus(""); setError("The image service returned an incomplete upload receipt."); return; }
       finalizeTicket = allocated.finalizeTicket;
-      setUploadReceipt({ image, finalizeTicket: allocated.finalizeTicket, uploadEtag, submissionId: allocated.submissionId });
+      setUploadReceipt({ image: activeImage, finalizeTicket: allocated.finalizeTicket, uploadEtag, submissionId: allocated.submissionId });
       setImageStatus("Saving your response…");
     }
 
@@ -190,10 +214,10 @@ export function StudentSubmit({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        drawingData,
-        gifData,
+        drawingData: activeDrawingData,
+        gifData: activeGifData,
         studentName,
-        text,
+        text: activeText,
         website,
         finalizeTicket,
         uploadEtag,
@@ -325,9 +349,9 @@ export function StudentSubmit({
             className="rounded-md border border-slate-200 bg-white p-5 shadow-sm"
             onSubmit={handleSubmit}
           >
-            <label className="block text-sm font-semibold text-slate-700" htmlFor="quick-write">
+            {textInputEnabled ? <label className="block text-sm font-semibold text-slate-700" htmlFor="quick-write">
               Your writing
-            </label>
+            </label> : null}
             <input
               aria-hidden="true"
               autoComplete="off"
@@ -337,7 +361,7 @@ export function StudentSubmit({
               value={website}
               onChange={(event) => setWebsite(event.target.value)}
             />
-            <textarea
+            {textInputEnabled ? <textarea
               id="quick-write"
               className="mt-3 min-h-40 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
               maxLength={2000}
@@ -345,29 +369,30 @@ export function StudentSubmit({
               value={text}
               onChange={(event) => setText(event.target.value)}
               onKeyDown={handleTextKeyDown}
-            />
-              <GiphyPicker
+            /> : null}
+              {gifInputEnabled ? <GiphyPicker
               disabled={!sessionIsOpen || isSaving}
               gifData={gifData}
               onChange={setGifData}
-              />
-              {imageUploadsEnabled ? <ImageUploadPanel disabled={!sessionIsOpen || isSaving} image={image} onChange={(nextImage) => { setUploadReceipt(null); setImage(nextImage); }} onProcessingChange={setIsImageProcessing} /> : null}
+              /> : null}
+              {imageUploadsEnabled && imageInputEnabled ? <ImageUploadPanel disabled={!sessionIsOpen || isSaving} image={image} onChange={(nextImage) => { setUploadReceipt(null); setImage(nextImage); }} onProcessingChange={setIsImageProcessing} /> : null}
               {imageStatus ? <p className="mt-2 text-sm text-slate-600">{imageStatus}</p> : null}
-            <DrawingPad
+            {drawingInputEnabled ? <DrawingPad
               disabled={!sessionIsOpen || isSaving}
               key={drawingResetSignal}
               onChange={setDrawingData}
-            />
+            /> : null}
+            {!textInputEnabled && !gifInputEnabled && !drawingInputEnabled && !(imageUploadsEnabled && imageInputEnabled) ? <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Response inputs are currently disabled by your teacher.</p> : null}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <p className={`text-sm ${remaining < 100 ? "text-amber-700" : "text-slate-500"}`}>
                 {remaining} characters remaining
               </p>
               <button
                 className="inline-flex h-11 items-center justify-center rounded-md bg-amber-300 px-5 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSaving || isImageProcessing || !sessionIsOpen || !hasSubmissionContent}
+                disabled={isSaving || Boolean(activeImage && isImageProcessing) || !sessionIsOpen || !hasSubmissionContent}
                 type="submit"
               >
-                {isImageProcessing ? "Preparing image..." : isSaving ? "Submitting..." : "Submit (Enter)"}
+                {activeImage && isImageProcessing ? "Preparing image..." : isSaving ? "Submitting..." : "Submit (Enter)"}
               </button>
             </div>
             {error ? (
