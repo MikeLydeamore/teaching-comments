@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeSubmissionImageData, type Session } from "./qwt-store-model";
+import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeDrawingData, normalizeSubmissionImageData, type Session } from "./qwt-store-model";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, isUuid, postInsertRecovery, sessionHash, signImageTicket, verifyImageTicket } from "./image-upload";
 import { toSubmissionDto } from "./qwt-store";
 import { collectSupabaseReferences, collectWorkerObjects, parseContentRange, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
@@ -82,6 +82,18 @@ it("fails closed for malformed persisted image metadata", () => {
   expect(normalizeSubmissionImageData(valid)).toEqual(valid);
   expect(() => normalizeSubmissionImageData({ ...valid, extra: true })).toThrow("Invalid");
   expect(() => normalizeSubmissionImageData({ ...valid, byteSize: 10485761 })).toThrow("Invalid");
+});
+
+it("preserves valid custom RGB drawing colours", () => {
+  const drawing = {
+    version: 1,
+    width: 100,
+    height: 100,
+    strokes: [{ color: "#A1B2C3", size: 4, points: [{ x: 10, y: 10 }] }],
+  };
+
+  expect(normalizeDrawingData(drawing)?.strokes[0].color).toBe("#a1b2c3");
+  expect(normalizeDrawingData({ ...drawing, strokes: [{ ...drawing.strokes[0], color: "rgb(1, 2, 3)" }] })?.strokes[0].color).toBe("#0f172a");
 });
 
 it("rejects browser-supplied internal image metadata", () => {

@@ -409,7 +409,7 @@ export function normalizeStudentName(name: string) {
   return normalized;
 }
 
-const DRAWING_COLORS = new Set(["#0f172a", "#2563eb", "#dc2626", "#0f766e"]);
+const RGB_HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const MAX_DRAWING_STROKES = 120;
 const MAX_DRAWING_POINTS = 12000;
 const MAX_DRAWING_PAYLOAD_CHARS = 180000;
@@ -455,7 +455,8 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
       continue;
     }
 
-    const color = typeof rawStroke.color === "string" ? rawStroke.color : "#0f172a";
+    const rawColor = typeof rawStroke.color === "string" ? rawStroke.color : "#0f172a";
+    const color = RGB_HEX_COLOR.test(rawColor) ? rawColor.toLowerCase() : "#0f172a";
     const size = boundedNumber(rawStroke.size, 1, 18) ?? 3;
     const points: DrawingPoint[] = [];
 
@@ -484,7 +485,7 @@ export function normalizeDrawingData(value: unknown): DrawingData | null {
 
     if (points.length > 0) {
       strokes.push({
-        color: DRAWING_COLORS.has(color) ? color : "#0f172a",
+        color,
         size,
         points,
       });

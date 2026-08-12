@@ -170,6 +170,18 @@ export function DrawingPad({ disabled = false, onChange }: DrawingPadProps) {
         </div>
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
+          <span>More colours</span>
+          <input
+            aria-label="Choose a custom RGB drawing colour"
+            className="size-8 cursor-pointer rounded border border-slate-300 bg-white p-0.5 disabled:cursor-not-allowed"
+            disabled={disabled}
+            type="color"
+            value={color}
+            onChange={(event) => setColor(event.target.value)}
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
           <span>Pen</span>
           <input
             className="w-24 accent-teal-700"
