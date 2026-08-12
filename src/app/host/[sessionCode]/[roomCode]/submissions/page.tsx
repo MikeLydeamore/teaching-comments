@@ -116,7 +116,8 @@ export default async function TeacherSpaceSubmissionsPage({
       initialSubmissions={displayedSubmissions.map(toSubmissionDto)}
       minutes={minutes}
       promptHistoryId={selectedPromptHistory?.id}
-      promptText={selectedPromptHistory?.prompt}
+      promptOptions={promptHistory.map(({ id, prompt }) => ({ id, prompt }))}
+      promptText={selectedPromptHistory?.prompt ?? session.prompt}
       sessionCode={session.id}
       sessionTitle={session.title}
       sortOrder={sortOrder}

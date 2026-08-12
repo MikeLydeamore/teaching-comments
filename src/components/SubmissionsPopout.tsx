@@ -20,6 +20,7 @@ type SubmissionsPopoutProps = {
   initialSubmissions: SubmissionDto[];
   minutes: number;
   promptHistoryId?: string;
+  promptOptions: Array<{ id: string; prompt: string }>;
   promptText?: string;
   sessionCode: string;
   sessionTitle: string;
@@ -68,6 +69,7 @@ export function SubmissionsPopout({
   initialSubmissions,
   minutes,
   promptHistoryId,
+  promptOptions,
   promptText,
   sessionCode,
   sessionTitle,
@@ -129,6 +131,18 @@ export function SubmissionsPopout({
     };
   }, [refresh]);
 
+  function selectPrompt(nextPromptHistoryId: string) {
+    const url = new URL(window.location.href);
+
+    if (nextPromptHistoryId) {
+      url.searchParams.set("promptHistoryId", nextPromptHistoryId);
+    } else {
+      url.searchParams.delete("promptHistoryId");
+    }
+
+    window.location.assign(url.toString());
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-6 text-slate-950">
       <header className="rounded-md border border-slate-200 bg-white px-6 py-5 shadow-sm">
@@ -140,12 +154,6 @@ export function SubmissionsPopout({
             <h1 className="mt-2 text-4xl font-semibold tracking-normal">
               {sessionTitle}
             </h1>
-            <p className="mt-2 text-base text-slate-600">
-              Last {minutes} minute{minutes === 1 ? "" : "s"}
-              {includeHidden ? ", including hidden responses" : ""}
-              {starredOnly ? ", starred responses only" : ""}
-              {promptText ? ", filtered by prompt" : ""}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
@@ -160,15 +168,63 @@ export function SubmissionsPopout({
           </div>
         </div>
         {promptText ? (
-          <p className="mt-4 max-w-5xl rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-base leading-7 text-slate-700">
-            <InlineCodeText>{promptText}</InlineCodeText>
-          </p>
+          <div className="relative mt-4 w-full rounded-md border border-slate-200 bg-slate-50 p-4">
+            <span className="inline-flex rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-teal-900">
+              Prompt
+            </span>
+            <details className="group absolute right-4 top-4">
+              <summary
+                aria-label="Choose prompt"
+                className="flex size-8 cursor-pointer list-none items-center justify-center rounded-md border border-slate-300 bg-white text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 [&::-webkit-details-marker]:hidden"
+              >
+                <span aria-hidden="true" className="transition group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="absolute right-0 z-10 mt-2 max-h-64 w-80 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                <button
+                  className={`w-full rounded px-3 py-2 text-left text-sm font-medium transition hover:bg-teal-50 ${
+                    !promptHistoryId ? "bg-teal-50 text-teal-900" : "text-slate-700"
+                  }`}
+                  onClick={() => selectPrompt("")}
+                  type="button"
+                >
+                  All prompts
+                </button>
+                {promptOptions.map((prompt) => (
+                  <button
+                    className={`mt-1 w-full rounded px-3 py-2 text-left text-sm leading-5 transition hover:bg-teal-50 ${
+                      promptHistoryId === prompt.id
+                        ? "bg-teal-50 font-medium text-teal-900"
+                        : "text-slate-700"
+                    }`}
+                    key={prompt.id}
+                    onClick={() => selectPrompt(prompt.id)}
+                    type="button"
+                  >
+                    {prompt.prompt}
+                  </button>
+                ))}
+              </div>
+            </details>
+            <p className="mt-3 max-h-40 overflow-y-auto break-words pr-2 text-xl font-medium leading-8 text-slate-900">
+              <InlineCodeText>{promptText}</InlineCodeText>
+            </p>
+          </div>
         ) : null}
-        <p className="mt-3 text-sm text-slate-500">
-          {lastRefresh
-            ? `Updated ${lastRefresh.toLocaleTimeString()}`
-            : "Loading latest submissions..."}
-        </p>
+        <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">
+          <span>
+            Last {minutes} minute{minutes === 1 ? "" : "s"}
+            {includeHidden ? ", including hidden responses" : ""}
+            {starredOnly ? ", starred responses only" : ""}
+          </span>
+          <span aria-hidden="true">•</span>
+          <span>
+            {lastRefresh
+              ? `Updated ${lastRefresh.toLocaleTimeString()}`
+              : "Loading latest submissions..."}
+          </span>
+        </div>
       </header>
 
       {submissions.length ? (
