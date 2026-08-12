@@ -7,6 +7,9 @@ import {
   type QwtStore,
   type PollSelectionMode,
   type SessionPatch,
+  type Submission,
+  type SubmissionDto,
+  type CreateSubmissionInput,
   type SubmissionPatch,
 } from "./qwt-store-model";
 
@@ -33,6 +36,10 @@ export type {
   SessionPatch,
   SessionStats,
   Submission,
+  SubmissionDto,
+  SubmissionImageData,
+  SubmissionImageDto,
+  CreateSubmissionInput,
   SubmissionPatch,
   SubmissionStatus,
   TeacherSpace,
@@ -120,14 +127,23 @@ export async function listSubmissions(
   return getStore().listSubmissions(code, options);
 }
 
-export async function addSubmission(
-  code: string,
-  text: string,
-  drawingData?: unknown,
-  gifData?: unknown,
-  studentName?: string,
-) {
-  return getStore().addSubmission(code, text, drawingData, gifData, studentName);
+export async function addSubmission(code: string, input: CreateSubmissionInput) {
+  return getStore().addSubmission(code, input);
+}
+
+/** Remove storage identifiers before data crosses a browser/RSC boundary. */
+export function toSubmissionDto(submission: Submission): SubmissionDto {
+  const { imageData, ...safe } = submission;
+  return {
+    ...safe,
+    image: imageData
+      ? {
+          contentType: imageData.contentType,
+          byteSize: imageData.byteSize,
+          url: `/api/submissions/${encodeURIComponent(submission.id)}/image`,
+        }
+      : null,
+  };
 }
 
 export async function getSubmission(id: string) {

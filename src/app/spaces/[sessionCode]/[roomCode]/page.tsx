@@ -6,6 +6,7 @@ import { getSessionInSpace, getTeacherSpace } from "@/lib/qwt-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "../StudentSubmit";
+import { imageUploadsEnabled } from "@/lib/image-upload";
 
 export default async function StudentSpacePage({
   params,
@@ -60,6 +61,7 @@ export default async function StudentSpacePage({
       spaceName={space?.name ?? spaceCode}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
+      imageUploadsEnabled={imageUploadsEnabled()}
     />
   );
 }

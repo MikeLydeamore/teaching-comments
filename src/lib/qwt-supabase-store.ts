@@ -21,6 +21,7 @@ import {
   validateQuestionTitle,
   validateQuestionText,
   validateSubmissionContent,
+  normalizeSubmissionImageData,
   validateTeacherSpaceName,
   validateTeacherSpacePinHash,
   type DrawingData,
@@ -73,6 +74,7 @@ type SupabaseSubmissionRow = {
   text: string;
   drawing_data: DrawingData | null;
   gif_data: GifData | null;
+  image_data: unknown;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -225,7 +227,7 @@ function teacherSpaceSummarySelect() {
 }
 
 function submissionSelect() {
-  return "id,session_code,student_name,text,drawing_data,gif_data,status,starred,flagged,version,archived_at,created_at,updated_at";
+  return "id,session_code,student_name,text,drawing_data,gif_data,image_data,status,starred,flagged,version,archived_at,created_at,updated_at";
 }
 
 function questionBankSelect() {
@@ -298,6 +300,7 @@ function submissionFromRow(row: SupabaseSubmissionRow): Submission {
     text: row.text,
     drawingData: row.drawing_data ?? null,
     gifData: row.gif_data ?? null,
+    imageData: normalizeSubmissionImageData(row.image_data),
     status: row.status,
     starred: row.starred,
     flagged: row.flagged,
@@ -821,8 +824,13 @@ export const supabaseStore: QwtStore = {
       );
   },
 
-  async addSubmission(code, text, drawingData, gifData, studentName) {
-    const submissionContent = validateSubmissionContent(text, drawingData, gifData);
+  async addSubmission(code, input) {
+    const submissionContent = validateSubmissionContent(
+      input.text,
+      input.drawingData,
+      input.gifData,
+      normalizeSubmissionImageData(input.imageData),
+    );
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -839,11 +847,13 @@ export const supabaseStore: QwtStore = {
       {
         method: "POST",
         body: JSON.stringify({
+          ...(input.id ? { id: input.id } : {}),
           session_code: session.id,
-          student_name: normalizeStudentName(studentName ?? ""),
+          student_name: normalizeStudentName(input.studentName ?? ""),
           text: submissionContent.text,
           drawing_data: submissionContent.drawingData,
           gif_data: submissionContent.gifData,
+          image_data: normalizeSubmissionImageData(input.imageData),
           status: session.submissionsScreeningEnabled ? "hidden" : "visible",
           starred: false,
           flagged: false,
@@ -881,7 +891,7 @@ export const supabaseStore: QwtStore = {
     const hasTextPatch = "text" in nextPatch;
     const nextText = hasTextPatch ? nextPatch.text ?? "" : current.text;
 
-    assertSubmissionHasContent(nextText, current.drawing_data ?? null, current.gif_data ?? null);
+    assertSubmissionHasContent(nextText, current.drawing_data ?? null, current.gif_data ?? null, normalizeSubmissionImageData(current.image_data));
 
     const rows = await supabaseFetch<SupabaseSubmissionRow[]>(
       `/qwt_submissions?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${submissionSelect()}`,

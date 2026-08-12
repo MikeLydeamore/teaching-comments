@@ -13,10 +13,12 @@ import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
+import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import type {
   DrawingData,
   GifData,
+  SubmissionImageDto,
   PromptHistoryItem,
   QuestionBankItem,
 } from "@/lib/qwt-store";
@@ -41,6 +43,7 @@ type Submission = {
   text: string;
   drawingData: DrawingData | null;
   gifData: GifData | null;
+  image: SubmissionImageDto | null;
   status: "visible" | "hidden";
   starred: boolean;
   flagged: boolean;
@@ -1846,7 +1849,7 @@ export function TeacherDashboard({
                         <InlineCodeText>{submission.text}</InlineCodeText>
                       </p>
                     </div>
-                  ) : !submission.drawingData && !submission.gifData ? (
+                  ) : !submission.drawingData && !submission.gifData && !submission.image ? (
                     <p
                       className="cursor-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600"
                       data-no-card-drag="true"
@@ -1863,6 +1866,12 @@ export function TeacherDashboard({
                     <div className="cursor-auto" data-no-card-drag="true">
                       <DrawingPreview drawingData={submission.drawingData} />
                     </div>
+                  ) : null}
+                  {submission.image ? (
+                    <SubmissionImagePreview
+                      key={submission.image.url}
+                      url={submission.image.url}
+                    />
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2" data-no-card-drag="true">
                     <button

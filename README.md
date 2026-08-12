@@ -19,6 +19,7 @@ The current slice includes:
 - a privacy notice page at `/privacy`
 - typed and drawn student responses
 - optional GIF responses through GIPHY search
+- optional private student image responses (PNG/JPEG/WebP, with local HEIC conversion)
 - optional student display names, defaulting to Anonymous
 - student group questions with shared upvoting, host-visible asker names, and host answered/re-show controls
 - host-facing submission cards
@@ -56,6 +57,7 @@ Open:
 ```bash
 npm run lint
 npm run build
+npm test
 ```
 
 ## Storage
@@ -90,6 +92,27 @@ NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key
 
 GIPHY's browser API key is public by design, unlike the Supabase service role
 key.
+
+Private image uploads are disabled unless all of these server-only values are set:
+
+```text
+IMAGE_UPLOADS_ENABLED=true
+IMAGE_WORKER_URL=https://your-private-image-worker.example
+IMAGE_WORKER_SERVICE_TOKEN=a-random-service-token-at-least-32-characters-long
+IMAGE_TICKET_SECRET=a-random-secret-at-least-32-characters-long
+```
+
+Run `supabase/add-submission-image-data.sql` for existing Supabase databases.
+See [the image storage Worker guide](workers/image-storage/README.md) for the
+bucket, lifecycle, deployment, and rollback steps.
+The Worker owns short-lived pending uploads and committed private objects; run
+`npm run reconcile-images` for a dry-run reconciliation, or append `--delete`
+only after reviewing a complete scan. Reconciliation never deletes archived
+submission images. Configure retention separately for your teaching activity.
+Cloudflare storage is selected for the Oceania region where available; this is
+not an Australia-only residency guarantee. The feature is deliberately
+conservative (roughly a small handful of upload allocations per student per
+minute) and should be protected by platform rate limits in public deployments.
 
 If you already ran the first schema before drawing support was added, run
 `supabase/add-drawing-data.sql` in the Supabase SQL editor.

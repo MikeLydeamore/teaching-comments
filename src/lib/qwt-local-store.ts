@@ -22,6 +22,7 @@ import {
   validatePollQuestionTitle,
   validateQuestionTitle,
   validateSubmissionContent,
+  normalizeSubmissionImageData,
   validateQuestionText,
   validateTeacherSpaceName,
   validateTeacherSpacePinHash,
@@ -107,6 +108,7 @@ function defaultStore(): StoreData {
         text: "There is no evidence against the null model, so the observed difference could be due to random variation.",
         drawingData: null,
         gifData: null,
+        imageData: null,
         status: "visible",
         starred: false,
         flagged: false,
@@ -122,6 +124,7 @@ function defaultStore(): StoreData {
         text: "The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.",
         drawingData: null,
         gifData: null,
+        imageData: null,
         status: "visible",
         starred: true,
         flagged: false,
@@ -246,6 +249,7 @@ async function readStore(): Promise<StoreData> {
       ...submission,
       drawingData: submission.drawingData ?? null,
       gifData: submission.gifData ?? null,
+      imageData: normalizeSubmissionImageData(submission.imageData),
       studentName: submission.studentName ?? "Anonymous",
       archivedAt: submission.archivedAt ?? null,
     })),
@@ -498,8 +502,13 @@ export const localStore: QwtStore = {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
-  async addSubmission(code, text, drawingData, gifData, studentName) {
-    const submissionContent = validateSubmissionContent(text, drawingData, gifData);
+  async addSubmission(code, input) {
+    const submissionContent = validateSubmissionContent(
+      input.text,
+      input.drawingData,
+      input.gifData,
+      normalizeSubmissionImageData(input.imageData),
+    );
     const session = await this.getSession(code);
 
     if (!session) {
@@ -513,12 +522,13 @@ export const localStore: QwtStore = {
     const data = await readStore();
     const timestamp = now();
     const submission: Submission = {
-      id: randomUUID(),
+      id: input.id ?? randomUUID(),
       sessionCode: session.id,
-      studentName: normalizeStudentName(studentName ?? ""),
+      studentName: normalizeStudentName(input.studentName ?? ""),
       text: submissionContent.text,
       drawingData: submissionContent.drawingData,
       gifData: submissionContent.gifData,
+      imageData: normalizeSubmissionImageData(input.imageData),
       status: session.submissionsScreeningEnabled ? "hidden" : "visible",
       starred: false,
       flagged: false,
@@ -528,6 +538,17 @@ export const localStore: QwtStore = {
       updatedAt: timestamp,
     };
 
+    const existing = data.submissions.find((item) => item.id === submission.id);
+    if (existing) {
+      if (
+        existing.sessionCode === submission.sessionCode &&
+        existing.imageData?.objectKey === submission.imageData?.objectKey &&
+        existing.imageData?.contentType === submission.imageData?.contentType &&
+        existing.imageData?.byteSize === submission.imageData?.byteSize &&
+        existing.imageData?.etag === submission.imageData?.etag
+      ) return existing;
+      throw new Error("That submission identifier is already in use.");
+    }
     data.submissions.push(submission);
     await writeStore(data);
     return submission;
@@ -557,7 +578,7 @@ export const localStore: QwtStore = {
       updatedAt: now(),
     };
 
-    assertSubmissionHasContent(next.text, next.drawingData, next.gifData);
+    assertSubmissionHasContent(next.text, next.drawingData, next.gifData, next.imageData);
 
     data.submissions[index] = next;
     await writeStore(data);

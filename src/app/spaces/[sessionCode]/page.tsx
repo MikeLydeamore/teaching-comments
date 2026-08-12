@@ -7,6 +7,7 @@ import { DEFAULT_SPACE_CODE } from "@/lib/qwt-store-model";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "./StudentSubmit";
+import { imageUploadsEnabled } from "@/lib/image-upload";
 
 export default async function StudentPage({
   params,
@@ -56,6 +57,7 @@ export default async function StudentPage({
       sessionCode={session.code}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
+      imageUploadsEnabled={imageUploadsEnabled()}
     />
   );
 }

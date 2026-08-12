@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         </h1>
         <p className="mt-4 leading-7 text-slate-700">
           Ed.ie collects short pieces of student writing, group questions,
-          optional drawings, optional GIF selections, and an optional display
+          optional drawings, optional GIF selections, one optional private image, and an optional display
           name so teaching staff can understand what the class is thinking
           during a learning activity. Students can leave the name field blank
           and submit as Anonymous.
@@ -23,13 +23,18 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-slate-950">What is collected</h2>
             <p className="mt-2">
               We store the writing, drawing, or group question you submit, the
-              session code, an optional selected GIF, an optional display name,
+              session code, an optional selected GIF, an optional private image, an optional display name,
               timestamps, anonymous browser vote markers for group-question
               upvotes, answered markers for group questions, and host
               moderation markers such as starred, flagged, or hidden. The
               service may also create ordinary technical logs through its
               hosting provider.
             </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Private images</h2>
+            <p className="mt-2">When enabled, an image is converted locally in your browser to strip metadata before upload. A random abuse-prevention browser cookie is used for the upload. Images are stored privately in Cloudflare storage and are available only to authenticated teaching staff; they are not shared with other students or sent to AI services.</p>
           </div>
 
           <div>

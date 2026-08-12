@@ -121,6 +121,7 @@ create table if not exists public.qwt_submissions (
   text text not null default '' check (char_length(text) <= 2000),
   drawing_data jsonb,
   gif_data jsonb,
+  image_data jsonb,
   status text not null default 'visible' check (status in ('visible', 'hidden')),
   starred boolean not null default false,
   flagged boolean not null default false,
@@ -129,15 +130,30 @@ create table if not exists public.qwt_submissions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint qwt_submissions_text_or_media_check
-    check (char_length(text) >= 1 or drawing_data is not null or gif_data is not null),
+    check (char_length(text) >= 1 or drawing_data is not null or gif_data is not null or image_data is not null),
   constraint qwt_submissions_drawing_data_check
     check (drawing_data is null or jsonb_typeof(drawing_data) = 'object'),
   constraint qwt_submissions_gif_data_check
-    check (gif_data is null or jsonb_typeof(gif_data) = 'object')
+    check (gif_data is null or jsonb_typeof(gif_data) = 'object'),
+  constraint qwt_submissions_image_data_check
+    check (image_data is null or (
+      jsonb_typeof(image_data) = 'object'
+      and image_data->>'version' = '1'
+      and (image_data->>'objectKey') ~ '^committed/[A-Za-z0-9_-]{43}/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\.(png|jpg|webp)$'
+      and image_data->>'contentType' in ('image/png', 'image/jpeg', 'image/webp')
+      and ((image_data->>'contentType' = 'image/png' and image_data->>'objectKey' ~ '\.png$') or (image_data->>'contentType' = 'image/jpeg' and image_data->>'objectKey' ~ '\.jpg$') or (image_data->>'contentType' = 'image/webp' and image_data->>'objectKey' ~ '\.webp$'))
+      and jsonb_typeof(image_data->'byteSize') = 'number'
+      and case when jsonb_typeof(image_data->'byteSize') = 'number' then (image_data->'byteSize')::numeric between 1 and 10485760 and (image_data->'byteSize')::numeric = trunc((image_data->'byteSize')::numeric) else false end
+      and char_length(coalesce(image_data->>'etag', '')) between 1 and 256
+    ))
 );
 
 create index if not exists qwt_submissions_session_created_idx
   on public.qwt_submissions (session_code, created_at desc);
+
+create unique index if not exists qwt_submissions_image_object_key_unique_idx
+  on public.qwt_submissions ((image_data->>'objectKey'))
+  where image_data is not null;
 
 create index if not exists qwt_submissions_session_status_idx
   on public.qwt_submissions (session_code, status);

@@ -79,8 +79,8 @@ export default async function JoinPage({
               type="checkbox"
             />
             <span>
-              I understand my response, timestamp, session code, and any name I
-              provide will be stored for this teaching activity. I will avoid
+              I understand my response, timestamp, session code, any name I
+              provide, and an optional private image will be stored for this teaching activity. I will avoid
               including student IDs or other identifying details.{" "}
               <Link className="font-semibold text-teal-700 underline" href="/privacy">
                 Read the privacy notice

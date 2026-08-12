@@ -14,6 +14,7 @@ import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
+import { ImageUploadPanel, type PreparedImage } from "@/components/ImageUploadPanel";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
 import type { DrawingData, GifData, ParticipantPoll } from "@/lib/qwt-store";
 
@@ -26,6 +27,7 @@ type StudentSubmitProps = {
   prompt: string;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
+  imageUploadsEnabled: boolean;
 };
 
 type SavedSubmission = {
@@ -36,6 +38,29 @@ type SavedSubmission = {
   createdAt: string;
 };
 
+type UploadReceipt = { image: PreparedImage; finalizeTicket: string; uploadEtag: string; submissionId: string };
+
+function uploadImage(url: string, image: PreparedImage, onProgress: (percent: number) => void) {
+  return new Promise<string>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", url);
+    request.setRequestHeader("Content-Type", image.contentType);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    };
+    request.onerror = () => reject(new Error("Could not upload the image."));
+    request.onload = () => {
+      if (request.status < 200 || request.status >= 300) { reject(new Error("Could not upload the image.")); return; }
+      let body: unknown;
+      try { body = JSON.parse(request.responseText); } catch { reject(new Error("The image service did not confirm the upload.")); return; }
+      const etag = body && typeof body === "object" && "etag" in body ? (body as { etag?: unknown }).etag : null;
+      if (typeof etag !== "string" || !etag || etag.length > 256) { reject(new Error("The image service did not confirm the upload.")); return; }
+      resolve(etag);
+    };
+    request.send(image.blob);
+  });
+}
+
 export function StudentSubmit({
   initialStudentName,
   sessionId,
@@ -45,6 +70,7 @@ export function StudentSubmit({
   prompt,
   timerDurationSeconds,
   timerEndsAt,
+  imageUploadsEnabled,
 }: StudentSubmitProps) {
   const [currentPrompt, setCurrentPrompt] = useState(prompt);
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
@@ -60,6 +86,10 @@ export function StudentSubmit({
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
   const [gifData, setGifData] = useState<GifData | null>(null);
+  const [image, setImage] = useState<PreparedImage | null>(null);
+  const [imageStatus, setImageStatus] = useState("");
+  const [isImageProcessing, setIsImageProcessing] = useState(false);
+  const [uploadReceipt, setUploadReceipt] = useState<UploadReceipt | null>(null);
   const [drawingResetSignal, setDrawingResetSignal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +98,7 @@ export function StudentSubmit({
 
   const remaining = useMemo(() => 2000 - text.length, [text]);
   const hasSubmissionContent =
-    text.trim().length >= 1 || drawingData !== null || gifData !== null;
+    text.trim().length >= 1 || drawingData !== null || gifData !== null || image !== null;
 
   const refreshSession = useCallback(async () => {
     const query = pollParticipantId
@@ -125,12 +155,36 @@ export function StudentSubmit({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isSaving || !sessionIsOpen || !hasSubmissionContent) {
+    if (isSaving || isImageProcessing || !sessionIsOpen || !hasSubmissionContent) {
       return;
     }
 
     setError("");
     setIsSaving(true);
+
+    let finalizeTicket: string | undefined;
+    let uploadEtag: string | undefined;
+    try {
+    if (image && uploadReceipt?.image === image) {
+      finalizeTicket = uploadReceipt.finalizeTicket;
+      uploadEtag = uploadReceipt.uploadEtag;
+      setImageStatus("Saving your response…");
+    } else if (image) {
+      setImageStatus("Preparing secure upload…");
+      const allocation = await fetch(`/api/sessions/${sessionId}/image-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: image.contentType, byteSize: image.blob.size }) });
+      const allocated = await allocation.json().catch(() => ({}));
+      if (!allocation.ok) { setIsSaving(false); setImageStatus(""); setError(allocated.error ?? "Could not prepare the image upload."); return; }
+      setImageStatus("Uploading image… 0%");
+      try {
+        uploadEtag = await uploadImage(allocated.uploadUrl, image, (percent) => setImageStatus(`Uploading image… ${percent}%`));
+      } catch (uploadError) {
+        setIsSaving(false); setImageStatus(""); setError(`${uploadError instanceof Error ? uploadError.message : "Could not upload the image."} Your response is still here to retry.`); return;
+      }
+      if (typeof allocated.finalizeTicket !== "string" || typeof allocated.submissionId !== "string" || !uploadEtag) { setIsSaving(false); setImageStatus(""); setError("The image service returned an incomplete upload receipt."); return; }
+      finalizeTicket = allocated.finalizeTicket;
+      setUploadReceipt({ image, finalizeTicket: allocated.finalizeTicket, uploadEtag, submissionId: allocated.submissionId });
+      setImageStatus("Saving your response…");
+    }
 
     const response = await fetch(`/api/sessions/${sessionId}/submissions`, {
       method: "POST",
@@ -141,13 +195,17 @@ export function StudentSubmit({
         studentName,
         text,
         website,
+        finalizeTicket,
+        uploadEtag,
       }),
     });
 
     const payload = await response.json();
     setIsSaving(false);
+    setImageStatus("");
 
     if (!response.ok) {
+      if (payload.imageReceiptInvalid) setUploadReceipt(null);
       setError(payload.error ?? "Could not save your writing.");
       return;
     }
@@ -156,7 +214,14 @@ export function StudentSubmit({
     setText("");
     setDrawingData(null);
     setGifData(null);
+    setImage(null);
+    setUploadReceipt(null);
     setDrawingResetSignal((currentSignal) => currentSignal + 1);
+    } catch (reason) {
+      setIsSaving(false);
+      setImageStatus("");
+      setError(`${reason instanceof Error ? reason.message : "Could not save your response."} Your response is still here to retry.`);
+    }
   }
 
   function handleTextKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -281,11 +346,13 @@ export function StudentSubmit({
               onChange={(event) => setText(event.target.value)}
               onKeyDown={handleTextKeyDown}
             />
-            <GiphyPicker
+              <GiphyPicker
               disabled={!sessionIsOpen || isSaving}
               gifData={gifData}
               onChange={setGifData}
-            />
+              />
+              {imageUploadsEnabled ? <ImageUploadPanel disabled={!sessionIsOpen || isSaving} image={image} onChange={(nextImage) => { setUploadReceipt(null); setImage(nextImage); }} onProcessingChange={setIsImageProcessing} /> : null}
+              {imageStatus ? <p className="mt-2 text-sm text-slate-600">{imageStatus}</p> : null}
             <DrawingPad
               disabled={!sessionIsOpen || isSaving}
               key={drawingResetSignal}
@@ -297,10 +364,10 @@ export function StudentSubmit({
               </p>
               <button
                 className="inline-flex h-11 items-center justify-center rounded-md bg-amber-300 px-5 text-base font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSaving || !sessionIsOpen || !hasSubmissionContent}
+                disabled={isSaving || isImageProcessing || !sessionIsOpen || !hasSubmissionContent}
                 type="submit"
               >
-                {isSaving ? "Submitting..." : "Submit (Enter)"}
+                {isImageProcessing ? "Preparing image..." : isSaving ? "Submitting..." : "Submit (Enter)"}
               </button>
             </div>
             {error ? (

@@ -11,12 +11,13 @@ import {
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
-import type { Submission } from "@/lib/qwt-store";
+import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
+import type { SubmissionDto } from "@/lib/qwt-store";
 
 type SubmissionsPopoutProps = {
   dashboardUrl: string;
   includeHidden: boolean;
-  initialSubmissions: Submission[];
+  initialSubmissions: SubmissionDto[];
   minutes: number;
   promptHistoryId?: string;
   promptText?: string;
@@ -39,7 +40,7 @@ function useHasHydrated() {
 }
 
 function sortSubmissions(
-  submissions: Submission[],
+  submissions: SubmissionDto[],
   sortOrder: "newest" | "oldest",
 ) {
   return [...submissions].sort((left, right) => {
@@ -103,7 +104,7 @@ export function SubmissionsPopout({
     }
 
     const payload = (await response.json().catch(() => ({}))) as {
-      submissions?: Submission[];
+      submissions?: SubmissionDto[];
     };
     const nextSubmissions = payload.submissions ?? [];
     const nextVisibleSubmissions = starredOnly
@@ -201,7 +202,7 @@ export function SubmissionsPopout({
                 <p className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-xl leading-8 text-slate-950">
                   <InlineCodeText>{submission.text}</InlineCodeText>
                 </p>
-              ) : !submission.drawingData && !submission.gifData ? (
+              ) : !submission.drawingData && !submission.gifData && !submission.image ? (
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-600">
                   Media-only response
                 </p>
@@ -212,6 +213,12 @@ export function SubmissionsPopout({
               ) : null}
               {submission.drawingData ? (
                 <DrawingPreview drawingData={submission.drawingData} />
+              ) : null}
+              {submission.image ? (
+                <SubmissionImagePreview
+                  key={submission.image.url}
+                  url={submission.image.url}
+                />
               ) : null}
             </article>
           ))}

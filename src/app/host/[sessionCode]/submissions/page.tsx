@@ -3,6 +3,7 @@ import {
   getOrCreateSession,
   listPromptHistory,
   listSubmissions,
+  toSubmissionDto,
 } from "@/lib/qwt-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
@@ -83,7 +84,7 @@ export default async function TeacherSubmissionsPage({
     <SubmissionsPopout
       dashboardUrl={`/host/${session.code}`}
       includeHidden={includeHidden}
-      initialSubmissions={displayedSubmissions}
+      initialSubmissions={displayedSubmissions.map(toSubmissionDto)}
       minutes={minutes}
       promptHistoryId={selectedPromptHistory?.id}
       promptText={selectedPromptHistory?.prompt}

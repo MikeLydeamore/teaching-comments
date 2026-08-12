@@ -4,6 +4,7 @@ import {
   getTeacherSpace,
   listPromptHistory,
   listSubmissions,
+  toSubmissionDto,
 } from "@/lib/qwt-store";
 import { isDefaultTeacherPin } from "@/lib/teacher-auth";
 import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
@@ -112,7 +113,7 @@ export default async function TeacherSpaceSubmissionsPage({
     <SubmissionsPopout
       dashboardUrl={`/host/${space.code}/${session.code}`}
       includeHidden={includeHidden}
-      initialSubmissions={displayedSubmissions}
+      initialSubmissions={displayedSubmissions.map(toSubmissionDto)}
       minutes={minutes}
       promptHistoryId={selectedPromptHistory?.id}
       promptText={selectedPromptHistory?.prompt}

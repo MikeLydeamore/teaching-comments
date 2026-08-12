@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local Wrangler development. Do not commit real values.
+TICKET_SECRET=replace-with-a-random-secret-at-least-32-characters-long
+SERVICE_TOKEN=replace-with-a-separate-random-token-at-least-32-characters-long

@@ -28,6 +28,32 @@ export type GifData = {
   height: number;
 };
 
+/** Internal-only object metadata. Never pass this shape to a client component. */
+export type SubmissionImageData = {
+  version: 1;
+  objectKey: string;
+  contentType: "image/png" | "image/jpeg" | "image/webp";
+  byteSize: number;
+  etag: string;
+};
+
+const IMAGE_KEY = /^committed\/[A-Za-z0-9_-]{43}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp)$/i;
+export function normalizeSubmissionImageData(value: unknown): SubmissionImageData | null {
+  if (value === null || typeof value === "undefined") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid submission image metadata.");
+  const data = value as Record<string, unknown>;
+  const keys = Object.keys(data).sort(); const expected = ["byteSize", "contentType", "etag", "objectKey", "version"];
+  if (keys.length !== expected.length || !keys.every((key, index) => key === expected[index]) || data.version !== 1 || typeof data.objectKey !== "string" || !IMAGE_KEY.test(data.objectKey) || (data.contentType !== "image/png" && data.contentType !== "image/jpeg" && data.contentType !== "image/webp") || typeof data.byteSize !== "number" || !Number.isSafeInteger(data.byteSize) || data.byteSize < 1 || data.byteSize > 10 * 1024 * 1024 || typeof data.etag !== "string" || data.etag.length < 1 || data.etag.length > 256) throw new Error("Invalid submission image metadata.");
+  const extension = data.objectKey.split(".").pop()?.toLowerCase();
+  if ((data.contentType === "image/png" && extension !== "png") || (data.contentType === "image/jpeg" && extension !== "jpg") || (data.contentType === "image/webp" && extension !== "webp")) throw new Error("Invalid submission image metadata.");
+  return data as SubmissionImageData;
+}
+
+export type SubmissionImageDto = Pick<
+  SubmissionImageData,
+  "contentType" | "byteSize"
+> & { url: string };
+
 export type TeacherSpace = {
   code: string;
   name: string;
@@ -59,6 +85,7 @@ export type Submission = {
   text: string;
   drawingData: DrawingData | null;
   gifData: GifData | null;
+  imageData: SubmissionImageData | null;
   status: SubmissionStatus;
   starred: boolean;
   flagged: boolean;
@@ -66,6 +93,19 @@ export type Submission = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SubmissionDto = Omit<Submission, "imageData"> & {
+  image: SubmissionImageDto | null;
+};
+
+export type CreateSubmissionInput = {
+  id?: string;
+  text: string;
+  drawingData?: unknown;
+  gifData?: unknown;
+  imageData?: SubmissionImageData | null;
+  studentName?: string;
 };
 
 export type QuestionBankItem = {
@@ -213,13 +253,7 @@ export type QwtStore = {
       promptHistoryId?: string;
     },
   ): Promise<Submission[]>;
-  addSubmission(
-    code: string,
-    text: string,
-    drawingData?: unknown,
-    gifData?: unknown,
-    studentName?: string,
-  ): Promise<Submission>;
+  addSubmission(code: string, input: CreateSubmissionInput): Promise<Submission>;
   getSubmission(id: string): Promise<Submission | null>;
   updateSubmission(
     sessionCode: string,
@@ -687,12 +721,13 @@ export function validateSubmissionContent(
   text: string,
   drawingData: unknown,
   gifData: unknown,
+  imageData: SubmissionImageData | null = null,
 ) {
   const trimmed = validateSubmissionText(text);
   const normalizedDrawingData = normalizeDrawingData(drawingData);
   const normalizedGifData = normalizeGifData(gifData);
 
-  assertSubmissionHasContent(trimmed, normalizedDrawingData, normalizedGifData);
+  assertSubmissionHasContent(trimmed, normalizedDrawingData, normalizedGifData, imageData);
 
   return {
     text: trimmed,
@@ -705,8 +740,9 @@ export function assertSubmissionHasContent(
   text: string,
   drawingData: DrawingData | null,
   gifData: GifData | null,
+  imageData: SubmissionImageData | null = null,
 ) {
-  if (text.trim().length < 1 && !drawingData && !gifData) {
+  if (text.trim().length < 1 && !drawingData && !gifData && !imageData) {
     throw new Error("A submission needs text, a drawing, or a GIF.");
   }
 }

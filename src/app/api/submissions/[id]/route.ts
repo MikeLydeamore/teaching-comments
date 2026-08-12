@@ -1,4 +1,4 @@
-import { getSubmission, updateSubmission } from "@/lib/qwt-store";
+import { getSubmission, toSubmissionDto, updateSubmission } from "@/lib/qwt-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/submissions/[id]">) {
@@ -30,7 +30,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/submission
       return Response.json({ error: "Submission not found." }, { status: 404 });
     }
 
-    return Response.json({ submission });
+    return Response.json({ submission: toSubmissionDto(submission) });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Could not update submission." },
