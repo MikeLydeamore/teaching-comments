@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { ThemeSelector } from "@/components/ThemeSelector";
 import "./globals.css";
 
@@ -38,6 +39,7 @@ try {
         {children}
         <ThemeSelector />
         <Analytics />
+        <SpeedInsights/>
       </body>
     </html>
   );
