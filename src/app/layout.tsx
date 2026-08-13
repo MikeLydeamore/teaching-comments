@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ try {
       <body className="min-h-full">
         {children}
         <ThemeSelector />
+        <Analytics />
       </body>
     </html>
   );
