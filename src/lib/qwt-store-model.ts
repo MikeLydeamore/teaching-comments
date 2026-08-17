@@ -193,7 +193,8 @@ export type PollResults = {
   options: Array<PollOption & { responseCount: number }>;
 };
 
-export type ParticipantPoll = SessionPoll & {
+export type ParticipantPoll = Omit<SessionPoll, "correctOptionIds"> & {
+  correctOptionIds: string[];
   selectedOptionIds: string[];
 };
 

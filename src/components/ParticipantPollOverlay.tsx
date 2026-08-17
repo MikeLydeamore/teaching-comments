@@ -117,7 +117,11 @@ export function ParticipantPollOverlay({
     }
   }
 
-  function toggleOption(optionId: string) {
+  function selectOption(optionId: string) {
+    if (poll.solutionRevealed) {
+      return;
+    }
+
     const nextOptionIds =
       poll.selectionMode === "single"
         ? [optionId]
@@ -153,7 +157,7 @@ export function ParticipantPollOverlay({
             >
               {poll.selectionMode === "single"
                 ? "Choose one answer. You can change it while the poll is open."
-                : "Choose any answers that apply. You can change them while the poll is open."}
+                : "Choose all answers that apply. You can change them while the poll is open."}
             </p>
           </div>
           <div className="shrink-0 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-center text-teal-950">
@@ -176,22 +180,31 @@ export function ParticipantPollOverlay({
         <div className="mt-5 space-y-3">
           {poll.options.map((option) => {
             const isSelected = selectedOptionIds.includes(option.id);
+            const isCorrect =
+              poll.solutionRevealed && poll.correctOptionIds.includes(option.id);
 
             return (
               <label
                 className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-md border px-4 py-3 text-base font-medium transition ${
-                  isSelected
-                    ? "border-teal-500 bg-teal-50 text-teal-950"
-                    : "border-slate-300 bg-white text-slate-800 hover:border-teal-400"
+                  isCorrect
+                    ? "border-green-600 bg-green-50 text-green-950 ring-2 ring-green-600 ring-offset-2"
+                    : isSelected
+                      ? "border-teal-500 bg-teal-50 text-teal-950"
+                      : "border-slate-300 bg-white text-slate-800 hover:border-teal-400"
                 }`}
                 key={option.id}
               >
                 <input
                   checked={isSelected}
-                  className="size-5 shrink-0 accent-teal-700"
+                  className={`size-5 shrink-0 appearance-none rounded-full border-2 transition ${
+                    isSelected
+                      ? "border-teal-700 bg-teal-700 shadow-[inset_0_0_0_3px_white]"
+                      : "border-slate-400 bg-white"
+                  }`}
+                  disabled={poll.solutionRevealed}
                   name={`poll-${poll.id}`}
                   type={poll.selectionMode === "single" ? "radio" : "checkbox"}
-                  onChange={() => toggleOption(option.id)}
+                  onChange={() => selectOption(option.id)}
                 />
                 <span className="min-w-0 break-words">
                   <InlineCodeText>{option.label}</InlineCodeText>
@@ -200,6 +213,17 @@ export function ParticipantPollOverlay({
             );
           })}
         </div>
+
+        {poll.solutionRevealed && poll.correctOptionIds.length > 0 ? (
+          <section className="mt-5 rounded-md border border-green-300 bg-green-50 p-4 text-green-950">
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-green-800">
+              Solution revealed
+            </p>
+            <p className="mt-2 text-sm font-medium">
+              Correct answer{poll.correctOptionIds.length === 1 ? "" : "s"} are outlined in green.
+            </p>
+          </section>
+        ) : null}
 
         <div className="mt-5 flex min-h-6 items-center justify-between gap-3">
           <p className="text-sm text-slate-500">

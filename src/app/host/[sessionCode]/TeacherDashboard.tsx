@@ -366,6 +366,7 @@ export function TeacherDashboard({
   const [draggedSubmissionId, setDraggedSubmissionId] = useState<string | null>(null);
   const [stats, setStats] = useState(initialStats);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshError, setRefreshError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showLiveControls, setShowLiveControls] = useState(false);
   const [showResultsChart, setShowResultsChart] = useState(false);
@@ -403,13 +404,34 @@ export function TeacherDashboard({
       query.set("promptHistoryId", selectedPromptHistoryId);
     }
 
-    const [submissionsResponse, sessionResponse] = await Promise.all([
-      fetch(`/api/sessions/${session.id}/submissions?${query}`),
-      fetch(`/api/sessions/${session.id}`),
+    let submissionsResponse: Response;
+    let sessionResponse: Response;
+
+    try {
+      [submissionsResponse, sessionResponse] = await Promise.all([
+        fetch(`/api/sessions/${session.id}/submissions?${query}`),
+        fetch(`/api/sessions/${session.id}`),
+      ]);
+    } catch {
+      setRefreshError("Could not refresh the dashboard. Trying again shortly.");
+      setIsLoading(false);
+      return;
+    }
+
+    const [submissionsPayload, sessionPayload] = await Promise.all([
+      submissionsResponse.json().catch(() => ({})),
+      sessionResponse.json().catch(() => ({})),
     ]);
 
-    const submissionsPayload = await submissionsResponse.json();
-    const sessionPayload = await sessionResponse.json();
+    if (!submissionsResponse.ok || !sessionResponse.ok) {
+      setRefreshError(
+        submissionsPayload.error ??
+          sessionPayload.error ??
+          "Could not refresh the dashboard. Trying again shortly.",
+      );
+      setIsLoading(false);
+      return;
+    }
 
     const nextSubmissions = submissionsPayload.submissions ?? [];
 
@@ -424,6 +446,7 @@ export function TeacherDashboard({
       setPromptHistory(sessionPayload.promptHistory);
     }
     setStats(sessionPayload.stats ?? initialStats);
+    setRefreshError("");
     setLastRefresh(new Date());
     setIsLoading(false);
   }, [
@@ -1336,6 +1359,11 @@ export function TeacherDashboard({
               <p className="text-sm text-slate-500">
                 {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>
+              {refreshError ? (
+                <p className="text-sm font-medium text-red-700" role="status">
+                  {refreshError}
+                </p>
+              ) : null}
               <button
                 className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                 type="button"

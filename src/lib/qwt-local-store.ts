@@ -1198,9 +1198,10 @@ export const localStore: QwtStore = {
 
     if (
       poll.status !== "active" ||
+      poll.solutionRevealed ||
       new Date(poll.endsAt).getTime() <= Date.now()
     ) {
-      throw new Error("This poll has ended.");
+      throw new Error("This poll is no longer accepting answers.");
     }
 
     const selectedOptionIds = [...new Set(optionIds)];

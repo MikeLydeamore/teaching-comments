@@ -21,19 +21,27 @@ export async function GET(
 
   const participantId = new URL(request.url).searchParams.get("participantId") ?? "";
   const availablePoll = session.isOpen ? poll : null;
-  let activePoll: ParticipantPoll | null = availablePoll
-    ? { ...availablePoll, selectedOptionIds: [] }
+  const participantPoll = availablePoll
+    ? {
+        ...availablePoll,
+        correctOptionIds: availablePoll.solutionRevealed
+          ? availablePoll.correctOptionIds
+          : [],
+      }
+    : null;
+  let activePoll: ParticipantPoll | null = participantPoll
+    ? { ...participantPoll, selectedOptionIds: [] }
     : null;
 
-  if (availablePoll && participantId) {
+  if (participantPoll && participantId) {
     try {
-      const response = await getPollResponse(availablePoll.id, participantId);
+      const response = await getPollResponse(participantPoll.id, participantId);
       activePoll = {
-        ...availablePoll,
+        ...participantPoll,
         selectedOptionIds: response?.optionIds ?? [],
       };
     } catch {
-      activePoll = { ...availablePoll, selectedOptionIds: [] };
+      activePoll = { ...participantPoll, selectedOptionIds: [] };
     }
   }
 
