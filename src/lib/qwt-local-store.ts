@@ -719,6 +719,31 @@ export const localStore: QwtStore = {
     return bankQuestion;
   },
 
+  async updatePollQuestionInBank(code, id, question, selectionMode, options, correctOptionIndexes) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const definition = validatePollQuestionDefinition(question, selectionMode, options);
+    const data = await readStore();
+    const bankQuestion = data.pollQuestionBank.find(
+      (item) => item.id === id && item.sessionCode === sessionCode,
+    );
+
+    if (!bankQuestion) {
+      return null;
+    }
+
+    bankQuestion.question = definition.question;
+    bankQuestion.selectionMode = definition.selectionMode;
+    bankQuestion.options = definition.optionLabels;
+    bankQuestion.correctOptionIndexes = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    );
+    bankQuestion.updatedAt = now();
+    await writeStore(data);
+    return bankQuestion;
+  },
+
   async deletePollQuestionFromBank(code, id) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();

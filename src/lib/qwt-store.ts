@@ -196,6 +196,24 @@ export async function deletePollQuestionFromBank(code: string, id: string) {
   return getStore().deletePollQuestionFromBank(code, id);
 }
 
+export async function updatePollQuestionInBank(
+  code: string,
+  id: string,
+  question: string,
+  selectionMode: PollSelectionMode,
+  options: string[],
+  correctOptionIndexes: number[],
+) {
+  return getStore().updatePollQuestionInBank(
+    code,
+    id,
+    question,
+    selectionMode,
+    options,
+    correctOptionIndexes,
+  );
+}
+
 export async function listGroupQuestions(
   code: string,
   voterId?: string,

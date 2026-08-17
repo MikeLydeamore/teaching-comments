@@ -290,6 +290,14 @@ export type QwtStore = {
     options: string[],
     correctOptionIndexes: number[],
   ): Promise<PollQuestionBankItem | null>;
+  updatePollQuestionInBank(
+    code: string,
+    id: string,
+    question: string,
+    selectionMode: PollSelectionMode,
+    options: string[],
+    correctOptionIndexes: number[],
+  ): Promise<PollQuestionBankItem | null>;
   deletePollQuestionFromBank(code: string, id: string): Promise<boolean>;
   listGroupQuestions(
     code: string,

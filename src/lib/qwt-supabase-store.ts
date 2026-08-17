@@ -1074,6 +1074,32 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? pollQuestionBankItemFromRow(rows[0]) : null;
   },
 
+  async updatePollQuestionInBank(code, id, question, selectionMode, options, correctOptionIndexes) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const definition = validatePollQuestionDefinition(question, selectionMode, options);
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(
+      `/qwt_poll_question_bank?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${pollQuestionBankSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          question: definition.question,
+          selection_mode: definition.selectionMode,
+          options: definition.optionLabels,
+          correct_option_indexes: validateCorrectOptionIndexes(
+            definition.selectionMode,
+            definition.optionLabels,
+            correctOptionIndexes,
+          ),
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollQuestionBankItemFromRow(rows[0]) : null;
+  },
+
   async deletePollQuestionFromBank(code, id) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(

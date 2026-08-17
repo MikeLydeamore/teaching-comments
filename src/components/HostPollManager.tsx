@@ -364,7 +364,6 @@ export function HostPollManager({
   }
 
   function updateOption(index: number, value: string) {
-    setSelectedBankQuestionId("");
     setBankStatus("");
     setOptions((currentOptions) =>
       currentOptions.map((option, optionIndex) =>
@@ -439,6 +438,56 @@ export function HostPollManager({
       setIsBankTitleDialogOpen(false);
     } catch {
       setBankStatus("Could not add poll question.");
+    } finally {
+      setIsBankSaving(false);
+    }
+  }
+
+  async function updateCurrentPollInBank() {
+    if (
+      !selectedBankQuestionId ||
+      !canAddToBank ||
+      !hasValidSingleChoiceSolution ||
+      isBankSaving
+    ) {
+      return;
+    }
+
+    setIsBankSaving(true);
+    setBankStatus("Updating poll question...");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/poll-questions/${encodeURIComponent(selectedBankQuestionId)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correctOptionIndexes,
+            options,
+            question,
+            selectionMode,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setBankStatus(payload.error ?? "Could not update poll question.");
+        return;
+      }
+
+      const bankQuestion = payload.bankQuestion as PollQuestionBankItem;
+      setPollQuestionBank((currentBank) =>
+        sortPollQuestionBank(
+          currentBank.map((item) =>
+            item.id === bankQuestion.id ? bankQuestion : item,
+          ),
+        ),
+      );
+      setBankStatus("Poll question updated.");
+    } catch {
+      setBankStatus("Could not update poll question.");
     } finally {
       setIsBankSaving(false);
     }
@@ -873,7 +922,7 @@ export function HostPollManager({
                     >
                       Poll question bank
                     </label>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                       <select
                         className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                         id="poll-question-bank"
@@ -902,6 +951,19 @@ export function HostPollManager({
                         }}
                       >
                         Add to bank
+                      </button>
+                      <button
+                        className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={
+                          !selectedBankQuestionId ||
+                          !canAddToBank ||
+                          !hasValidSingleChoiceSolution ||
+                          isBankSaving
+                        }
+                        type="button"
+                        onClick={() => void updateCurrentPollInBank()}
+                      >
+                        Update saved
                       </button>
                       <button
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -937,7 +999,6 @@ export function HostPollManager({
                     value={question}
                     onChange={(event) => {
                       setQuestion(event.target.value);
-                      setSelectedBankQuestionId("");
                       setBankStatus("");
                       setStatus("");
                     }}
@@ -961,7 +1022,6 @@ export function HostPollManager({
                               ? currentIndexes.slice(0, 1)
                               : currentIndexes,
                           );
-                          setSelectedBankQuestionId("");
                           setBankStatus("");
                         }}
                       >
@@ -978,7 +1038,6 @@ export function HostPollManager({
                       type="button"
                       onClick={() => {
                         setOptions((currentOptions) => [...currentOptions, ""]);
-                        setSelectedBankQuestionId("");
                         setBankStatus("");
                       }}
                     >
@@ -1015,7 +1074,6 @@ export function HostPollManager({
                                   ? [index]
                                   : [...currentIndexes, index];
                               });
-                              setSelectedBankQuestionId("");
                               setBankStatus("");
                             }}
                           />
@@ -1037,7 +1095,6 @@ export function HostPollManager({
                                   .filter((item) => item !== index)
                                   .map((item) => (item > index ? item - 1 : item)),
                               );
-                              setSelectedBankQuestionId("");
                               setBankStatus("");
                             }
                           }
