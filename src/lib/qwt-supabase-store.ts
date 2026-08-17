@@ -1276,7 +1276,6 @@ export const supabaseStore: QwtStore = {
     const params = new URLSearchParams({
       session_code: `eq.${sessionCode}`,
       status: "eq.active",
-      ends_at: `gt.${now()}`,
       select: pollSelect(),
       order: "started_at.desc",
       limit: "1",
@@ -1421,6 +1420,10 @@ export const supabaseStore: QwtStore = {
 
     if (poll.status !== "active") {
       throw new Error("This poll has been ended.");
+    }
+
+    if (new Date(poll.endsAt).getTime() <= Date.now()) {
+      throw new Error("This poll timer has ended.");
     }
 
     const timestamp = now();

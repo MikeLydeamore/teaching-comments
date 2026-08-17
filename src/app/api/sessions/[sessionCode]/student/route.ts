@@ -24,9 +24,14 @@ export async function GET(
   const participantPoll = availablePoll
     ? {
         ...availablePoll,
-        correctOptionIds: availablePoll.solutionRevealed
-          ? availablePoll.correctOptionIds
-          : [],
+        solutionRevealed:
+          availablePoll.solutionRevealed ||
+          new Date(availablePoll.endsAt).getTime() <= Date.now(),
+        correctOptionIds:
+          availablePoll.solutionRevealed ||
+          new Date(availablePoll.endsAt).getTime() <= Date.now()
+            ? availablePoll.correctOptionIds
+            : [],
       }
     : null;
   let activePoll: ParticipantPoll | null = participantPoll

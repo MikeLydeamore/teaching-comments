@@ -211,6 +211,7 @@ export function HostPollManager({
   const pollIsLive = Boolean(
     poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs),
   );
+  const pollNeedsEnding = poll?.status === "active";
   const pastPollResults = useMemo(
     () =>
       history.filter(
@@ -235,7 +236,7 @@ export function HostPollManager({
   );
   const canStart =
     sessionIsOpen &&
-    !pollIsLive &&
+    !pollNeedsEnding &&
     question.trim().length > 0 &&
     options.length >= 2 &&
     options.every((option) => option.trim().length > 0) &&
@@ -560,13 +561,15 @@ export function HostPollManager({
             ? "border-teal-400 bg-teal-50 text-teal-900 hover:bg-teal-100"
             : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
         }`}
-        disabled={!sessionIsOpen && !pollIsLive}
+        disabled={!sessionIsOpen && !pollNeedsEnding}
         type="button"
         onClick={openManager}
       >
         {pollIsLive
           ? `Poll live (${results?.responseCount ?? 0})`
-          : !sessionIsOpen
+          : pollNeedsEnding
+            ? "Poll ready to end"
+            : !sessionIsOpen
             ? "Session closed"
           : "Run poll"}
       </button>
@@ -733,7 +736,7 @@ export function HostPollManager({
                         ) : null}
                         {poll.status === "active" ? (
                           <>
-                          {pollExtensions.map((seconds) => (
+                          {pollIsLive ? pollExtensions.map((seconds) => (
                             <button
                               className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:opacity-60"
                               disabled={isSaving}
@@ -743,7 +746,7 @@ export function HostPollManager({
                             >
                               +{seconds}s
                             </button>
-                          ))}
+                          )) : null}
                           <button
                             className="h-10 rounded-md border border-red-200 px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:opacity-60"
                             disabled={isSaving}

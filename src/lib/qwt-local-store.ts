@@ -1009,15 +1009,12 @@ export const localStore: QwtStore = {
   async getActivePoll(code) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();
-    const currentTime = Date.now();
-
     return (
       data.polls
         .filter(
           (poll) =>
             poll.sessionCode === sessionCode &&
-            poll.status === "active" &&
-            new Date(poll.endsAt).getTime() > currentTime,
+            poll.status === "active",
         )
         .sort(
           (left, right) =>
@@ -1144,6 +1141,10 @@ export const localStore: QwtStore = {
 
     if (poll.status !== "active") {
       throw new Error("This poll has been ended.");
+    }
+
+    if (new Date(poll.endsAt).getTime() <= Date.now()) {
+      throw new Error("This poll timer has ended.");
     }
 
     const timestamp = now();

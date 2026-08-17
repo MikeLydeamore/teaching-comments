@@ -43,24 +43,17 @@ export function ParticipantPollOverlay({
   }, [poll.endsAt]);
 
   const endTime = new Date(poll.endsAt).getTime();
-  const isOpen = nowMs === 0 || endTime > nowMs;
+  const timerEnded = nowMs > 0 && endTime <= nowMs;
+  const solutionIsVisible = poll.solutionRevealed || timerEnded;
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
+  }, []);
 
   const remainingSeconds =
     nowMs > 0 ? Math.max(0, (endTime - nowMs) / 1000) : poll.durationSeconds;
@@ -118,7 +111,7 @@ export function ParticipantPollOverlay({
   }
 
   function selectOption(optionId: string) {
-    if (poll.solutionRevealed) {
+    if (solutionIsVisible) {
       return;
     }
 
@@ -149,15 +142,17 @@ export function ParticipantPollOverlay({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
-              Live poll
+              {solutionIsVisible ? "Poll results" : "Live poll"}
             </p>
             <p
               className="mt-2 text-sm text-slate-500"
               id="participant-poll-instructions"
             >
-              {poll.selectionMode === "single"
-                ? "Choose one answer. You can change it while the poll is open."
-                : "Choose all answers that apply. You can change them while the poll is open."}
+              {solutionIsVisible
+                ? "The poll has finished. Correct answers are outlined in green."
+                : poll.selectionMode === "single"
+                  ? "Choose one answer. You can change it while the poll is open."
+                  : "Choose all answers that apply. You can change them while the poll is open."}
             </p>
           </div>
           <div className="shrink-0 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-center text-teal-950">
@@ -181,7 +176,7 @@ export function ParticipantPollOverlay({
           {poll.options.map((option) => {
             const isSelected = selectedOptionIds.includes(option.id);
             const isCorrect =
-              poll.solutionRevealed && poll.correctOptionIds.includes(option.id);
+              solutionIsVisible && poll.correctOptionIds.includes(option.id);
 
             return (
               <label
@@ -201,7 +196,7 @@ export function ParticipantPollOverlay({
                       ? "border-teal-700 bg-teal-700 shadow-[inset_0_0_0_3px_white]"
                       : "border-slate-400 bg-white"
                   }`}
-                  disabled={poll.solutionRevealed}
+                  disabled={solutionIsVisible}
                   name={`poll-${poll.id}`}
                   type={poll.selectionMode === "single" ? "radio" : "checkbox"}
                   onChange={() => selectOption(option.id)}
