@@ -6,7 +6,7 @@ grant select, insert, update on qwt_teacher_spaces to qwt_app;
 grant select, insert, update on qwt_sessions to qwt_app;
 grant select, insert, update on qwt_submissions to qwt_app;
 grant select, insert, delete on qwt_question_bank to qwt_app;
-grant select, insert, delete on qwt_poll_question_bank to qwt_app;
+grant select, insert, update, delete on qwt_poll_question_bank to qwt_app;
 grant select, insert, update on qwt_prompt_history to qwt_app;
 grant select, insert, update on qwt_group_questions to qwt_app;
 grant select, insert, delete on qwt_group_question_votes to qwt_app;

@@ -28,6 +28,19 @@ const sessionRow = {
   prompt_updated_at: new Date("2026-01-02T03:04:05.000Z"),
   timer_duration_seconds: 0, timer_ends_at: null,
 };
+const pollRow = {
+  id: "123e4567-e89b-42d3-a456-426614174001", session_code: "demo-lecture",
+  question: "Which answer is correct?", selection_mode: "single",
+  options: [
+    { id: "option-a", label: "A", position: 0 },
+    { id: "option-b", label: "B", position: 1 },
+  ],
+  correct_option_ids: ["option-b"], solution_revealed: true, status: "active",
+  duration_seconds: 60, started_at: new Date("2026-01-02T03:04:05.000Z"),
+  ends_at: new Date("2026-01-02T03:05:05.000Z"), ended_at: null,
+  created_at: new Date("2026-01-02T03:04:05.000Z"),
+  updated_at: new Date("2026-01-02T03:04:06.000Z"),
+};
 
 function submissionRow(values: unknown[]) {
   return {
@@ -83,6 +96,54 @@ describe("Neon submission serialization", () => {
     expect(result.imageData).toEqual(expectedMedia[2]);
     expect(result.createdAt).toBe("2026-01-02T03:04:06.000Z");
     expect(result.updatedAt).toBe("2026-01-02T03:04:06.000Z");
+  });
+});
+
+describe("Neon poll solutions", () => {
+  it("maps persisted solution fields", async () => {
+    queryMock.mockResolvedValueOnce([pollRow]);
+
+    await expect(neonStore.getPoll(pollRow.id)).resolves.toMatchObject({
+      correctOptionIds: ["option-b"],
+      solutionRevealed: true,
+    });
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("correct_option_ids, solution_revealed"),
+      [pollRow.id],
+    );
+  });
+
+  it("converts correct option indexes to generated option IDs", async () => {
+    queryMock.mockImplementation(async (statement: string, values: unknown[] = []) => {
+      if (statement.startsWith("SELECT") && statement.includes("qwt_sessions")) return [sessionRow];
+      if (statement.startsWith("WITH ended")) {
+        const options = JSON.parse(String(values[4]));
+        return [{
+          ...pollRow,
+          question: values[2], selection_mode: values[3], options,
+          correct_option_ids: JSON.parse(String(values[5])), solution_revealed: false,
+          duration_seconds: values[6], started_at: values[1], ends_at: values[7],
+          created_at: values[1], updated_at: values[1],
+        }];
+      }
+      return [];
+    });
+
+    const poll = await neonStore.startPoll(
+      "demo-lecture",
+      "Which answer is correct?",
+      "single",
+      ["A", "B"],
+      [1],
+      60,
+    );
+
+    expect(poll?.correctOptionIds).toEqual([poll?.options[1].id]);
+    expect(poll?.solutionRevealed).toBe(false);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("correct_option_ids,solution_revealed"),
+      expect.any(Array),
+    );
   });
 });
 
