@@ -33,6 +33,6 @@
 		}
 	],
 	"vars": {
-		"ALLOWED_ORIGINS": "http://localhost:3000,https://teaching-comments-xi.vercel.app,https://www.ed-ie.com,https://ed-ie.com"
+		"ALLOWED_ORIGINS": "http://localhost:3000,https://teaching-comments-xi.vercel.app,https://www.ed-ie.com,https://ed-ie.com,https://teaching-comments-git-neon-mikelydeamores-projects.vercel.app"
 	}
 }
