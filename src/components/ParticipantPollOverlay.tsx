@@ -214,16 +214,6 @@ export function ParticipantPollOverlay({
           })}
         </div>
 
-        {poll.solutionRevealed && poll.correctOptionIds.length > 0 ? (
-          <section className="mt-5 rounded-md border border-green-300 bg-green-50 p-4 text-green-950">
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-green-800">
-              Solution revealed
-            </p>
-            <p className="mt-2 text-sm font-medium">
-              Correct answer{poll.correctOptionIds.length === 1 ? "" : "s"} are outlined in green.
-            </p>
-          </section>
-        ) : null}
 
         <div className="mt-5 flex min-h-6 items-center justify-between gap-3">
           <p className="text-sm text-slate-500">
