@@ -34,7 +34,7 @@ The current slice includes:
 - word cloud charts for common words in typed responses
 - response-time plotting from the latest prompt update
 - local JSON storage for development
-- optional Supabase storage for hosting
+- optional Supabase or Neon PostgreSQL storage for hosting
 
 ## Run locally
 
@@ -69,7 +69,7 @@ For a hosted deployment, use Supabase Postgres so data survives Vercel server
 restarts and can be managed outside the app:
 
 1. Create a free Supabase project.
-2. Open the Supabase SQL editor and run `supabase/schema.sql`.
+2. Open the Supabase SQL editor and run `database/schema.sql`.
 3. Set these environment variables locally and in Vercel:
 
 ```text
@@ -83,6 +83,42 @@ TEACHER_AUTH_SECRET=replace-with-a-random-cookie-secret-before-deploying
 
 Keep the service role key server-side only. Do not put it in browser code or
 commit it to the repo.
+
+### Neon development migration (safe first step)
+
+Neon is opt-in. Existing deployments continue to use Supabase whenever its
+environment variables exist, even if the host injects `DATABASE_URL`. Only an
+explicit `QWT_STORAGE_BACKEND=neon` switches the application.
+
+1. Create a Neon project and a separate development branch.
+2. In that branch's SQL editor (or through its **unpooled owner** URL), apply
+   `database/schema.sql` and then `database/neon-app-role.sql`. Set a strong
+   password for `qwt_app` in the SQL editor separately.
+3. Put the branch's **pooled**, `qwt_app`-authenticated URL in `.env.local`:
+
+```text
+QWT_STORAGE_BACKEND=neon
+DATABASE_URL=postgresql://qwt_app:your-password@your-pooled-neon-host/neondb?sslmode=require
+```
+
+4. Run `npm run dev`, exercise the app, and run `npm test`. `DATABASE_URL`
+   stays server-side; it must never be exposed as `NEXT_PUBLIC_*`.
+5. If desired, configure these two settings for Vercel **Preview** only. Leave
+   the Production Supabase settings and `QWT_STORAGE_BACKEND` unchanged until
+   a separately planned cutover.
+
+`npm run reconcile-images` loads the usual `.env*` files and supports local,
+Supabase, and Neon reference scans. It remains dry-run by default.
+
+For a later production cutover, schedule a write-freeze/maintenance window for
+the final Supabase export, Neon import, validation, and backend switch (or
+implement and verify a delta-synchronisation process). Take a verified backup,
+validate row counts and image references before opening Neon for writes, then
+change only the Production backend setting. Once Neon accepts writes, a
+rollback needs a planned reconciliation/copy of those Neon-side writes before
+switching back to Supabase; a blind environment-variable rollback can lose
+data. Do not delete either database until the import and rollback window have
+been accepted.
 
 GIF search is optional. To enable it, create a GIPHY API key and set:
 

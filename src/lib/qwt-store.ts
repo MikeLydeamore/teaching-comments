@@ -1,4 +1,6 @@
 import { localStore } from "./qwt-local-store";
+import { neonStore } from "./qwt-neon-store";
+import { selectedStorageBackend } from "./qwt-storage-backend";
 import { supabaseStore } from "./qwt-supabase-store";
 import {
   normalizeSpaceCode,
@@ -46,22 +48,12 @@ export type {
   TeacherSpaceSummary,
 } from "./qwt-store-model";
 
-function shouldUseSupabaseStore() {
-  const requestedBackend = process.env.QWT_STORAGE_BACKEND?.toLowerCase();
-
-  if (requestedBackend === "supabase") {
-    return true;
-  }
-
-  if (requestedBackend === "local") {
-    return false;
-  }
-
-  return Boolean(process.env.SUPABASE_URL || process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-
 function getStore(): QwtStore {
-  return shouldUseSupabaseStore() ? supabaseStore : localStore;
+  switch (selectedStorageBackend()) {
+    case "supabase": return supabaseStore;
+    case "neon": return neonStore;
+    default: return localStore;
+  }
 }
 
 export async function getSession(code: string) {

@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { loadEnvConfig } from "@next/env";
+import { neon } from "@neondatabase/serverless";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const KEY = /^committed\/([A-Za-z0-9_-]{43})\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(png|jpg|webp)$/i;
@@ -11,11 +13,14 @@ function assertWorkerUrl(value) {
   throw new Error("IMAGE_WORKER_URL must be an HTTP(S) URL.");
 }
 
+/** @param {Record<string, string | undefined>} env */
 export function selectedBackend(env = process.env) {
   const requested = env.QWT_STORAGE_BACKEND?.toLowerCase();
   if (requested === "supabase") return "supabase";
   if (requested === "local") return "local";
-  return env.SUPABASE_URL || env.SUPABASE_SERVICE_ROLE_KEY ? "supabase" : "local";
+  if (requested === "neon") return "neon";
+  if (env.SUPABASE_URL || env.SUPABASE_SERVICE_ROLE_KEY) return "supabase";
+  return env.DATABASE_URL ? "neon" : "local";
 }
 
 export function validateReference(value) {
@@ -69,6 +74,15 @@ export async function collectSupabaseReferences(fetchImpl, base, token) {
   }
 }
 
+/** The CLI runs outside Next, so this is intentionally a direct SQL scan. */
+export async function collectNeonReferences(databaseUrl, sqlFactory = neon) {
+  if (!databaseUrl) throw new Error("Neon reconciliation requires DATABASE_URL.");
+  const sql = sqlFactory(databaseUrl);
+  const rows = await sql.query("SELECT image_data FROM qwt_submissions WHERE image_data IS NOT NULL ORDER BY id ASC");
+  if (!Array.isArray(rows)) throw new Error("Malformed Neon reference scan.");
+  return rows.map((row) => validateReference(row.image_data));
+}
+
 export function planReconciliation(references, objects, now = Date.now()) {
   const refs = new Map(); for (const ref of references) { if (refs.has(ref.objectKey)) throw new Error("Duplicate committed image reference."); refs.set(ref.objectKey, ref); }
   const worker = new Map(); for (const object of objects) { if (worker.has(object.key)) throw new Error("Duplicate Worker object."); worker.set(object.key, object); }
@@ -78,12 +92,14 @@ export function planReconciliation(references, objects, now = Date.now()) {
 
 async function collectReferences() {
   if (selectedBackend() === "local") { const data = JSON.parse(await readFile(new URL("../.data/qwt-store.json", import.meta.url), "utf8")); return (data.submissions ?? []).flatMap((submission) => submission.imageData ? [validateReference(submission.imageData)] : []); }
+  if (selectedBackend() === "neon") return collectNeonReferences(process.env.DATABASE_URL);
   const base = process.env.SUPABASE_URL?.replace(/\/$/, ""); const token = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !token) throw new Error("Supabase reconciliation requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   return collectSupabaseReferences(fetch, base, token);
 }
 
 async function main() {
+  loadEnvConfig(process.cwd());
   const args = process.argv.slice(2); if (args.length > 1 || (args.length && args[0] !== "--delete")) throw new Error("Usage: npm run reconcile-images [-- --delete]");
   const workerUrl = assertWorkerUrl(process.env.IMAGE_WORKER_URL); const token = process.env.IMAGE_WORKER_SERVICE_TOKEN;
   if (!token || token.length < 32 || token.length > 4096) throw new Error("IMAGE_WORKER_SERVICE_TOKEN must be 32–4096 characters.");

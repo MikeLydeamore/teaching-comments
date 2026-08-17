@@ -1,7 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeDrawingData, normalizeSubmissionImageData, type Session } from "./qwt-store-model";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, isUuid, postInsertRecovery, sessionHash, signImageTicket, verifyImageTicket } from "./image-upload";
 import { toSubmissionDto } from "./qwt-store";
+import { selectedStorageBackend } from "./qwt-storage-backend";
 import { collectSupabaseReferences, collectWorkerObjects, parseContentRange, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
 import { outputImageContentType } from "../components/ImageUploadPanel";
 import { submissionImageRetryUrl } from "../components/SubmissionImagePreview";
@@ -46,7 +49,12 @@ it("matches app backend selection and exact Supabase page counts", async () => {
   expect(selectedBackend({ QWT_STORAGE_BACKEND: "supabase" })).toBe("supabase");
   expect(selectedBackend({ QWT_STORAGE_BACKEND: "local", SUPABASE_URL: "x" })).toBe("local");
   expect(selectedBackend({ SUPABASE_URL: "x" })).toBe("supabase");
+  expect(selectedBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
+  expect(selectedBackend({ SUPABASE_URL: "x", DATABASE_URL: "postgresql://example" })).toBe("supabase");
   expect(selectedBackend({})).toBe("local");
+  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
+  expect(selectedStorageBackend({ SUPABASE_URL: "x", DATABASE_URL: "postgresql://example" })).toBe("supabase");
+  expect(selectedStorageBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
   expect(parseContentRange("0-999/1001", 0, 1000)).toBe(1001);
   expect(() => parseContentRange("0-999/1000", 1000, 1)).toThrow("mismatch");
   let call = 0;
