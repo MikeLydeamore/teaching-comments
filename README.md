@@ -195,6 +195,10 @@ If you already ran the schema before live polls were added, run
 If you already ran the schema before poll question banks were added, run
 `supabase/add-poll-question-bank.sql` in the Supabase SQL editor.
 
+If you already ran the schema before poll solutions were added, run
+`supabase/add-poll-solutions.sql` for Supabase or
+`database/add-poll-solutions.sql` as the Neon project owner.
+
 If you already ran the schema before session codes were scoped to teaching
 spaces, run `supabase/scope-session-codes-to-spaces.sql` in the Supabase SQL
 editor.

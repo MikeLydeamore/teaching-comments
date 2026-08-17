@@ -20,6 +20,7 @@ import {
   validatePollExtension,
   validatePollParticipantId,
   validatePollQuestionDefinition,
+  validateCorrectOptionIndexes,
   validatePollQuestionTitle,
   validateQuestionTitle,
   validateSubmissionContent,
@@ -225,10 +226,13 @@ async function readStore(): Promise<StoreData> {
     pollQuestionBank: (data.pollQuestionBank ?? []).map((question) => ({
       ...question,
       title: question.title ?? question.question,
+      correctOptionIndexes: question.correctOptionIndexes ?? [],
       updatedAt: question.updatedAt ?? question.createdAt,
     })),
     polls: (data.polls ?? []).map((poll) => ({
       ...poll,
+      correctOptionIds: poll.correctOptionIds ?? [],
+      solutionRevealed: poll.solutionRevealed ?? false,
       endedAt: poll.endedAt ?? null,
     })),
     teacherSpaces,
@@ -680,7 +684,7 @@ export const localStore: QwtStore = {
       .sort((left, right) => left.question.localeCompare(right.question));
   },
 
-  async addPollQuestionToBank(code, title, question, selectionMode, options) {
+  async addPollQuestionToBank(code, title, question, selectionMode, options, correctOptionIndexes) {
     const session = await this.getSession(code);
 
     if (!session) {
@@ -701,11 +705,41 @@ export const localStore: QwtStore = {
       question: definition.question,
       selectionMode: definition.selectionMode,
       options: definition.optionLabels,
+      correctOptionIndexes: validateCorrectOptionIndexes(
+        definition.selectionMode,
+        definition.optionLabels,
+        correctOptionIndexes,
+      ),
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
     data.pollQuestionBank.push(bankQuestion);
+    await writeStore(data);
+    return bankQuestion;
+  },
+
+  async updatePollQuestionInBank(code, id, question, selectionMode, options, correctOptionIndexes) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const definition = validatePollQuestionDefinition(question, selectionMode, options);
+    const data = await readStore();
+    const bankQuestion = data.pollQuestionBank.find(
+      (item) => item.id === id && item.sessionCode === sessionCode,
+    );
+
+    if (!bankQuestion) {
+      return null;
+    }
+
+    bankQuestion.question = definition.question;
+    bankQuestion.selectionMode = definition.selectionMode;
+    bankQuestion.options = definition.optionLabels;
+    bankQuestion.correctOptionIndexes = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    );
+    bankQuestion.updatedAt = now();
     await writeStore(data);
     return bankQuestion;
   },
@@ -975,15 +1009,12 @@ export const localStore: QwtStore = {
   async getActivePoll(code) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();
-    const currentTime = Date.now();
-
     return (
       data.polls
         .filter(
           (poll) =>
             poll.sessionCode === sessionCode &&
-            poll.status === "active" &&
-            new Date(poll.endsAt).getTime() > currentTime,
+            poll.status === "active",
         )
         .sort(
           (left, right) =>
@@ -1039,7 +1070,7 @@ export const localStore: QwtStore = {
     return data.polls.find((poll) => poll.id === id) ?? null;
   },
 
-  async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {
+  async startPoll(code, question, selectionMode, optionLabels, correctOptionIndexes, durationSeconds) {
     const session = await this.getSession(code);
 
     if (!session) {
@@ -1058,6 +1089,11 @@ export const localStore: QwtStore = {
     );
     const data = await readStore();
     const timestamp = now();
+    const correctIndexes = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    );
 
     data.polls = data.polls.map((poll) =>
       poll.sessionCode === session.id && poll.status === "active"
@@ -1075,6 +1111,8 @@ export const localStore: QwtStore = {
         label,
         position,
       })),
+      correctOptionIds: [],
+      solutionRevealed: false,
       status: "active",
       durationSeconds: definition.durationSeconds,
       startedAt: timestamp,
@@ -1085,6 +1123,7 @@ export const localStore: QwtStore = {
       createdAt: timestamp,
       updatedAt: timestamp,
     };
+    poll.correctOptionIds = correctIndexes.map((index) => poll.options[index].id);
 
     data.polls.push(poll);
     await writeStore(data);
@@ -1102,6 +1141,10 @@ export const localStore: QwtStore = {
 
     if (poll.status !== "active") {
       throw new Error("This poll has been ended.");
+    }
+
+    if (new Date(poll.endsAt).getTime() <= Date.now()) {
+      throw new Error("This poll timer has ended.");
     }
 
     const timestamp = now();
@@ -1126,6 +1169,23 @@ export const localStore: QwtStore = {
       poll.status = "ended";
       poll.endedAt = timestamp;
       poll.updatedAt = timestamp;
+      await writeStore(data);
+    }
+
+    return poll;
+  },
+
+  async revealPollSolution(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (!poll.solutionRevealed) {
+      poll.solutionRevealed = true;
+      poll.updatedAt = now();
       await writeStore(data);
     }
 
@@ -1164,9 +1224,10 @@ export const localStore: QwtStore = {
 
     if (
       poll.status !== "active" ||
+      poll.solutionRevealed ||
       new Date(poll.endsAt).getTime() <= Date.now()
     ) {
-      throw new Error("This poll has ended.");
+      throw new Error("This poll is no longer accepting answers.");
     }
 
     const selectedOptionIds = [...new Set(optionIds)];
@@ -1176,7 +1237,7 @@ export const localStore: QwtStore = {
       throw new Error("That poll answer could not be found.");
     }
 
-    if (poll.selectionMode === "single" && selectedOptionIds.length > 1) {
+    if (poll.selectionMode === "single" && selectedOptionIds.length !== 1) {
       throw new Error("Choose one answer for this poll.");
     }
 

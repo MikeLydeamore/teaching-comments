@@ -35,6 +35,7 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as {
     options?: unknown[];
+    correctOptionIndexes?: unknown[];
     question?: string;
     selectionMode?: PollSelectionMode;
     title?: string;
@@ -47,6 +48,9 @@ export async function POST(
       String(body.question ?? ""),
       body.selectionMode ?? "single",
       Array.isArray(body.options) ? body.options.map(String) : [],
+      Array.isArray(body.correctOptionIndexes)
+        ? body.correctOptionIndexes.map(Number)
+        : [],
     );
 
     if (!bankQuestion) {

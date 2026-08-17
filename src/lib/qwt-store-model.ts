@@ -128,6 +128,7 @@ export type PollQuestionBankItem = {
   question: string;
   selectionMode: PollSelectionMode;
   options: string[];
+  correctOptionIndexes: number[];
   createdAt: string;
   updatedAt: string;
 };
@@ -168,6 +169,8 @@ export type SessionPoll = {
   question: string;
   selectionMode: PollSelectionMode;
   options: PollOption[];
+  correctOptionIds: string[];
+  solutionRevealed: boolean;
   status: "active" | "ended";
   durationSeconds: number;
   startedAt: string;
@@ -190,7 +193,8 @@ export type PollResults = {
   options: Array<PollOption & { responseCount: number }>;
 };
 
-export type ParticipantPoll = SessionPoll & {
+export type ParticipantPoll = Omit<SessionPoll, "correctOptionIds"> & {
+  correctOptionIds: string[];
   selectedOptionIds: string[];
 };
 
@@ -284,6 +288,15 @@ export type QwtStore = {
     question: string,
     selectionMode: PollSelectionMode,
     options: string[],
+    correctOptionIndexes: number[],
+  ): Promise<PollQuestionBankItem | null>;
+  updatePollQuestionInBank(
+    code: string,
+    id: string,
+    question: string,
+    selectionMode: PollSelectionMode,
+    options: string[],
+    correctOptionIndexes: number[],
   ): Promise<PollQuestionBankItem | null>;
   deletePollQuestionFromBank(code: string, id: string): Promise<boolean>;
   listGroupQuestions(
@@ -322,10 +335,12 @@ export type QwtStore = {
     question: string,
     selectionMode: PollSelectionMode,
     optionLabels: string[],
+    correctOptionIndexes: number[],
     durationSeconds: number,
   ): Promise<SessionPoll | null>;
   extendPoll(id: string, seconds: number): Promise<SessionPoll | null>;
   endPoll(id: string): Promise<SessionPoll | null>;
+  revealPollSolution(id: string): Promise<SessionPoll | null>;
   getPollResponse(
     pollId: string,
     participantId: string,
@@ -691,6 +706,32 @@ export function validatePollQuestionDefinition(
     selectionMode,
     optionLabels: normalizedOptions,
   };
+}
+
+export function validateCorrectOptionIndexes(
+  selectionMode: PollSelectionMode,
+  optionLabels: string[],
+  correctOptionIndexes: number[],
+) {
+  if (!Array.isArray(correctOptionIndexes)) {
+    throw new Error("Correct answers could not be read.");
+  }
+
+  const indexes = [...new Set(correctOptionIndexes)];
+
+  if (
+    indexes.some(
+      (index) => !Number.isInteger(index) || index < 0 || index >= optionLabels.length,
+    )
+  ) {
+    throw new Error("Choose valid correct answers.");
+  }
+
+  if (selectionMode === "single" && indexes.length !== 1) {
+    throw new Error("Single-choice polls need exactly one correct answer.");
+  }
+
+  return indexes.sort((left, right) => left - right);
 }
 
 export function validatePollDefinition(

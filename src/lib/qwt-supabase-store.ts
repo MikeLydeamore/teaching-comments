@@ -18,6 +18,7 @@ import {
   validatePollExtension,
   validatePollParticipantId,
   validatePollQuestionDefinition,
+  validateCorrectOptionIndexes,
   validatePollQuestionTitle,
   validateQuestionTitle,
   validateQuestionText,
@@ -105,6 +106,7 @@ type SupabasePollQuestionBankRow = {
   question: string;
   selection_mode: "single" | "multiple";
   options: string[];
+  correct_option_indexes: number[];
   created_at: string;
   updated_at: string;
 };
@@ -141,6 +143,8 @@ type SupabasePollRow = {
   question: string;
   selection_mode: "single" | "multiple";
   options: PollOption[];
+  correct_option_ids: string[];
+  solution_revealed: boolean;
   status: "active" | "ended";
   duration_seconds: number;
   started_at: string;
@@ -240,7 +244,7 @@ function questionBankSelect() {
 }
 
 function pollQuestionBankSelect() {
-  return "id,session_code,title,question,selection_mode,options,created_at,updated_at";
+  return "id,session_code,title,question,selection_mode,options,correct_option_indexes,created_at,updated_at";
 }
 
 function promptHistorySelect() {
@@ -256,7 +260,7 @@ function groupQuestionVoteSelect() {
 }
 
 function pollSelect() {
-  return "id,session_code,question,selection_mode,options,status,duration_seconds,started_at,ends_at,ended_at,created_at,updated_at";
+  return "id,session_code,question,selection_mode,options,correct_option_ids,solution_revealed,status,duration_seconds,started_at,ends_at,ended_at,created_at,updated_at";
 }
 
 function pollResponseSelect() {
@@ -341,6 +345,7 @@ function pollQuestionBankItemFromRow(
     question: row.question,
     selectionMode: row.selection_mode,
     options: row.options,
+    correctOptionIndexes: row.correct_option_indexes ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -387,6 +392,8 @@ function pollFromRow(row: SupabasePollRow): SessionPoll {
     question: row.question,
     selectionMode: row.selection_mode,
     options: [...row.options].sort((left, right) => left.position - right.position),
+    correctOptionIds: row.correct_option_ids ?? [],
+    solutionRevealed: row.solution_revealed ?? false,
     status: row.status,
     durationSeconds: row.duration_seconds,
     startedAt: row.started_at,
@@ -1029,7 +1036,7 @@ export const supabaseStore: QwtStore = {
     return rows.map(pollQuestionBankItemFromRow);
   },
 
-  async addPollQuestionToBank(code, title, question, selectionMode, options) {
+  async addPollQuestionToBank(code, title, question, selectionMode, options, correctOptionIndexes) {
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -1052,7 +1059,38 @@ export const supabaseStore: QwtStore = {
           question: definition.question,
           selection_mode: definition.selectionMode,
           options: definition.optionLabels,
+          correct_option_indexes: validateCorrectOptionIndexes(
+            definition.selectionMode,
+            definition.optionLabels,
+            correctOptionIndexes,
+          ),
           created_at: timestamp,
+          updated_at: timestamp,
+        }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollQuestionBankItemFromRow(rows[0]) : null;
+  },
+
+  async updatePollQuestionInBank(code, id, question, selectionMode, options, correctOptionIndexes) {
+    const sessionCode = normalizeSessionCode(code) || "demo-lecture";
+    const definition = validatePollQuestionDefinition(question, selectionMode, options);
+    const timestamp = now();
+    const rows = await supabaseFetch<SupabasePollQuestionBankRow[]>(
+      `/qwt_poll_question_bank?id=eq.${encodeFilterValue(id)}&session_code=eq.${encodeFilterValue(sessionCode)}&select=${pollQuestionBankSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          question: definition.question,
+          selection_mode: definition.selectionMode,
+          options: definition.optionLabels,
+          correct_option_indexes: validateCorrectOptionIndexes(
+            definition.selectionMode,
+            definition.optionLabels,
+            correctOptionIndexes,
+          ),
           updated_at: timestamp,
         }),
         prefer: "return=representation",
@@ -1238,7 +1276,6 @@ export const supabaseStore: QwtStore = {
     const params = new URLSearchParams({
       session_code: `eq.${sessionCode}`,
       status: "eq.active",
-      ends_at: `gt.${now()}`,
       select: pollSelect(),
       order: "started_at.desc",
       limit: "1",
@@ -1306,7 +1343,7 @@ export const supabaseStore: QwtStore = {
 
   getPoll: getPollFromSupabase,
 
-  async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {
+  async startPoll(code, question, selectionMode, optionLabels, correctOptionIndexes, durationSeconds) {
     const session = await getSessionFromSupabase(code);
 
     if (!session) {
@@ -1329,6 +1366,11 @@ export const supabaseStore: QwtStore = {
       label,
       position,
     }));
+    const correctOptionIds = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    ).map((index) => options[index].id);
 
     await supabaseFetch<SupabasePollRow[]>(
       `/qwt_polls?session_code=eq.${encodeFilterValue(session.id)}&status=eq.active&select=${pollSelect()}`,
@@ -1352,6 +1394,8 @@ export const supabaseStore: QwtStore = {
           question: definition.question,
           selection_mode: definition.selectionMode,
           options,
+          correct_option_ids: correctOptionIds,
+          solution_revealed: false,
           status: "active",
           duration_seconds: definition.durationSeconds,
           started_at: timestamp,
@@ -1376,6 +1420,10 @@ export const supabaseStore: QwtStore = {
 
     if (poll.status !== "active") {
       throw new Error("This poll has been ended.");
+    }
+
+    if (new Date(poll.endsAt).getTime() <= Date.now()) {
+      throw new Error("This poll timer has ended.");
     }
 
     const timestamp = now();
@@ -1414,6 +1462,19 @@ export const supabaseStore: QwtStore = {
     return rows[0] ? pollFromRow(rows[0]) : null;
   },
 
+  async revealPollSolution(id) {
+    const rows = await supabaseFetch<SupabasePollRow[]>(
+      `/qwt_polls?id=eq.${encodeFilterValue(id)}&select=${pollSelect()}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ solution_revealed: true, updated_at: now() }),
+        prefer: "return=representation",
+      },
+    );
+
+    return rows[0] ? pollFromRow(rows[0]) : null;
+  },
+
   async getPollResponse(pollId, participantId) {
     const normalizedParticipantId = validatePollParticipantId(participantId);
     const params = new URLSearchParams({
@@ -1445,9 +1506,10 @@ export const supabaseStore: QwtStore = {
 
     if (
       poll.status !== "active" ||
+      poll.solutionRevealed ||
       new Date(poll.endsAt).getTime() <= Date.now()
     ) {
-      throw new Error("This poll has ended.");
+      throw new Error("This poll is no longer accepting answers.");
     }
 
     const selectedOptionIds = [...new Set(optionIds)];
@@ -1457,7 +1519,7 @@ export const supabaseStore: QwtStore = {
       throw new Error("That poll answer could not be found.");
     }
 
-    if (poll.selectionMode === "single" && selectedOptionIds.length > 1) {
+    if (poll.selectionMode === "single" && selectedOptionIds.length !== 1) {
       throw new Error("Choose one answer for this poll.");
     }
 

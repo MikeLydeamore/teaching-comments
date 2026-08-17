@@ -92,6 +92,7 @@ export function HostPollManager({
   const [selectionMode, setSelectionMode] =
     useState<PollSelectionMode>("single");
   const [options, setOptions] = useState(["", ""]);
+  const [correctOptionIndexes, setCorrectOptionIndexes] = useState<number[]>([]);
   const [pollQuestionBank, setPollQuestionBank] = useState<
     PollQuestionBankItem[]
   >([]);
@@ -210,6 +211,7 @@ export function HostPollManager({
   const pollIsLive = Boolean(
     poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs),
   );
+  const pollNeedsEnding = poll?.status === "active";
   const pastPollResults = useMemo(
     () =>
       history.filter(
@@ -234,10 +236,11 @@ export function HostPollManager({
   );
   const canStart =
     sessionIsOpen &&
-    !pollIsLive &&
+    !pollNeedsEnding &&
     question.trim().length > 0 &&
     options.length >= 2 &&
     options.every((option) => option.trim().length > 0) &&
+    (selectionMode !== "single" || correctOptionIndexes.length === 1) &&
     durationSeconds >= 5 &&
     durationSeconds <= 3600;
   const normalizedBankOptions = options.map((option) => option.trim());
@@ -251,6 +254,13 @@ export function HostPollManager({
     ) &&
     new Set(normalizedBankOptions.map((option) => option.toLowerCase())).size ===
       normalizedBankOptions.length;
+  const hasValidSingleChoiceSolution =
+    selectionMode !== "single" || correctOptionIndexes.length === 1;
+  const solutionIsVisible = Boolean(
+    poll &&
+      (poll.solutionRevealed ||
+        (nowMs > 0 && new Date(poll.endsAt).getTime() <= nowMs)),
+  );
 
   function openManager() {
     setTab(poll ? "current" : "new");
@@ -275,6 +285,7 @@ export function HostPollManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           durationSeconds,
+          correctOptionIndexes,
           options,
           question,
           selectionMode,
@@ -291,6 +302,7 @@ export function HostPollManager({
       setResults(payload.results);
       setQuestion("");
       setOptions(["", ""]);
+      setCorrectOptionIndexes([]);
       setSelectedBankQuestionId("");
       setBankStatus("");
       setTab("current");
@@ -303,13 +315,22 @@ export function HostPollManager({
     }
   }
 
-  async function updatePoll(action: "end" | "extend", seconds?: number) {
+  async function updatePoll(
+    action: "end" | "extend" | "reveal-solution",
+    seconds?: number,
+  ) {
     if (!poll || isSaving) {
       return;
     }
 
     setIsSaving(true);
-    setStatus(action === "end" ? "Ending poll..." : "Extending poll...");
+    setStatus(
+      action === "end"
+        ? "Ending poll..."
+        : action === "reveal-solution"
+          ? "Revealing solutions..."
+          : "Extending poll...",
+    );
 
     try {
       const response = await fetch(`/api/polls/${poll.id}`, {
@@ -326,7 +347,13 @@ export function HostPollManager({
 
       setPoll(payload.poll);
       setResults(payload.results);
-      setStatus(action === "end" ? "Poll ended." : `Added ${seconds} seconds.`);
+      setStatus(
+        action === "end"
+          ? "Poll ended."
+          : action === "reveal-solution"
+            ? "Solutions revealed."
+            : `Added ${seconds} seconds.`,
+      );
       if (action === "end") {
         void refreshHistory();
       }
@@ -338,7 +365,6 @@ export function HostPollManager({
   }
 
   function updateOption(index: number, value: string) {
-    setSelectedBankQuestionId("");
     setBankStatus("");
     setOptions((currentOptions) =>
       currentOptions.map((option, optionIndex) =>
@@ -364,6 +390,7 @@ export function HostPollManager({
     setQuestion(bankQuestion.question);
     setSelectionMode(bankQuestion.selectionMode);
     setOptions([...bankQuestion.options]);
+    setCorrectOptionIndexes([...bankQuestion.correctOptionIndexes]);
   }
 
   async function addCurrentPollToBank() {
@@ -387,7 +414,13 @@ export function HostPollManager({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ options, question, selectionMode, title }),
+          body: JSON.stringify({
+            correctOptionIndexes,
+            options,
+            question,
+            selectionMode,
+            title,
+          }),
         },
       );
       const payload = await response.json().catch(() => ({}));
@@ -406,6 +439,56 @@ export function HostPollManager({
       setIsBankTitleDialogOpen(false);
     } catch {
       setBankStatus("Could not add poll question.");
+    } finally {
+      setIsBankSaving(false);
+    }
+  }
+
+  async function updateCurrentPollInBank() {
+    if (
+      !selectedBankQuestionId ||
+      !canAddToBank ||
+      !hasValidSingleChoiceSolution ||
+      isBankSaving
+    ) {
+      return;
+    }
+
+    setIsBankSaving(true);
+    setBankStatus("Updating poll question...");
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/poll-questions/${encodeURIComponent(selectedBankQuestionId)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            correctOptionIndexes,
+            options,
+            question,
+            selectionMode,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setBankStatus(payload.error ?? "Could not update poll question.");
+        return;
+      }
+
+      const bankQuestion = payload.bankQuestion as PollQuestionBankItem;
+      setPollQuestionBank((currentBank) =>
+        sortPollQuestionBank(
+          currentBank.map((item) =>
+            item.id === bankQuestion.id ? bankQuestion : item,
+          ),
+        ),
+      );
+      setBankStatus("Poll question updated.");
+    } catch {
+      setBankStatus("Could not update poll question.");
     } finally {
       setIsBankSaving(false);
     }
@@ -478,13 +561,15 @@ export function HostPollManager({
             ? "border-teal-400 bg-teal-50 text-teal-900 hover:bg-teal-100"
             : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
         }`}
-        disabled={!sessionIsOpen && !pollIsLive}
+        disabled={!sessionIsOpen && !pollNeedsEnding}
         type="button"
         onClick={openManager}
       >
         {pollIsLive
           ? `Poll live (${results?.responseCount ?? 0})`
-          : !sessionIsOpen
+          : pollNeedsEnding
+            ? "Poll ready to end"
+            : !sessionIsOpen
             ? "Session closed"
           : "Run poll"}
       </button>
@@ -601,7 +686,13 @@ export function HostPollManager({
                               {option.responseCount}
                             </span>
                           </div>
-                          <div className="mt-1 h-4 overflow-hidden rounded bg-slate-100">
+                          <div
+                            className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
+                              solutionIsVisible && poll.correctOptionIds.includes(option.id)
+                                ? "ring-2 ring-green-600 ring-offset-2"
+                                : ""
+                            }`}
+                          >
                             <div
                               className="h-full rounded bg-teal-600 transition-[width]"
                               style={{
@@ -633,9 +724,19 @@ export function HostPollManager({
                         >
                           Download CSV
                         </button>
+                        {!solutionIsVisible && poll.correctOptionIds.length > 0 ? (
+                          <button
+                            className="h-10 rounded-md border border-green-300 px-3 text-sm font-semibold text-green-800 transition hover:border-green-500 disabled:opacity-60"
+                            disabled={isSaving}
+                            type="button"
+                            onClick={() => void updatePoll("reveal-solution")}
+                          >
+                            Reveal solution
+                          </button>
+                        ) : null}
                         {poll.status === "active" ? (
                           <>
-                          {pollExtensions.map((seconds) => (
+                          {pollIsLive ? pollExtensions.map((seconds) => (
                             <button
                               className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:opacity-60"
                               disabled={isSaving}
@@ -645,7 +746,7 @@ export function HostPollManager({
                             >
                               +{seconds}s
                             </button>
-                          ))}
+                          )) : null}
                           <button
                             className="h-10 rounded-md border border-red-200 px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:opacity-60"
                             disabled={isSaving}
@@ -772,7 +873,13 @@ export function HostPollManager({
                                 {option.responseCount}
                               </span>
                             </div>
-                            <div className="mt-1 h-4 overflow-hidden rounded bg-slate-100">
+                            <div
+                              className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
+                                selectedHistoryResults.poll.correctOptionIds.includes(option.id)
+                                  ? "ring-2 ring-green-600 ring-offset-2"
+                                  : ""
+                              }`}
+                            >
                               <div
                                 className="h-full rounded bg-teal-600"
                                 style={{
@@ -818,7 +925,7 @@ export function HostPollManager({
                     >
                       Poll question bank
                     </label>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                       <select
                         className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
                         id="poll-question-bank"
@@ -838,7 +945,7 @@ export function HostPollManager({
                       </select>
                       <button
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canAddToBank || isBankSaving}
+                        disabled={!canAddToBank || !hasValidSingleChoiceSolution || isBankSaving}
                         type="button"
                         onClick={() => {
                           setBankTitleDraft(question);
@@ -847,6 +954,19 @@ export function HostPollManager({
                         }}
                       >
                         Add to bank
+                      </button>
+                      <button
+                        className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={
+                          !selectedBankQuestionId ||
+                          !canAddToBank ||
+                          !hasValidSingleChoiceSolution ||
+                          isBankSaving
+                        }
+                        type="button"
+                        onClick={() => void updateCurrentPollInBank()}
+                      >
+                        Update saved
                       </button>
                       <button
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -882,7 +1002,6 @@ export function HostPollManager({
                     value={question}
                     onChange={(event) => {
                       setQuestion(event.target.value);
-                      setSelectedBankQuestionId("");
                       setBankStatus("");
                       setStatus("");
                     }}
@@ -901,7 +1020,11 @@ export function HostPollManager({
                         type="button"
                         onClick={() => {
                           setSelectionMode(mode);
-                          setSelectedBankQuestionId("");
+                          setCorrectOptionIndexes((currentIndexes) =>
+                            mode === "single"
+                              ? currentIndexes.slice(0, 1)
+                              : currentIndexes,
+                          );
                           setBankStatus("");
                         }}
                       >
@@ -918,7 +1041,6 @@ export function HostPollManager({
                       type="button"
                       onClick={() => {
                         setOptions((currentOptions) => [...currentOptions, ""]);
-                        setSelectedBankQuestionId("");
                         setBankStatus("");
                       }}
                     >
@@ -938,6 +1060,28 @@ export function HostPollManager({
                           value={option}
                           onChange={(event) => updateOption(index, event.target.value)}
                         />
+                        <label className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700">
+                          <input
+                            aria-label={`Correct answer ${index + 1}`}
+                            checked={correctOptionIndexes.includes(index)}
+                            className="size-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                            type="checkbox"
+                            onChange={(event) => {
+                              setCorrectOptionIndexes((currentIndexes) => {
+                                if (!event.target.checked) {
+                                  return currentIndexes.filter(
+                                    (item) => item !== index,
+                                  );
+                                }
+                                return selectionMode === "single"
+                                  ? [index]
+                                  : [...currentIndexes, index];
+                              });
+                              setBankStatus("");
+                            }}
+                          />
+                          Correct
+                        </label>
                         <button
                           aria-label={`Remove answer ${index + 1}`}
                           className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-700 disabled:opacity-40"
@@ -949,7 +1093,11 @@ export function HostPollManager({
                               setOptions((currentOptions) =>
                                 currentOptions.filter((_, optionIndex) => optionIndex !== index),
                               );
-                              setSelectedBankQuestionId("");
+                              setCorrectOptionIndexes((currentIndexes) =>
+                                currentIndexes
+                                  .filter((item) => item !== index)
+                                  .map((item) => (item > index ? item - 1 : item)),
+                              );
                               setBankStatus("");
                             }
                           }
@@ -959,6 +1107,11 @@ export function HostPollManager({
                       </div>
                     ))}
                   </div>
+                  {selectionMode === "single" && !hasValidSingleChoiceSolution ? (
+                    <p className="mt-2 text-sm font-medium text-amber-800">
+                      Mark exactly one correct answer before starting or saving this poll.
+                    </p>
+                  ) : null}
 
                   <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
                     <div>

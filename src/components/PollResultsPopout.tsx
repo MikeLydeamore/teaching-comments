@@ -23,6 +23,7 @@ export function PollResultsPopout({
 }: PollResultsPopoutProps) {
   const [poll, setPoll] = useState(initialPoll);
   const [results, setResults] = useState(initialResults);
+  const [nowMs, setNowMs] = useState(0);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/sessions/${sessionCode}/polls`, {
@@ -50,6 +51,13 @@ export function PollResultsPopout({
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const timer = window.setInterval(updateNow, 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const maxResultCount = useMemo(
     () =>
       Math.max(
@@ -57,6 +65,9 @@ export function PollResultsPopout({
         ...(results?.options.map((option) => option.responseCount) ?? []),
       ),
     [results],
+  );
+  const solutionIsVisible = Boolean(
+    poll && (poll.solutionRevealed || (nowMs > 0 && new Date(poll.endsAt).getTime() <= nowMs)),
   );
 
   return (
@@ -106,7 +117,13 @@ export function PollResultsPopout({
                     {option.responseCount}
                   </p>
                 </div>
-                <div className="mt-3 h-8 overflow-hidden rounded bg-white shadow-inner sm:h-10">
+                <div
+                  className={`mt-3 h-8 overflow-hidden rounded bg-white shadow-inner sm:h-10 ${
+                    solutionIsVisible && poll.correctOptionIds.includes(option.id)
+                      ? "ring-4 ring-green-600 ring-offset-2"
+                      : ""
+                  }`}
+                >
                   <div
                     className="h-full rounded bg-teal-600 transition-[width] duration-300"
                     style={{

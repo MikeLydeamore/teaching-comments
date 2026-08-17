@@ -1,4 +1,10 @@
-import { endPoll, extendPoll, getPoll, getPollResults } from "@/lib/qwt-store";
+import {
+  endPoll,
+  extendPoll,
+  getPoll,
+  getPollResults,
+  revealPollSolution,
+} from "@/lib/qwt-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PATCH(
@@ -19,7 +25,7 @@ export async function PATCH(
   }
 
   const body = (await request.json().catch(() => ({}))) as {
-    action?: "end" | "extend";
+    action?: "end" | "extend" | "reveal-solution";
     seconds?: number;
   };
 
@@ -29,6 +35,8 @@ export async function PATCH(
         ? await endPoll(id)
         : body.action === "extend"
           ? await extendPoll(id, Number(body.seconds))
+          : body.action === "reveal-solution"
+            ? await revealPollSolution(id)
           : null;
 
     if (!poll) {

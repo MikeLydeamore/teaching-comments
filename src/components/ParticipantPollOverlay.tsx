@@ -43,24 +43,17 @@ export function ParticipantPollOverlay({
   }, [poll.endsAt]);
 
   const endTime = new Date(poll.endsAt).getTime();
-  const isOpen = nowMs === 0 || endTime > nowMs;
+  const timerEnded = nowMs > 0 && endTime <= nowMs;
+  const solutionIsVisible = poll.solutionRevealed || timerEnded;
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
+  }, []);
 
   const remainingSeconds =
     nowMs > 0 ? Math.max(0, (endTime - nowMs) / 1000) : poll.durationSeconds;
@@ -117,7 +110,11 @@ export function ParticipantPollOverlay({
     }
   }
 
-  function toggleOption(optionId: string) {
+  function selectOption(optionId: string) {
+    if (solutionIsVisible) {
+      return;
+    }
+
     const nextOptionIds =
       poll.selectionMode === "single"
         ? [optionId]
@@ -145,15 +142,17 @@ export function ParticipantPollOverlay({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
-              Live poll
+              {solutionIsVisible ? "Poll results" : "Live poll"}
             </p>
             <p
               className="mt-2 text-sm text-slate-500"
               id="participant-poll-instructions"
             >
-              {poll.selectionMode === "single"
-                ? "Choose one answer. You can change it while the poll is open."
-                : "Choose any answers that apply. You can change them while the poll is open."}
+              {solutionIsVisible
+                ? "The poll has finished. Correct answers are outlined in green."
+                : poll.selectionMode === "single"
+                  ? "Choose one answer. You can change it while the poll is open."
+                  : "Choose all answers that apply. You can change them while the poll is open."}
             </p>
           </div>
           <div className="shrink-0 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-center text-teal-950">
@@ -176,22 +175,31 @@ export function ParticipantPollOverlay({
         <div className="mt-5 space-y-3">
           {poll.options.map((option) => {
             const isSelected = selectedOptionIds.includes(option.id);
+            const isCorrect =
+              solutionIsVisible && poll.correctOptionIds.includes(option.id);
 
             return (
               <label
                 className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-md border px-4 py-3 text-base font-medium transition ${
-                  isSelected
-                    ? "border-teal-500 bg-teal-50 text-teal-950"
-                    : "border-slate-300 bg-white text-slate-800 hover:border-teal-400"
+                  isCorrect
+                    ? "border-green-600 bg-green-50 text-green-950 ring-2 ring-green-600 ring-offset-2"
+                    : isSelected
+                      ? "border-teal-500 bg-teal-50 text-teal-950"
+                      : "border-slate-300 bg-white text-slate-800 hover:border-teal-400"
                 }`}
                 key={option.id}
               >
                 <input
                   checked={isSelected}
-                  className="size-5 shrink-0 accent-teal-700"
+                  className={`size-5 shrink-0 appearance-none rounded-full border-2 transition ${
+                    isSelected
+                      ? "border-teal-700 bg-teal-700 shadow-[inset_0_0_0_3px_white]"
+                      : "border-slate-400 bg-white"
+                  }`}
+                  disabled={solutionIsVisible}
                   name={`poll-${poll.id}`}
                   type={poll.selectionMode === "single" ? "radio" : "checkbox"}
-                  onChange={() => toggleOption(option.id)}
+                  onChange={() => selectOption(option.id)}
                 />
                 <span className="min-w-0 break-words">
                   <InlineCodeText>{option.label}</InlineCodeText>
@@ -200,6 +208,7 @@ export function ParticipantPollOverlay({
             );
           })}
         </div>
+
 
         <div className="mt-5 flex min-h-6 items-center justify-between gap-3">
           <p className="text-sm text-slate-500">
