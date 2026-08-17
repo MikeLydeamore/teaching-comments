@@ -731,7 +731,7 @@ export function HostPollManager({
                             type="button"
                             onClick={() => void updatePoll("reveal-solution")}
                           >
-                            Reveal solutions
+                            Reveal solution
                           </button>
                         ) : null}
                         {poll.status === "active" ? (
