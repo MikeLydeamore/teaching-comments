@@ -239,6 +239,7 @@ export function HostPollManager({
     question.trim().length > 0 &&
     options.length >= 2 &&
     options.every((option) => option.trim().length > 0) &&
+    (selectionMode !== "single" || correctOptionIndexes.length === 1) &&
     durationSeconds >= 5 &&
     durationSeconds <= 3600;
   const normalizedBankOptions = options.map((option) => option.trim());
@@ -252,6 +253,8 @@ export function HostPollManager({
     ) &&
     new Set(normalizedBankOptions.map((option) => option.toLowerCase())).size ===
       normalizedBankOptions.length;
+  const hasValidSingleChoiceSolution =
+    selectionMode !== "single" || correctOptionIndexes.length === 1;
   const solutionIsVisible = Boolean(
     poll &&
       (poll.solutionRevealed ||
@@ -890,7 +893,7 @@ export function HostPollManager({
                       </select>
                       <button
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canAddToBank || isBankSaving}
+                        disabled={!canAddToBank || !hasValidSingleChoiceSolution || isBankSaving}
                         type="button"
                         onClick={() => {
                           setBankTitleDraft(question);
@@ -1044,6 +1047,11 @@ export function HostPollManager({
                       </div>
                     ))}
                   </div>
+                  {selectionMode === "single" && !hasValidSingleChoiceSolution ? (
+                    <p className="mt-2 text-sm font-medium text-amber-800">
+                      Mark exactly one correct answer before starting or saving this poll.
+                    </p>
+                  ) : null}
 
                   <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
                     <div>

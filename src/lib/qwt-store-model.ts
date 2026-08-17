@@ -718,8 +718,8 @@ export function validateCorrectOptionIndexes(
     throw new Error("Choose valid correct answers.");
   }
 
-  if (selectionMode === "single" && indexes.length > 1) {
-    throw new Error("Single-choice polls can have only one correct answer.");
+  if (selectionMode === "single" && indexes.length !== 1) {
+    throw new Error("Single-choice polls need exactly one correct answer.");
   }
 
   return indexes.sort((left, right) => left - right);

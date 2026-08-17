@@ -1489,7 +1489,7 @@ export const supabaseStore: QwtStore = {
       throw new Error("That poll answer could not be found.");
     }
 
-    if (poll.selectionMode === "single" && selectedOptionIds.length > 1) {
+    if (poll.selectionMode === "single" && selectedOptionIds.length !== 1) {
       throw new Error("Choose one answer for this poll.");
     }
 
