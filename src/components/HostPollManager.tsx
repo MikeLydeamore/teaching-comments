@@ -92,6 +92,7 @@ export function HostPollManager({
   const [selectionMode, setSelectionMode] =
     useState<PollSelectionMode>("single");
   const [options, setOptions] = useState(["", ""]);
+  const [correctOptionIndexes, setCorrectOptionIndexes] = useState<number[]>([]);
   const [pollQuestionBank, setPollQuestionBank] = useState<
     PollQuestionBankItem[]
   >([]);
@@ -251,6 +252,11 @@ export function HostPollManager({
     ) &&
     new Set(normalizedBankOptions.map((option) => option.toLowerCase())).size ===
       normalizedBankOptions.length;
+  const solutionIsVisible = Boolean(
+    poll &&
+      (poll.solutionRevealed ||
+        (nowMs > 0 && new Date(poll.endsAt).getTime() <= nowMs)),
+  );
 
   function openManager() {
     setTab(poll ? "current" : "new");
@@ -275,6 +281,7 @@ export function HostPollManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           durationSeconds,
+          correctOptionIndexes,
           options,
           question,
           selectionMode,
@@ -291,6 +298,7 @@ export function HostPollManager({
       setResults(payload.results);
       setQuestion("");
       setOptions(["", ""]);
+      setCorrectOptionIndexes([]);
       setSelectedBankQuestionId("");
       setBankStatus("");
       setTab("current");
@@ -303,13 +311,22 @@ export function HostPollManager({
     }
   }
 
-  async function updatePoll(action: "end" | "extend", seconds?: number) {
+  async function updatePoll(
+    action: "end" | "extend" | "reveal-solution",
+    seconds?: number,
+  ) {
     if (!poll || isSaving) {
       return;
     }
 
     setIsSaving(true);
-    setStatus(action === "end" ? "Ending poll..." : "Extending poll...");
+    setStatus(
+      action === "end"
+        ? "Ending poll..."
+        : action === "reveal-solution"
+          ? "Revealing solutions..."
+          : "Extending poll...",
+    );
 
     try {
       const response = await fetch(`/api/polls/${poll.id}`, {
@@ -326,7 +343,13 @@ export function HostPollManager({
 
       setPoll(payload.poll);
       setResults(payload.results);
-      setStatus(action === "end" ? "Poll ended." : `Added ${seconds} seconds.`);
+      setStatus(
+        action === "end"
+          ? "Poll ended."
+          : action === "reveal-solution"
+            ? "Solutions revealed."
+            : `Added ${seconds} seconds.`,
+      );
       if (action === "end") {
         void refreshHistory();
       }
@@ -364,6 +387,7 @@ export function HostPollManager({
     setQuestion(bankQuestion.question);
     setSelectionMode(bankQuestion.selectionMode);
     setOptions([...bankQuestion.options]);
+    setCorrectOptionIndexes([...bankQuestion.correctOptionIndexes]);
   }
 
   async function addCurrentPollToBank() {
@@ -387,7 +411,13 @@ export function HostPollManager({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ options, question, selectionMode, title }),
+          body: JSON.stringify({
+            correctOptionIndexes,
+            options,
+            question,
+            selectionMode,
+            title,
+          }),
         },
       );
       const payload = await response.json().catch(() => ({}));
@@ -601,7 +631,13 @@ export function HostPollManager({
                               {option.responseCount}
                             </span>
                           </div>
-                          <div className="mt-1 h-4 overflow-hidden rounded bg-slate-100">
+                          <div
+                            className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
+                              solutionIsVisible && poll.correctOptionIds.includes(option.id)
+                                ? "ring-2 ring-green-600 ring-offset-2"
+                                : ""
+                            }`}
+                          >
                             <div
                               className="h-full rounded bg-teal-600 transition-[width]"
                               style={{
@@ -633,6 +669,16 @@ export function HostPollManager({
                         >
                           Download CSV
                         </button>
+                        {!solutionIsVisible && poll.correctOptionIds.length > 0 ? (
+                          <button
+                            className="h-10 rounded-md border border-green-300 px-3 text-sm font-semibold text-green-800 transition hover:border-green-500 disabled:opacity-60"
+                            disabled={isSaving}
+                            type="button"
+                            onClick={() => void updatePoll("reveal-solution")}
+                          >
+                            Reveal solutions
+                          </button>
+                        ) : null}
                         {poll.status === "active" ? (
                           <>
                           {pollExtensions.map((seconds) => (
@@ -772,7 +818,13 @@ export function HostPollManager({
                                 {option.responseCount}
                               </span>
                             </div>
-                            <div className="mt-1 h-4 overflow-hidden rounded bg-slate-100">
+                            <div
+                              className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
+                                selectedHistoryResults.poll.correctOptionIds.includes(option.id)
+                                  ? "ring-2 ring-green-600 ring-offset-2"
+                                  : ""
+                              }`}
+                            >
                               <div
                                 className="h-full rounded bg-teal-600"
                                 style={{
@@ -901,6 +953,11 @@ export function HostPollManager({
                         type="button"
                         onClick={() => {
                           setSelectionMode(mode);
+                          setCorrectOptionIndexes((currentIndexes) =>
+                            mode === "single"
+                              ? currentIndexes.slice(0, 1)
+                              : currentIndexes,
+                          );
                           setSelectedBankQuestionId("");
                           setBankStatus("");
                         }}
@@ -938,6 +995,29 @@ export function HostPollManager({
                           value={option}
                           onChange={(event) => updateOption(index, event.target.value)}
                         />
+                        <label className="flex shrink-0 items-center gap-2 text-sm font-medium text-slate-700">
+                          <input
+                            aria-label={`Correct answer ${index + 1}`}
+                            checked={correctOptionIndexes.includes(index)}
+                            className="size-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                            type="checkbox"
+                            onChange={(event) => {
+                              setCorrectOptionIndexes((currentIndexes) => {
+                                if (!event.target.checked) {
+                                  return currentIndexes.filter(
+                                    (item) => item !== index,
+                                  );
+                                }
+                                return selectionMode === "single"
+                                  ? [index]
+                                  : [...currentIndexes, index];
+                              });
+                              setSelectedBankQuestionId("");
+                              setBankStatus("");
+                            }}
+                          />
+                          Correct
+                        </label>
                         <button
                           aria-label={`Remove answer ${index + 1}`}
                           className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-600 transition hover:border-red-300 hover:text-red-700 disabled:opacity-40"
@@ -948,6 +1028,11 @@ export function HostPollManager({
                             {
                               setOptions((currentOptions) =>
                                 currentOptions.filter((_, optionIndex) => optionIndex !== index),
+                              );
+                              setCorrectOptionIndexes((currentIndexes) =>
+                                currentIndexes
+                                  .filter((item) => item !== index)
+                                  .map((item) => (item > index ? item - 1 : item)),
                               );
                               setSelectedBankQuestionId("");
                               setBankStatus("");

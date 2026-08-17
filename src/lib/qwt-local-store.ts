@@ -20,6 +20,7 @@ import {
   validatePollExtension,
   validatePollParticipantId,
   validatePollQuestionDefinition,
+  validateCorrectOptionIndexes,
   validatePollQuestionTitle,
   validateQuestionTitle,
   validateSubmissionContent,
@@ -225,10 +226,13 @@ async function readStore(): Promise<StoreData> {
     pollQuestionBank: (data.pollQuestionBank ?? []).map((question) => ({
       ...question,
       title: question.title ?? question.question,
+      correctOptionIndexes: question.correctOptionIndexes ?? [],
       updatedAt: question.updatedAt ?? question.createdAt,
     })),
     polls: (data.polls ?? []).map((poll) => ({
       ...poll,
+      correctOptionIds: poll.correctOptionIds ?? [],
+      solutionRevealed: poll.solutionRevealed ?? false,
       endedAt: poll.endedAt ?? null,
     })),
     teacherSpaces,
@@ -680,7 +684,7 @@ export const localStore: QwtStore = {
       .sort((left, right) => left.question.localeCompare(right.question));
   },
 
-  async addPollQuestionToBank(code, title, question, selectionMode, options) {
+  async addPollQuestionToBank(code, title, question, selectionMode, options, correctOptionIndexes) {
     const session = await this.getSession(code);
 
     if (!session) {
@@ -701,6 +705,11 @@ export const localStore: QwtStore = {
       question: definition.question,
       selectionMode: definition.selectionMode,
       options: definition.optionLabels,
+      correctOptionIndexes: validateCorrectOptionIndexes(
+        definition.selectionMode,
+        definition.optionLabels,
+        correctOptionIndexes,
+      ),
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -1039,7 +1048,7 @@ export const localStore: QwtStore = {
     return data.polls.find((poll) => poll.id === id) ?? null;
   },
 
-  async startPoll(code, question, selectionMode, optionLabels, durationSeconds) {
+  async startPoll(code, question, selectionMode, optionLabels, correctOptionIndexes, durationSeconds) {
     const session = await this.getSession(code);
 
     if (!session) {
@@ -1058,6 +1067,11 @@ export const localStore: QwtStore = {
     );
     const data = await readStore();
     const timestamp = now();
+    const correctIndexes = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    );
 
     data.polls = data.polls.map((poll) =>
       poll.sessionCode === session.id && poll.status === "active"
@@ -1075,6 +1089,8 @@ export const localStore: QwtStore = {
         label,
         position,
       })),
+      correctOptionIds: [],
+      solutionRevealed: false,
       status: "active",
       durationSeconds: definition.durationSeconds,
       startedAt: timestamp,
@@ -1085,6 +1101,7 @@ export const localStore: QwtStore = {
       createdAt: timestamp,
       updatedAt: timestamp,
     };
+    poll.correctOptionIds = correctIndexes.map((index) => poll.options[index].id);
 
     data.polls.push(poll);
     await writeStore(data);
@@ -1126,6 +1143,23 @@ export const localStore: QwtStore = {
       poll.status = "ended";
       poll.endedAt = timestamp;
       poll.updatedAt = timestamp;
+      await writeStore(data);
+    }
+
+    return poll;
+  },
+
+  async revealPollSolution(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (!poll.solutionRevealed) {
+      poll.solutionRevealed = true;
+      poll.updatedAt = now();
       await writeStore(data);
     }
 

@@ -180,6 +180,7 @@ export async function addPollQuestionToBank(
   question: string,
   selectionMode: PollSelectionMode,
   options: string[],
+  correctOptionIndexes: number[],
 ) {
   return getStore().addPollQuestionToBank(
     code,
@@ -187,6 +188,7 @@ export async function addPollQuestionToBank(
     question,
     selectionMode,
     options,
+    correctOptionIndexes,
   );
 }
 
@@ -263,6 +265,7 @@ export async function startPoll(
   question: string,
   selectionMode: PollSelectionMode,
   optionLabels: string[],
+  correctOptionIndexes: number[],
   durationSeconds: number,
 ) {
   return getStore().startPoll(
@@ -270,6 +273,7 @@ export async function startPoll(
     question,
     selectionMode,
     optionLabels,
+    correctOptionIndexes,
     durationSeconds,
   );
 }
@@ -280,6 +284,10 @@ export async function extendPoll(id: string, seconds: number) {
 
 export async function endPoll(id: string) {
   return getStore().endPoll(id);
+}
+
+export async function revealPollSolution(id: string) {
+  return getStore().revealPollSolution(id);
 }
 
 export async function getPollResponse(pollId: string, participantId: string) {
