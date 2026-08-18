@@ -3,7 +3,7 @@
 Ed.ie is a classroom helper for questions, short responses, drawings, polls,
 and live check-ins.
 
-The current slice includes:
+This includes:
 
 - a student writing page at `/spaces/default/demo-lecture`
 - a student join page at `/join`
@@ -34,7 +34,7 @@ The current slice includes:
 - word cloud charts for common words in typed responses
 - response-time plotting from the latest prompt update
 - local JSON storage for development
-- optional Supabase or Neon PostgreSQL storage for hosting
+- A PostgreSQL schema for holding responses
 
 ## Run locally
 
@@ -65,61 +65,17 @@ npm test
 For local development, submissions are stored in `.data/qwt-store.json`.
 This keeps the first step free and fast to iterate on.
 
-For a hosted deployment, use Supabase Postgres so data survives Vercel server
-restarts and can be managed outside the app:
+For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/neon-app-role.sql`.
 
-1. Create a free Supabase project.
-2. Open the Supabase SQL editor and run `database/schema.sql`.
-3. Set these environment variables locally and in Vercel:
+Set these environment variables locally and in Vercel:
 
 ```text
-QWT_STORAGE_BACKEND=supabase
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+QWT_STORAGE_BACKEND=<your-hosting>
+DATABASE_URL=https://your-project-ref.
 TEACHER_PIN=replace-with-a-private-pin-before-deploying
 ADMIN_PIN=replace-with-a-private-admin-pin-before-deploying
 TEACHER_AUTH_SECRET=replace-with-a-random-cookie-secret-before-deploying
 ```
-
-Keep the service role key server-side only. Do not put it in browser code or
-commit it to the repo.
-
-### Neon development migration (safe first step)
-
-Neon is opt-in. Existing deployments continue to use Supabase whenever its
-environment variables exist, even if the host injects `DATABASE_URL`. Only an
-explicit `QWT_STORAGE_BACKEND=neon` switches the application.
-
-1. Create a Neon project and a separate development branch.
-2. In that branch's SQL editor (or through its **unpooled owner** URL), apply
-   `database/schema.sql` and then `database/neon-app-role.sql`. Set a strong
-   password for `qwt_app` in the SQL editor separately.
-3. Put the branch's **pooled**, `qwt_app`-authenticated URL in `.env.local`:
-
-```text
-QWT_STORAGE_BACKEND=neon
-DATABASE_URL=postgresql://qwt_app:your-password@your-pooled-neon-host/neondb?sslmode=require
-```
-
-4. Run `npm run dev`, exercise the app, and run `npm test`. `DATABASE_URL`
-   stays server-side; it must never be exposed as `NEXT_PUBLIC_*`.
-5. If desired, configure these two settings for Vercel **Preview** only. Leave
-   the Production Supabase settings and `QWT_STORAGE_BACKEND` unchanged until
-   a separately planned cutover.
-
-`npm run reconcile-images` loads the usual `.env*` files and supports local,
-Supabase, and Neon reference scans. It remains dry-run by default.
-
-For a later production cutover, schedule a write-freeze/maintenance window for
-the final Supabase export, Neon import, validation, and backend switch (or
-implement and verify a delta-synchronisation process). Take a verified backup,
-validate row counts and image references before opening Neon for writes, then
-change only the Production backend setting. Once Neon accepts writes, a
-rollback needs a planned reconciliation/copy of those Neon-side writes before
-switching back to Supabase; a blind environment-variable rollback can lose
-data. Do not delete either database until the import and rollback window have
-been accepted.
-
 GIF search is optional. To enable it, create a GIPHY API key and set:
 
 ```text
@@ -137,72 +93,6 @@ IMAGE_WORKER_URL=https://your-private-image-worker.example
 IMAGE_WORKER_SERVICE_TOKEN=a-random-service-token-at-least-32-characters-long
 IMAGE_TICKET_SECRET=a-random-secret-at-least-32-characters-long
 ```
-
-Run `supabase/add-submission-image-data.sql` for existing Supabase databases.
-See [the image storage Worker guide](workers/image-storage/README.md) for the
-bucket, lifecycle, deployment, and rollback steps.
-The Worker owns short-lived pending uploads and committed private objects; run
-`npm run reconcile-images` for a dry-run reconciliation, or append `--delete`
-only after reviewing a complete scan. Reconciliation never deletes archived
-submission images. Configure retention separately for your teaching activity.
-Cloudflare storage is selected for the Oceania region where available; this is
-not an Australia-only residency guarantee. The feature is deliberately
-conservative (roughly a small handful of upload allocations per student per
-minute) and should be protected by platform rate limits in public deployments.
-
-If you already ran the first schema before drawing support was added, run
-`supabase/add-drawing-data.sql` in the Supabase SQL editor.
-
-If you already ran the schema before response-time plotting was added, run
-`supabase/add-prompt-timing.sql` in the Supabase SQL editor.
-
-If you already ran the schema before prompt history was added, run
-`supabase/add-prompt-history.sql` in the Supabase SQL editor.
-
-If you already ran the schema before teacher spaces were added, run
-`supabase/add-teacher-spaces.sql` in the Supabase SQL editor.
-
-If you already ran the schema before student display names were added, run
-`supabase/add-student-name.sql` in the Supabase SQL editor.
-
-If you already ran the schema before the classroom timer was added, run
-`supabase/add-session-timer.sql` in the Supabase SQL editor.
-
-If you already ran the schema before GIF support was added, run
-`supabase/add-gif-data.sql` in the Supabase SQL editor.
-
-If you already ran the schema before per-input submission controls were added,
-run `supabase/add-submission-input-controls.sql` in the Supabase SQL editor.
-
-If you already ran the schema before question banks were added, run
-`supabase/add-question-bank.sql` in the Supabase SQL editor.
-
-If you already ran the schema before group questions were added, run
-`supabase/add-group-questions.sql` in the Supabase SQL editor.
-
-If you already ran the group-question migration before answered questions were
-added, run `supabase/add-group-question-answered.sql` in the Supabase SQL editor.
-
-If you already ran the group-question migration before asker names were added,
-run `supabase/add-group-question-student-name.sql` in the Supabase SQL editor.
-
-If you already ran the schema before clear/archive support was added, run
-`supabase/add-archive-fields.sql` in the Supabase SQL editor.
-
-If you already ran the schema before live polls were added, run
-`supabase/add-live-polls.sql` in the Supabase SQL editor.
-
-If you already ran the schema before poll question banks were added, run
-`supabase/add-poll-question-bank.sql` in the Supabase SQL editor.
-
-If you already ran the schema before poll solutions were added, run
-`supabase/add-poll-solutions.sql` for Supabase or
-`database/add-poll-solutions.sql` as the Neon project owner.
-
-If you already ran the schema before session codes were scoped to teaching
-spaces, run `supabase/scope-session-codes-to-spaces.sql` in the Supabase SQL
-editor.
-
 ## Sessions
 
 Students join with a space code and session code on `/join` or by opening
