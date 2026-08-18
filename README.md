@@ -115,10 +115,3 @@ Set `ADMIN_PIN` before deploying anywhere public. If `ADMIN_PIN` is not set,
 the app falls back to `TEACHER_PIN` for compatibility with the earlier
 setup. Space PINs are created and reset from `/admin/spaces`, then
 stored hashed in the database.
-
-## Next steps
-
-1. Add basic rate limiting for student submissions.
-2. Deploy the app to Vercel with the Supabase environment variables.
-3. Add response editing/version history.
-4. Add peer comparison and ranking views.
