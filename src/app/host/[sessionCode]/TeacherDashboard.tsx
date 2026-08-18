@@ -882,7 +882,9 @@ export function TeacherDashboard({
       void refresh();
     }, 0);
     const timer = window.setInterval(() => {
-      void refresh();
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
     }, 3000);
 
     return () => {
