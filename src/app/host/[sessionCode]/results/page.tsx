@@ -8,18 +8,12 @@ import {
   listPromptHistory,
   listSubmissions,
 } from "@/lib/qwt-store";
+import {
+  parseSubmissionMinutes,
+  submissionTimeRangeLabel,
+} from "@/lib/submission-time-range";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
-
-function parseMinutes(value: string | undefined) {
-  const minutes = value ? Number(value) : 3;
-
-  if (!Number.isFinite(minutes)) {
-    return 3;
-  }
-
-  return Math.min(500, Math.max(1, minutes));
-}
 
 function parseChartType(value: string | undefined): ChartType {
   if (value === "pie" || value === "wordCloud") {
@@ -51,7 +45,7 @@ export default async function TeacherResultsPage({
 }) {
   const { sessionCode } = await params;
   const query = await searchParams;
-  const minutes = parseMinutes(query.minutes);
+  const minutes = parseSubmissionMinutes(query.minutes);
   const chartType = parseChartType(query.chartType);
   const includeHidden = query.includeHidden === "true";
   const promptHistoryId = query.promptHistoryId ?? "";
@@ -111,7 +105,7 @@ export default async function TeacherResultsPage({
             {session.title}
           </h1>
           <p className="mt-2 text-base text-slate-600">
-            Last {minutes} minute{minutes === 1 ? "" : "s"}
+            {submissionTimeRangeLabel(minutes)}
             {includeHidden ? ", including hidden responses" : ""}
             {starredOnly ? ", starred responses only" : ""}
             {selectedPromptHistory ? ", filtered by prompt" : ""}

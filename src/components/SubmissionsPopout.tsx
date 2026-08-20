@@ -13,6 +13,7 @@ import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import type { SubmissionDto } from "@/lib/qwt-store";
+import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
 
 type SubmissionsPopoutProps = {
   dashboardUrl: string;
@@ -50,6 +51,22 @@ function sortSubmissions(
 
     return sortOrder === "oldest" ? leftTime - rightTime : rightTime - leftTime;
   });
+}
+
+function submissionsAreUnchanged(
+  currentSubmissions: SubmissionDto[],
+  nextSubmissions: SubmissionDto[],
+) {
+  return (
+    currentSubmissions.length === nextSubmissions.length &&
+    currentSubmissions.every((submission, index) => {
+      const nextSubmission = nextSubmissions[index];
+      return (
+        submission.id === nextSubmission?.id &&
+        submission.version === nextSubmission.version
+      );
+    })
+  );
 }
 
 function responseTime(value: string, hasHydrated: boolean) {
@@ -95,10 +112,10 @@ export function SubmissionsPopout({
     return query.toString();
   }, [includeHidden, minutes, promptHistoryId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(
       `/api/sessions/${sessionCode}/submissions?${queryString}`,
-      { cache: "no-store" },
+      { cache: "no-store", signal },
     );
 
     if (!response.ok) {
@@ -112,22 +129,48 @@ export function SubmissionsPopout({
     const nextVisibleSubmissions = starredOnly
       ? nextSubmissions.filter((submission) => submission.starred)
       : nextSubmissions;
+    const sortedSubmissions = sortSubmissions(
+      nextVisibleSubmissions,
+      sortOrder,
+    );
 
-    setSubmissions(sortSubmissions(nextVisibleSubmissions, sortOrder));
+    setSubmissions((currentSubmissions) =>
+      submissionsAreUnchanged(currentSubmissions, sortedSubmissions)
+        ? currentSubmissions
+        : sortedSubmissions,
+    );
     setLastRefresh(new Date());
   }, [queryString, sessionCode, sortOrder, starredOnly]);
 
   useEffect(() => {
-    const firstRefresh = window.setTimeout(() => {
-      void refresh();
-    }, 0);
-    const timer = window.setInterval(() => {
-      void refresh();
+    const controller = new AbortController();
+    let timer: number | null = null;
+    let disposed = false;
+
+    const poll = async () => {
+      try {
+        await refresh(controller.signal);
+      } catch {
+        // A later poll can recover from transient network failures.
+      } finally {
+        if (!disposed) {
+          timer = window.setTimeout(() => {
+            void poll();
+          }, 3000);
+        }
+      }
+    };
+
+    timer = window.setTimeout(() => {
+      void poll();
     }, 3000);
 
     return () => {
-      window.clearTimeout(firstRefresh);
-      window.clearInterval(timer);
+      disposed = true;
+      controller.abort();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
     };
   }, [refresh]);
 
@@ -214,7 +257,7 @@ export function SubmissionsPopout({
         ) : null}
         <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">
           <span>
-            Last {minutes} minute{minutes === 1 ? "" : "s"}
+            {submissionTimeRangeLabel(minutes)}
             {includeHidden ? ", including hidden responses" : ""}
             {starredOnly ? ", starred responses only" : ""}
           </span>
@@ -222,7 +265,7 @@ export function SubmissionsPopout({
           <span>
             {lastRefresh
               ? `Updated ${lastRefresh.toLocaleTimeString()}`
-              : "Loading latest submissions..."}
+              : "Loaded with page"}
           </span>
         </div>
       </header>

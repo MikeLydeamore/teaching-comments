@@ -98,7 +98,9 @@ export function SubmissionImagePreview({
         <img
           alt="Student submitted image"
           className={className}
+          decoding="async"
           key={attempt}
+          loading="lazy"
           src={submissionImageRetryUrl(url, attempt)}
           onError={handleError}
           onLoad={handleLoad}
