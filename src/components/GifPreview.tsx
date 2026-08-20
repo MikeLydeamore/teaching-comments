@@ -27,7 +27,9 @@ export function GifPreview({
         <img
           alt={altText}
           className="mx-auto block max-h-64 w-full object-contain"
+          decoding="async"
           height={gifData.height}
+          loading="lazy"
           src={imageUrl}
           style={{ aspectRatio: `${gifData.width} / ${gifData.height}` }}
           width={gifData.width}

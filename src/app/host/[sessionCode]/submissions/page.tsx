@@ -6,17 +6,8 @@ import {
   toSubmissionDto,
 } from "@/lib/qwt-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
+import { parseSubmissionMinutes } from "@/lib/submission-time-range";
 import { TeacherLogin } from "../TeacherLogin";
-
-function parseMinutes(value: string | undefined) {
-  const minutes = value ? Number(value) : 3;
-
-  if (!Number.isFinite(minutes)) {
-    return 3;
-  }
-
-  return Math.min(500, Math.max(1, minutes));
-}
 
 function parseSortOrder(value: string | undefined) {
   return value === "oldest" ? "oldest" : "newest";
@@ -37,7 +28,7 @@ export default async function TeacherSubmissionsPage({
 }) {
   const { sessionCode } = await params;
   const query = await searchParams;
-  const minutes = parseMinutes(query.minutes);
+  const minutes = parseSubmissionMinutes(query.minutes);
   const includeHidden = false;
   const promptHistoryId = query.promptHistoryId ?? "";
   const sortOrder = parseSortOrder(query.sortOrder);
