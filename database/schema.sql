@@ -1,12 +1,20 @@
 -- Provider-neutral fresh-install schema. Apply with an owner connection.
 create extension if not exists pgcrypto;
+create extension if not exists citext;
 
 create table if not exists edie_teacher_spaces (
   code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name text not null check (char_length(name) between 1 and 120),
-  pin_hash text not null check (char_length(pin_hash) between 8 and 300),
   created_at timestamptz not null default now()
 );
+create table if not exists edie_space_members (
+  space_code text not null references edie_teacher_spaces(code) on delete cascade,
+  email citext not null check (char_length(email) between 3 and 320),
+  role text not null check (role in ('owner', 'editor')),
+  created_at timestamptz not null default now(),
+  primary key (space_code, email)
+);
+create index if not exists edie_space_members_email_idx on edie_space_members (email);
 create table if not exists edie_sessions (
   id text primary key default gen_random_uuid()::text,
   code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
@@ -108,7 +116,7 @@ alter table edie_group_question_votes enable row level security;
 alter table edie_polls enable row level security;
 alter table edie_poll_responses enable row level security;
 
-insert into edie_teacher_spaces (code,name,pin_hash) values ('default','Default Space','plain:teach123') on conflict (code) do nothing;
+insert into edie_teacher_spaces (code,name) values ('default','Default Space') on conflict (code) do nothing;
 insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','In one or two sentences, explain what the p-value tells us in this setting.',true) on conflict (space_code,code) do nothing;
 insert into edie_prompt_history (id,session_code,prompt,started_at,ended_at)
 select '44444444-4444-4444-8444-444444444444',id,prompt,prompt_updated_at,null from edie_sessions where id='demo-lecture' on conflict (id) do nothing;

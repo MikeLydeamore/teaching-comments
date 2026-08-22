@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import { SettingsMenu } from "@/components/SettingsMenu";
 import { joinSession } from "./actions";
 
 const messages = {
@@ -23,6 +24,7 @@ export default async function JoinPage({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
+      <SettingsMenu />
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
           Ed.ie

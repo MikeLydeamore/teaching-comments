@@ -8,6 +8,7 @@ import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "./StudentSubmit";
 import { imageUploadsEnabled } from "@/lib/image-upload";
+import { SettingsMenu } from "@/components/SettingsMenu";
 
 export default async function StudentPage({
   params,
@@ -75,6 +76,7 @@ function StudentSessionUnavailable({
 }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
+      <SettingsMenu />
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
           Ed.ie

@@ -3,6 +3,7 @@
 create role edie_app login nosuperuser nocreatedb nocreaterole noinherit;
 grant usage on schema public to edie_app;
 grant select, insert, update on edie_teacher_spaces to edie_app;
+grant select, insert, update, delete on edie_space_members to edie_app;
 grant select, insert, update on edie_sessions to edie_app;
 grant select, insert, update on edie_submissions to edie_app;
 grant select, insert, delete on edie_question_bank to edie_app;

@@ -1,59 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const storageKey = "edie_theme";
-
-const themes = [
-  { label: "Default", value: "default" },
-  { label: "Flatly", value: "flatly" },
-  { label: "Minty", value: "minty" },
-  { label: "Cerulean", value: "cerulean" },
-  { label: "Pulse", value: "pulse" },
-  { label: "Solar", value: "solar" },
-  { label: "Amethyst", value: "amethyst" },
-  { label: "Midnight", value: "midnight" },
-  { label: "Blush", value: "blush" },
-  { label: "Darkly", value: "darkly" },
-] as const;
-
-type ThemeName = (typeof themes)[number]["value"];
-
-function isThemeName(value: string | null): value is ThemeName {
-  return themes.some((theme) => theme.value === value);
-}
-
-function storedTheme(): ThemeName {
-  if (typeof window === "undefined") {
-    return "default";
-  }
-
-  const value = window.localStorage.getItem(storageKey);
-  return isThemeName(value) ? value : "default";
-}
-
-function applyTheme(theme: ThemeName) {
-  if (theme === "default") {
-    document.documentElement.removeAttribute("data-edie-theme");
-    document.documentElement.style.colorScheme = "light";
-  } else {
-    document.documentElement.dataset.edieTheme = theme;
-    document.documentElement.style.colorScheme =
-      theme === "darkly" || theme === "midnight" ? "dark" : "light";
-  }
-}
+import {
+  applyTheme,
+  storedTheme,
+  themes,
+  type ThemeName,
+} from "@/lib/theme";
 
 export function ThemeSelector() {
   const [theme, setTheme] = useState<ThemeName>(storedTheme);
 
   useEffect(() => {
     applyTheme(theme);
-    window.localStorage.setItem(storageKey, theme);
+    window.localStorage.setItem("edie_theme", theme);
   }, [theme]);
 
   return (
-    <div className="edie-theme-selector fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-      <label className="font-semibold text-slate-600" htmlFor="edie-theme">
+    <div className="flex items-center gap-2">
+      <label className="text-sm font-semibold text-slate-600" htmlFor="edie-theme">
         Theme
       </label>
       <select

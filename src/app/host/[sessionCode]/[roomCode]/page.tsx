@@ -1,5 +1,7 @@
-import { isDefaultTeacherPin } from "@/lib/teacher-auth";
-import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
+import { redirect } from "next/navigation";
+import { AccountMenu } from "@/components/AccountMenu";
+import { NoAccess } from "@/components/NoAccess";
+import { getCurrentTeacher } from "@/lib/auth-server";
 import {
   getOrCreateSessionInSpace,
   getSessionStats,
@@ -7,69 +9,49 @@ import {
   listPromptHistory,
   listQuestionBank,
 } from "@/lib/edie-store";
+import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
 import { TeacherDashboard } from "../TeacherDashboard";
-import { TeacherLogin } from "../TeacherLogin";
 
 export default async function TeacherSpaceSessionPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ sessionCode: string; roomCode: string }>;
-  searchParams: Promise<{ auth?: string }>;
 }) {
   const { roomCode, sessionCode: spaceCode } = await params;
-  const query = await searchParams;
   const space = await getTeacherSpace(spaceCode);
+  const access = await resolveSpaceAccess(spaceCode);
 
-  if (!space) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed"}
-        nextPath={`/host/${spaceCode}/${roomCode}`}
-        sessionCode={roomCode}
-        spaceCode={spaceCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
+  if (access.status === "unauthenticated") {
+    redirect(
+      loginRedirectPath(`/host/${space?.code ?? spaceCode}/${roomCode}`),
     );
   }
 
-  if (!(await isTeacherAuthenticatedForSpaceCode(space.code))) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed"}
-        nextPath={`/host/${space.code}/${roomCode}`}
-        sessionCode={roomCode}
-        spaceCode={space.code}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+  if (access.status !== "ok" || !space) {
+    return <NoAccess />;
   }
 
   const session = await getOrCreateSessionInSpace(space.code, roomCode);
 
   if (!session) {
-    return (
-      <TeacherLogin
-        authFailed
-        nextPath={`/host/${space.code}`}
-        sessionCode={roomCode}
-        spaceCode={space.code}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+    redirect(`/host/${space.code}`);
   }
 
+  const teacher = await getCurrentTeacher();
   const stats = await getSessionStats(session.id);
   const promptHistory = await listPromptHistory(session.id);
   const questionBank = await listQuestionBank(session.id);
 
   return (
-    <TeacherDashboard
-      initialPromptHistory={promptHistory}
-      initialQuestionBank={questionBank}
-      initialStats={stats}
-      session={session}
-      spaceCode={space.code}
-    />
+    <>
+      {teacher ? <AccountMenu user={teacher} /> : null}
+      <TeacherDashboard
+        initialPromptHistory={promptHistory}
+        initialQuestionBank={questionBank}
+        initialStats={stats}
+        session={session}
+        spaceCode={space.code}
+      />
+    </>
   );
 }

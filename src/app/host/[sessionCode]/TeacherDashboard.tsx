@@ -8,7 +8,6 @@ import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { HostPollManager } from "@/components/HostPollManager";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingActionButton } from "@/components/PendingActionButton";
-import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { ToastProvider, useToast } from "@/components/Toast";
 import { QrCode } from "@/components/QrCode";
@@ -1256,20 +1255,13 @@ function TeacherDashboardContent({
           >
             QR popout
           </Link>
-          <PendingLink
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={teacherHomeUrl}
-            pendingChildren="Opening sessions..."
-          >
-            Select session
-          </PendingLink>
           <form action={logoutTeacher}>
             <input name="next" type="hidden" value={teacherHomeUrl} />
             <PendingSubmitButton
               className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
-              pendingChildren="Locking..."
+              pendingChildren="Signing out..."
             >
-              Lock
+              Sign out
             </PendingSubmitButton>
           </form>
         </div>

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { SubmissionsPopout } from "@/components/SubmissionsPopout";
 import {
   getOrCreateSession,
@@ -5,9 +6,10 @@ import {
   listSubmissions,
   toSubmissionDto,
 } from "@/lib/edie-store";
-import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
+import { DEFAULT_SPACE_CODE } from "@/lib/edie-store-model";
 import { parseSubmissionMinutes } from "@/lib/submission-time-range";
-import { TeacherLogin } from "../TeacherLogin";
+import { NoAccess } from "@/components/NoAccess";
+import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
 
 function parseSortOrder(value: string | undefined) {
   return value === "oldest" ? "oldest" : "newest";
@@ -46,15 +48,14 @@ export default async function TeacherSubmissionsPage({
 
   const nextPath = `/host/${sessionCode}/submissions?${search.toString()}`;
 
-  if (!(await isTeacherAuthenticated())) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed"}
-        nextPath={nextPath}
-        sessionCode={sessionCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+  const access = await resolveSpaceAccess(DEFAULT_SPACE_CODE);
+
+  if (access.status === "unauthenticated") {
+    redirect(loginRedirectPath(nextPath));
+  }
+
+  if (access.status !== "ok") {
+    return <NoAccess />;
   }
 
   const session = await getOrCreateSession(sessionCode);

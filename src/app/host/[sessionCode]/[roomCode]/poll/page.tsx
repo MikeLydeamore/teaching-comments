@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PollResultsPopout } from "@/components/PollResultsPopout";
 import {
   getLatestPoll,
@@ -5,46 +6,31 @@ import {
   getPollResults,
   getTeacherSpace,
 } from "@/lib/edie-store";
-import { isDefaultTeacherPin } from "@/lib/teacher-auth";
-import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
-import { TeacherLogin } from "../../TeacherLogin";
+import { NoAccess } from "@/components/NoAccess";
+import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
 
 export default async function TeacherSpacePollPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ roomCode: string; sessionCode: string }>;
-  searchParams: Promise<{ auth?: string }>;
 }) {
   const { roomCode, sessionCode: spaceCode } = await params;
-  const query = await searchParams;
   const nextPath = `/host/${spaceCode}/${roomCode}/poll`;
   const space = await getTeacherSpace(spaceCode);
+  const access = await resolveSpaceAccess(spaceCode);
 
-  if (!space || !(await isTeacherAuthenticatedForSpaceCode(space.code))) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed" || !space}
-        nextPath={space ? nextPath : `/host/${spaceCode}`}
-        sessionCode={roomCode}
-        spaceCode={spaceCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+  if (access.status === "unauthenticated") {
+    redirect(loginRedirectPath(nextPath));
+  }
+
+  if (access.status !== "ok" || !space) {
+    return <NoAccess />;
   }
 
   const session = await getOrCreateSessionInSpace(space.code, roomCode);
 
   if (!session) {
-    return (
-      <TeacherLogin
-        authFailed
-        nextPath={`/host/${space.code}`}
-        sessionCode={roomCode}
-        spaceCode={space.code}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+    redirect(`/host/${space.code}`);
   }
 
   const poll = await getLatestPoll(session.id);

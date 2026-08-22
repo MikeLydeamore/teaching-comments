@@ -57,11 +57,44 @@ export type SubmissionImageDto = Pick<
 export type TeacherSpace = {
   code: string;
   name: string;
-  pinHash: string;
   createdAt: string;
 };
 
-export type TeacherSpaceSummary = Omit<TeacherSpace, "pinHash">;
+export type TeacherSpaceSummary = TeacherSpace;
+
+export type SpaceRole = "owner" | "editor";
+
+export type SpaceMember = {
+  spaceCode: string;
+  email: string;
+  role: SpaceRole;
+  createdAt: string;
+};
+
+export type SpaceWithRole = TeacherSpaceSummary & {
+  role: SpaceRole;
+};
+
+const SPACE_ROLE_ROLES: readonly SpaceRole[] = ["owner", "editor"];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizeSpaceEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+
+  if (!EMAIL_PATTERN.test(normalized)) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  return normalized;
+}
+
+export function validateSpaceRole(role: string): SpaceRole {
+  if (!(SPACE_ROLE_ROLES as readonly string[]).includes(role)) {
+    throw new Error("Unknown space role.");
+  }
+
+  return role as SpaceRole;
+}
 
 export type Session = {
   id: string;
@@ -235,17 +268,26 @@ export type ArchiveSessionActivityResult = {
 };
 
 export type EdieStore = {
-  createTeacherSpace(
-    code: string,
-    name: string,
-    pinHash: string,
-  ): Promise<TeacherSpace>;
+  createTeacherSpace(code: string, name: string): Promise<TeacherSpace>;
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
-  updateTeacherSpacePinHash(
-    code: string,
-    pinHash: string,
-  ): Promise<TeacherSpace | null>;
+  listTeacherSpacesForUser(email: string): Promise<SpaceWithRole[]>;
+  getSpaceMemberRole(
+    spaceCode: string,
+    email: string,
+  ): Promise<SpaceRole | null>;
+  listSpaceMembers(spaceCode: string): Promise<SpaceMember[]>;
+  addSpaceMember(
+    spaceCode: string,
+    email: string,
+    role?: SpaceRole,
+  ): Promise<SpaceMember>;
+  updateSpaceMemberRole(
+    spaceCode: string,
+    email: string,
+    role: SpaceRole,
+  ): Promise<SpaceMember | null>;
+  removeSpaceMember(spaceCode: string, email: string): Promise<boolean>;
   getSession(code: string): Promise<Session | null>;
   getSessionInSpace(spaceCode: string, code: string): Promise<Session | null>;
   getOrCreateSession(code: string): Promise<Session>;
@@ -395,16 +437,6 @@ export function validateTeacherSpaceName(name: string) {
 
   if (normalized.length > 120) {
     throw new Error("Space name must be 120 characters or fewer.");
-  }
-
-  return normalized;
-}
-
-export function validateTeacherSpacePinHash(pinHash: string) {
-  const normalized = pinHash.trim();
-
-  if (normalized.length < 8 || normalized.length > 300) {
-    throw new Error("Space PIN hash could not be saved.");
   }
 
   return normalized;

@@ -12,6 +12,7 @@ import {
   type SubmissionDto,
   type CreateSubmissionInput,
   type SubmissionPatch,
+  type SpaceRole,
 } from "./edie-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
@@ -45,6 +46,9 @@ export type {
   SubmissionStatus,
   TeacherSpace,
   TeacherSpaceSummary,
+  SpaceMember,
+  SpaceRole,
+  SpaceWithRole,
 } from "./edie-store-model";
 
 // Artificial per-call latency for local testing, e.g. STORE_DELAY_MS=1500 npm run dev.
@@ -83,12 +87,8 @@ export async function getSession(code: string) {
   return getStore().getSession(code);
 }
 
-export async function createTeacherSpace(
-  code: string,
-  name: string,
-  pinHash: string,
-) {
-  return getStore().createTeacherSpace(code, name, pinHash);
+export async function createTeacherSpace(code: string, name: string) {
+  return getStore().createTeacherSpace(code, name);
 }
 
 export async function getTeacherSpace(code: string) {
@@ -99,11 +99,36 @@ export async function listTeacherSpaces() {
   return getStore().listTeacherSpaces();
 }
 
-export async function updateTeacherSpacePinHash(
-  code: string,
-  pinHash: string,
+export async function listTeacherSpacesForUser(email: string) {
+  return getStore().listTeacherSpacesForUser(email);
+}
+
+export async function getSpaceMemberRole(spaceCode: string, email: string) {
+  return getStore().getSpaceMemberRole(spaceCode, email);
+}
+
+export async function listSpaceMembers(spaceCode: string) {
+  return getStore().listSpaceMembers(spaceCode);
+}
+
+export async function addSpaceMember(
+  spaceCode: string,
+  email: string,
+  role?: SpaceRole,
 ) {
-  return getStore().updateTeacherSpacePinHash(code, pinHash);
+  return getStore().addSpaceMember(spaceCode, email, role);
+}
+
+export async function updateSpaceMemberRole(
+  spaceCode: string,
+  email: string,
+  role: SpaceRole,
+) {
+  return getStore().updateSpaceMemberRole(spaceCode, email, role);
+}
+
+export async function removeSpaceMember(spaceCode: string, email: string) {
+  return getStore().removeSpaceMember(spaceCode, email);
 }
 
 export async function getSessionInSpace(spaceCode: string, code: string) {

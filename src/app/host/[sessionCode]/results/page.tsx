@@ -1,19 +1,21 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
+import { NoAccess } from "@/components/NoAccess";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import {
   getOrCreateSession,
   listPromptHistory,
   listSubmissions,
 } from "@/lib/edie-store";
+import { DEFAULT_SPACE_CODE } from "@/lib/edie-store-model";
 import {
   parseSubmissionMinutes,
   submissionTimeRangeLabel,
 } from "@/lib/submission-time-range";
-import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
-import { TeacherLogin } from "../TeacherLogin";
+import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
 
 function parseChartType(value: string | undefined): ChartType {
   if (value === "pie" || value === "wordCloud") {
@@ -63,15 +65,14 @@ export default async function TeacherResultsPage({
 
   const nextPath = `/host/${sessionCode}/results?${search.toString()}`;
 
-  if (!(await isTeacherAuthenticated())) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed"}
-        nextPath={nextPath}
-        sessionCode={sessionCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+  const access = await resolveSpaceAccess(DEFAULT_SPACE_CODE);
+
+  if (access.status === "unauthenticated") {
+    redirect(loginRedirectPath(nextPath));
+  }
+
+  if (access.status !== "ok") {
+    return <NoAccess />;
   }
 
   const session = await getOrCreateSession(sessionCode);

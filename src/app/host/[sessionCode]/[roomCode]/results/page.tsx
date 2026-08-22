@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
+import { NoAccess } from "@/components/NoAccess";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import {
   getOrCreateSessionInSpace,
@@ -12,9 +14,7 @@ import {
   parseSubmissionMinutes,
   submissionTimeRangeLabel,
 } from "@/lib/submission-time-range";
-import { isDefaultTeacherPin } from "@/lib/teacher-auth";
-import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
-import { TeacherLogin } from "../../TeacherLogin";
+import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
 
 function parseChartType(value: string | undefined): ChartType {
   if (value === "pie" || value === "wordCloud") {
@@ -36,7 +36,6 @@ export default async function TeacherSpaceResultsPage({
 }: {
   params: Promise<{ sessionCode: string; roomCode: string }>;
   searchParams: Promise<{
-    auth?: string;
     chartType?: string;
     includeHidden?: string;
     minutes?: string;
@@ -63,31 +62,20 @@ export default async function TeacherSpaceResultsPage({
   }
 
   const nextPath = `/host/${spaceCode}/${roomCode}/results?${search.toString()}`;
+  const access = await resolveSpaceAccess(spaceCode);
 
-  if (!(await isTeacherAuthenticatedForSpaceCode(spaceCode))) {
-    return (
-      <TeacherLogin
-        authFailed={query.auth === "failed"}
-        nextPath={nextPath}
-        sessionCode={roomCode}
-        spaceCode={spaceCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+  if (access.status === "unauthenticated") {
+    redirect(loginRedirectPath(nextPath));
+  }
+
+  if (access.status !== "ok") {
+    return <NoAccess />;
   }
 
   const session = await getOrCreateSessionInSpace(spaceCode, roomCode);
 
   if (!session) {
-    return (
-      <TeacherLogin
-        authFailed
-        nextPath={`/host/${spaceCode}`}
-        sessionCode={roomCode}
-        spaceCode={spaceCode}
-        usesDefaultPin={isDefaultTeacherPin()}
-      />
-    );
+    redirect(`/host/${spaceCode}`);
   }
 
   const promptHistory = await listPromptHistory(session.id);

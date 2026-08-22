@@ -9,8 +9,9 @@ This includes:
 - a student join page at `/join`
 - a host dashboard at `/host/default/demo-lecture`
 - host-generated QR codes for the student session link
-- teacher spaces with an admin-created space PIN
-- an admin page at `/admin/spaces` for creating spaces and resetting space PINs
+- teacher accounts via Google/GitHub OAuth (no passwords)
+- teacher spaces with owner/editor sharing by email
+- an admin page at `/admin/spaces` for admins listed in `ADMIN_EMAILS`
 - in-session prompt editing from the host dashboard
 - per-session prompt history with response filtering by prompt
 - per-session teacher question banks for saved prompts
@@ -72,9 +73,14 @@ Set these environment variables locally and in Vercel:
 ```text
 EDIE_STORAGE_BACKEND=<your-hosting>
 DATABASE_URL=https://your-project-ref.
-TEACHER_PIN=replace-with-a-private-pin-before-deploying
-ADMIN_PIN=replace-with-a-private-admin-pin-before-deploying
-TEACHER_AUTH_SECRET=replace-with-a-random-cookie-secret-before-deploying
+BETTER_AUTH_SECRET=replace-with-a-random-secret-at-least-32-characters-long
+BETTER_AUTH_URL=https://your-deployed-origin
+AUTH_DATABASE_URL=<postgres-url-holding-auth-tables>
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+ADMIN_EMAILS=you@example.com
 ```
 GIF search is optional. To enable it, create a GIPHY API key and set:
 
@@ -96,21 +102,34 @@ IMAGE_TICKET_SECRET=a-random-secret-at-least-32-characters-long
 
 Students join with a space code and session code on `/join` or by opening
 `/spaces/<space-code>/<session-code>`. Student routes and submission APIs only
-accept existing open sessions. Teachers create sessions by opening a session
-from `/host/<space-code>` after entering that space's teacher PIN.
+accept existing open sessions. Students never sign in. Teachers open sessions
+from their space dashboard after signing in with Google or GitHub.
 
 Session codes are unique within a teaching space. Different spaces can use the
 same session code without sharing responses, questions, or polls.
 
-## Teacher Spaces And PINs
+## Teacher Accounts And Spaces
 
-Local development defaults to this admin PIN and default-space PIN:
+Teachers sign in with Google or GitHub through Better Auth; there are no
+passwords, so there are no resets to manage. Every teacher route requires a
+signed-in account with a membership row in `edie_space_members`:
 
-```text
-teach123
+- **owner** — full access, can share the space and manage members
+- **editor** — run live sessions and moderate responses
+
+Members are invited by email on `/host/<space-code>/settings`; the invite
+becomes active as soon as the invitee signs in with that email.
+
+Admins are verified emails listed in `ADMIN_EMAILS` (comma-separated). They
+manage all spaces from `/admin/spaces`, including claiming legacy spaces that
+have no owner.
+
+Local development uses Docker Postgres for auth tables:
+
+```bash
+docker compose up -d
+AUTH_DATABASE_URL=postgres://edie:edie@localhost:5432/edie_auth \
+  node tools/generate-auth-schema.mjs   # regenerate database/auth-schema.sql
+docker exec -i edie-auth-postgres psql -U edie -d edie_auth \
+  < database/auth-schema.sql
 ```
-
-Set `ADMIN_PIN` before deploying anywhere public. If `ADMIN_PIN` is not set,
-the app falls back to `TEACHER_PIN` for compatibility with the earlier
-setup. Space PINs are created and reset from `/admin/spaces`, then
-stored hashed in the database.

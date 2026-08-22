@@ -28,7 +28,8 @@ import {
   validateQuestionTitle,
   validateSubmissionContent,
   validateTeacherSpaceName,
-  validateTeacherSpacePinHash,
+  normalizeSpaceEmail,
+  validateSpaceRole,
   type GroupQuestion,
   type PollOption,
   type PromptHistoryItem,
@@ -37,9 +38,19 @@ import {
   type SessionPoll,
   type Submission,
   type TeacherSpace,
+  type SpaceMember,
 } from "./edie-store-model";
 
 type Row = Record<string, unknown>;
+
+function spaceMemberFromRow(row: Row): SpaceMember {
+  return {
+    spaceCode: text(row, "space_code"),
+    email: text(row, "email"),
+    role: validateSpaceRole(text(row, "role")),
+    createdAt: text(row, "created_at"),
+  };
+}
 
 export class NeonStoreError extends Error {
   readonly status: number;
@@ -143,7 +154,7 @@ function sessionFromRow(row: Row): Session {
 }
 
 function teacherSpaceFromRow(row: Row): TeacherSpace {
-  return { code: text(row, "code"), name: text(row, "name"), pinHash: text(row, "pin_hash"), createdAt: text(row, "created_at") };
+  return { code: text(row, "code"), name: text(row, "name"), createdAt: text(row, "created_at") };
 }
 
 function submissionFromRow(row: Row): Submission {
@@ -221,11 +232,11 @@ async function groupQuestionRow(id: string, voterId = "") {
 }
 
 export const neonStore: EdieStore = {
-  async createTeacherSpace(code, name, pinHash) {
+  async createTeacherSpace(code, name) {
     const normalized = normalizeSpaceCode(code);
     if (!normalized) throw new Error("Space code is required.");
     try {
-      const rows = await query("INSERT INTO edie_teacher_spaces (code, name, pin_hash) VALUES ($1, $2, $3) RETURNING code, name, pin_hash, created_at", [normalized, validateTeacherSpaceName(name), validateTeacherSpacePinHash(pinHash)]);
+      const rows = await query("INSERT INTO edie_teacher_spaces (code, name) VALUES ($1, $2) RETURNING code, name, created_at", [normalized, validateTeacherSpaceName(name)]);
       return teacherSpaceFromRow(rows[0]);
     } catch (error) {
       if (error instanceof NeonStoreError && error.status === 409) throw new Error("That space code already exists.");
@@ -234,17 +245,60 @@ export const neonStore: EdieStore = {
   },
   async getTeacherSpace(code) {
     const normalized = normalizeSpaceCode(code); if (!normalized) return null;
-    const rows = await query("SELECT code, name, pin_hash, created_at FROM edie_teacher_spaces WHERE code = $1 LIMIT 1", [normalized]);
+    const rows = await query("SELECT code, name, created_at FROM edie_teacher_spaces WHERE code = $1 LIMIT 1", [normalized]);
     return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
   },
   async listTeacherSpaces() {
     const rows = await query("SELECT code, name, created_at FROM edie_teacher_spaces ORDER BY name ASC");
     return rows.map((row) => ({ code: text(row, "code"), name: text(row, "name"), createdAt: text(row, "created_at") }));
   },
-  async updateTeacherSpacePinHash(code, pinHash) {
-    const normalized = normalizeSpaceCode(code); if (!normalized) return null;
-    const rows = await query("UPDATE edie_teacher_spaces SET pin_hash = $2 WHERE code = $1 RETURNING code, name, pin_hash, created_at", [normalized, validateTeacherSpacePinHash(pinHash)]);
-    return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
+  async listTeacherSpacesForUser(email) {
+    const normalizedEmail = normalizeSpaceEmail(email);
+    const rows = await query(
+      "SELECT s.code, s.name, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.email = $1 ORDER BY s.name ASC",
+      [normalizedEmail],
+    );
+    return rows.map((row) => ({
+      code: text(row, "code"),
+      name: text(row, "name"),
+      createdAt: text(row, "created_at"),
+      role: validateSpaceRole(text(row, "role")),
+    }));
+  },
+  async getSpaceMemberRole(spaceCode, email) {
+    const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
+    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND email = $2 LIMIT 1", [normalized, normalizeSpaceEmail(email)]);
+    return rows[0] ? validateSpaceRole(text(rows[0], "role")) : null;
+  },
+  async listSpaceMembers(spaceCode) {
+    const normalized = normalizeSpaceCode(spaceCode);
+    if (!normalized) return [];
+    const rows = await query("SELECT space_code, email, role, created_at FROM edie_space_members WHERE space_code = $1 ORDER BY email ASC", [normalized]);
+    return rows.map(spaceMemberFromRow);
+  },
+  async addSpaceMember(spaceCode, email, role = "editor") {
+    const normalized = normalizeSpaceCode(spaceCode);
+    if (!normalized) throw new Error("Space code is required.");
+    const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1", [normalized]);
+    if (!space.length) throw new Error("That space could not be found.");
+    try {
+      const rows = await query("INSERT INTO edie_space_members (space_code, email, role) VALUES ($1, $2, $3) RETURNING space_code, email, role, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role)]);
+      return spaceMemberFromRow(rows[0]);
+    } catch (error) {
+      if (error instanceof NeonStoreError && error.status === 409) throw new Error("That person is already a member of this space.");
+      throw error;
+    }
+  },
+  async updateSpaceMemberRole(spaceCode, email, role) {
+    const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
+    const rows = await query("UPDATE edie_space_members SET role = $3 WHERE space_code = $1 AND email = $2 RETURNING space_code, email, role, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role)]);
+    return rows[0] ? spaceMemberFromRow(rows[0]) : null;
+  },
+  async removeSpaceMember(spaceCode, email) {
+    const normalized = normalizeSpaceCode(spaceCode);
+    if (!normalized) return false;
+    const rows = await query("DELETE FROM edie_space_members WHERE space_code = $1 AND email = $2 RETURNING space_code", [normalized, normalizeSpaceEmail(email)]);
+    return rows.length > 0;
   },
   async getSession(code) { const row = await getSessionRow(code); return row ? sessionFromRow(row) : null; },
   async getSessionInSpace(spaceCode, code) { const row = await getSessionInSpaceRow(spaceCode, code); return row ? sessionFromRow(row) : null; },
