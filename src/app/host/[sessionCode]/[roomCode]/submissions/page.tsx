@@ -5,7 +5,7 @@ import {
   listPromptHistory,
   listSubmissions,
   toSubmissionDto,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { isDefaultTeacherPin } from "@/lib/teacher-auth";
 import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
 import { parseSubmissionMinutes } from "@/lib/submission-time-range";

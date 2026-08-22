@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PinInput } from "@/components/PinInput";
-import { listTeacherSpaces } from "@/lib/qwt-store";
+import { listTeacherSpaces } from "@/lib/edie-store";
 import { isAdminAuthenticated, isDefaultAdminPin } from "@/lib/teacher-auth";
 import { createTeachingSpace } from "@/app/host/actions";
 import { resetTeacherSpacePin, unlockAdminSpaces } from "./actions";

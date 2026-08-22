@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
-import type { PollResults, SessionPoll } from "@/lib/qwt-store";
+import type { PollResults, SessionPoll } from "@/lib/edie-store";
 
 type PollResultsPopoutProps = {
   dashboardUrl: string;

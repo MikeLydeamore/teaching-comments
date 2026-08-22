@@ -2,7 +2,7 @@ import {
   deletePollQuestionFromBank,
   type PollSelectionMode,
   updatePollQuestionInBank,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PUT(

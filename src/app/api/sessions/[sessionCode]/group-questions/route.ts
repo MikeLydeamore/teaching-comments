@@ -1,4 +1,4 @@
-import { addGroupQuestion, listGroupQuestions } from "@/lib/qwt-store";
+import { addGroupQuestion, listGroupQuestions } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(

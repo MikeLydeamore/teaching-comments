@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { GifPreview } from "@/components/GifPreview";
-import type { GifData } from "@/lib/qwt-store";
+import type { GifData } from "@/lib/edie-store";
 
 type GiphyPickerProps = {
   disabled?: boolean;

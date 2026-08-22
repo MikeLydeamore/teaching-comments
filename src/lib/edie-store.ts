@@ -1,23 +1,23 @@
-import { localStore } from "./qwt-local-store";
-import { neonStore } from "./qwt-neon-store";
-import { selectedStorageBackend } from "./qwt-storage-backend";
+import { localStore } from "./edie-local-store";
+import { neonStore } from "./edie-neon-store";
+import { selectedStorageBackend } from "./edie-storage-backend";
 import {
   normalizeSpaceCode,
   normalizeSessionCode,
   normalizeStudentName,
-  type QwtStore,
+  type EdieStore,
   type PollSelectionMode,
   type SessionPatch,
   type Submission,
   type SubmissionDto,
   type CreateSubmissionInput,
   type SubmissionPatch,
-} from "./qwt-store-model";
+} from "./edie-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
 export { normalizeSpaceCode };
 export type {
-  QwtStore,
+  EdieStore,
   DrawingData,
   DrawingPoint,
   DrawingStroke,
@@ -45,11 +45,11 @@ export type {
   SubmissionStatus,
   TeacherSpace,
   TeacherSpaceSummary,
-} from "./qwt-store-model";
+} from "./edie-store-model";
 
 // Artificial per-call latency for local testing, e.g. STORE_DELAY_MS=1500 npm run dev.
 // Applies to every store method (reads and writes) on any backend.
-function getStore(): QwtStore {
+function getStore(): EdieStore {
   const delayMs = Number(process.env.STORE_DELAY_MS ?? 0);
 
   const store = (() => {

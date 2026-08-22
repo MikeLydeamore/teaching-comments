@@ -2,7 +2,7 @@
 
 import { type PointerEvent, useEffect, useRef, useState } from "react";
 import { DRAWING_HEIGHT, DRAWING_WIDTH, renderDrawing } from "@/lib/drawing-render";
-import type { DrawingData, DrawingPoint, DrawingStroke } from "@/lib/qwt-store";
+import type { DrawingData, DrawingPoint, DrawingStroke } from "@/lib/edie-store";
 
 const COLORS = [
   { label: "Black", value: "#0f172a" },

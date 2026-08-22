@@ -5,11 +5,11 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { cookies } from "next/headers";
-import type { TeacherSpace } from "@/lib/qwt-store";
+import type { TeacherSpace } from "@/lib/edie-store";
 
-export const TEACHER_COOKIE = "qwt_teacher";
-export const TEACHER_SPACE_COOKIE = "qwt_teacher_space";
-export const ADMIN_COOKIE = "qwt_admin";
+export const TEACHER_COOKIE = "edie_teacher";
+export const TEACHER_SPACE_COOKIE = "edie_teacher_space";
+export const ADMIN_COOKIE = "edie_admin";
 
 const COOKIE_MAX_AGE_SECONDS = 8 * 60 * 60;
 const DEFAULT_DEV_PIN = "teach123";

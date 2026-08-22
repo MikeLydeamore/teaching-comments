@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getPoll, savePollResponse } from "@/lib/qwt-store";
+import { getPoll, savePollResponse } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 
 export async function PUT(

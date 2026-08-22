@@ -33,12 +33,12 @@ import {
   type PollResponse,
   type PollQuestionBankItem,
   type QuestionBankItem,
-  type QwtStore,
+  type EdieStore,
   type Session,
   type SessionPoll,
   type Submission,
   type TeacherSpace,
-} from "./qwt-store-model";
+} from "./edie-store-model";
 
 type StoreData = {
   groupQuestions: StoredGroupQuestion[];
@@ -57,7 +57,7 @@ type StoredGroupQuestion = Omit<GroupQuestion, "hasVoted" | "voteCount"> & {
 };
 
 const DATA_DIR = path.join(process.cwd(), ".data");
-const STORE_PATH = path.join(DATA_DIR, "qwt-store.json");
+const STORE_PATH = path.join(DATA_DIR, "edie-store.json");
 
 function defaultStore(): StoreData {
   const createdAt = now();
@@ -274,7 +274,7 @@ async function writeStore(data: StoreData) {
   await writeFile(STORE_PATH, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
-export const localStore: QwtStore = {
+export const localStore: EdieStore = {
   async createTeacherSpace(code, name, pinHash) {
     const spaceCode = normalizeSpaceCode(code);
 

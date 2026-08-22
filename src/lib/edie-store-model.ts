@@ -234,7 +234,7 @@ export type ArchiveSessionActivityResult = {
   submissions: number;
 };
 
-export type QwtStore = {
+export type EdieStore = {
   createTeacherSpace(
     code: string,
     name: string,

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/qwt-store";
+import { getSession } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { IMAGE_CONTENT_TYPES, MAX_IMAGE_BYTES, imageUploadsEnabled, isUuid, sessionHash, signImageTicket, uploadClientCookieName, type ImageContentType } from "@/lib/image-upload";
 

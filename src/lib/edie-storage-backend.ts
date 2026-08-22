@@ -4,7 +4,7 @@ export type StorageBackend = "local" | "neon";
 export function selectedStorageBackend(
   env: Record<string, string | undefined> = process.env,
 ): StorageBackend {
-  const requestedBackend = env.QWT_STORAGE_BACKEND?.toLowerCase();
+  const requestedBackend = env.EDIE_STORAGE_BACKEND?.toLowerCase();
 
   if (requestedBackend === "local" || requestedBackend === "neon") {
     return requestedBackend;

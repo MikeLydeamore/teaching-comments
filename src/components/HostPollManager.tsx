@@ -8,7 +8,7 @@ import type {
   PollResults,
   PollSelectionMode,
   SessionPoll,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 
 type HostPollManagerProps = {
   dashboardUrl: string;

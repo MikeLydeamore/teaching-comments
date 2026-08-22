@@ -3,7 +3,7 @@ import {
   getPollResults,
   startPoll,
   type PollSelectionMode,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(

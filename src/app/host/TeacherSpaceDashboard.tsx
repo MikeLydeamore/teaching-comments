@@ -3,7 +3,7 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { enterTeacherSession, logoutTeacher } from "./actions";
-import type { Session, TeacherSpace } from "@/lib/qwt-store";
+import type { Session, TeacherSpace } from "@/lib/edie-store";
 
 type TeacherSpaceDashboardProps = {
   authFailed: boolean;

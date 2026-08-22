@@ -1,4 +1,4 @@
-const pollParticipantStorageKey = "qwt_poll_participant_id";
+const pollParticipantStorageKey = "edie_poll_participant_id";
 
 function createParticipantId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

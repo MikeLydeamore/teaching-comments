@@ -1,4 +1,4 @@
-import { deleteQuestionFromBank, getQuestionFromBank } from "@/lib/qwt-store";
+import { deleteQuestionFromBank, getQuestionFromBank } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/questions/[id]">) {

@@ -1,4 +1,4 @@
-import { unvoteGroupQuestion, upvoteGroupQuestion } from "@/lib/qwt-store";
+import { unvoteGroupQuestion, upvoteGroupQuestion } from "@/lib/edie-store";
 
 export async function POST(
   request: Request,

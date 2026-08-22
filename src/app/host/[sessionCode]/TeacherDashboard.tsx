@@ -23,7 +23,7 @@ import type {
   SubmissionImageDto,
   PromptHistoryItem,
   QuestionBankItem,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { logoutTeacher } from "../actions";
 
 type Session = {

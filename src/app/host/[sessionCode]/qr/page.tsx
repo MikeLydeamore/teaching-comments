@@ -1,5 +1,5 @@
 import { QrPopout } from "@/components/QrPopout";
-import { getOrCreateSession } from "@/lib/qwt-store";
+import { getOrCreateSession } from "@/lib/edie-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
 

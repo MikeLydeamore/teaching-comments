@@ -1,4 +1,4 @@
-import { getSubmission, toSubmissionDto, updateSubmission } from "@/lib/qwt-store";
+import { getSubmission, toSubmissionDto, updateSubmission } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/submissions/[id]">) {

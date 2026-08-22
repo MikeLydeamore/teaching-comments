@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GroupQuestion } from "@/lib/qwt-store";
+import type { GroupQuestion } from "@/lib/edie-store";
 
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
@@ -12,7 +12,7 @@ type GroupQuestionsPanelProps = {
   variant?: "student" | "teacher";
 };
 
-const voterIdStorageKey = "qwt_group_question_voter_id";
+const voterIdStorageKey = "edie_group_question_voter_id";
 
 function createVoterId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

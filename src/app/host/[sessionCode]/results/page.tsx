@@ -7,7 +7,7 @@ import {
   getOrCreateSession,
   listPromptHistory,
   listSubmissions,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import {
   parseSubmissionMinutes,
   submissionTimeRangeLabel,

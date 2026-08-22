@@ -1,4 +1,4 @@
-import { getPollHistory } from "@/lib/qwt-store";
+import { getPollHistory } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(

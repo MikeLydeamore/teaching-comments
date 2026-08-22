@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 
-import type { GifData } from "@/lib/qwt-store";
+import type { GifData } from "@/lib/edie-store";
 
 type GifPreviewProps = {
   gifData: GifData;

@@ -15,7 +15,7 @@ function assertWorkerUrl(value) {
 
 /** @param {Record<string, string | undefined>} env */
 export function selectedBackend(env = process.env) {
-  const requested = env.QWT_STORAGE_BACKEND?.toLowerCase();
+  const requested = env.EDIE_STORAGE_BACKEND?.toLowerCase();
   if (requested === "local") return "local";
   if (requested === "neon") return "neon";
   return env.DATABASE_URL ? "neon" : "local";
@@ -55,7 +55,7 @@ export async function collectWorkerObjects(fetchImpl, workerUrl, token) {
 export async function collectNeonReferences(databaseUrl, sqlFactory = neon) {
   if (!databaseUrl) throw new Error("Neon reconciliation requires DATABASE_URL.");
   const sql = sqlFactory(databaseUrl);
-  const rows = await sql.query("SELECT image_data FROM qwt_submissions WHERE image_data IS NOT NULL ORDER BY id ASC");
+  const rows = await sql.query("SELECT image_data FROM edie_submissions WHERE image_data IS NOT NULL ORDER BY id ASC");
   if (!Array.isArray(rows)) throw new Error("Malformed Neon reference scan.");
   return rows.map((row) => validateReference(row.image_data));
 }
@@ -68,7 +68,7 @@ export function planReconciliation(references, objects, now = Date.now()) {
 }
 
 async function collectReferences() {
-  if (selectedBackend() === "local") { const data = JSON.parse(await readFile(new URL("../.data/qwt-store.json", import.meta.url), "utf8")); return (data.submissions ?? []).flatMap((submission) => submission.imageData ? [validateReference(submission.imageData)] : []); }
+  if (selectedBackend() === "local") { const data = JSON.parse(await readFile(new URL("../.data/edie-store.json", import.meta.url), "utf8")); return (data.submissions ?? []).flatMap((submission) => submission.imageData ? [validateReference(submission.imageData)] : []); }
   if (selectedBackend() === "neon") return collectNeonReferences(process.env.DATABASE_URL);
 }
 

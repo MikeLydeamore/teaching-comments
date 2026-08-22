@@ -1,4 +1,4 @@
-import { getSubmission } from "@/lib/qwt-store";
+import { getSubmission } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { imageUploadsEnabled, sessionHash, signImageTicket } from "@/lib/image-upload";
 

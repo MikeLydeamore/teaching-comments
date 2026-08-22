@@ -7,7 +7,7 @@ import {
   normalizeSessionCode,
   normalizeSpaceCode,
   normalizeStudentName,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 

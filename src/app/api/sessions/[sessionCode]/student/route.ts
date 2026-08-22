@@ -3,7 +3,7 @@ import {
   getPollResponse,
   getSession,
   type ParticipantPoll,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 
 export async function GET(
   request: Request,

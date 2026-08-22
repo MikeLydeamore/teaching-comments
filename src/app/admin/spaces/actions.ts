@@ -10,7 +10,7 @@ import {
 import {
   normalizeSpaceCode,
   updateTeacherSpacePinHash,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 
 function adminSpacesResetPath(status: string, spaceCode = "") {
   const params = new URLSearchParams({ pinReset: status });

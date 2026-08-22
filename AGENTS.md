@@ -19,7 +19,7 @@ A Next.js 16 + React 19 classroom engagement app where students submit typed/dra
 
 - src/lib/ — storage abstraction with pluggable backends: local JSON file (dev), Neon serverless Postgres (production); also teacher auth (hashed PINs), image upload tickets, and poll logic. Tests via Vitest.
 - src/components/ — UI pieces: drawing pad, Giphy picker, QR popouts, poll overlays, results charts (pie/column/word cloud), response-time plots. All components start with `"use client"`.
-- database/ — SQL schema for Neon/Postgres (`schema.sql`, `neon-app-role.sql`) plus incremental migrations. All tables are prefixed `qwt_` (quick-write-tool legacy naming).
+- database/ — SQL schema for Neon/Postgres (`schema.sql`, `neon-app-role.sql`) plus incremental migrations. All tables are prefixed `edie_` (quick-write-tool legacy naming).
 - workers/image-storage — Cloudflare-style worker for private image storage; a **separate npm project** with its own package.json, scripts (`npm run dev|deploy|test|typecheck`) and vitest config. Root commands do not cover it. See its README for hard constraints (R2 stays fully private, lifecycle rules only on `pending/`, secrets fail closed below 32 chars).
 - tools/reconcile-images.mjs — maintenance CLI (`npm run reconcile-images`) auditing R2-committed images vs DB references.
 - Deployed to Vercel (Analytics/Speed Insights), Tailwind CSS v4 styling.
@@ -30,20 +30,20 @@ Auth model: teacher spaces secured by hashed PINs; sessions are scoped per-space
 
 - Verify changes with: `npm run lint && npm run build && npm test`
 - Tests run via Vitest with zero config, scoped to `src/` only — colocated as `*.test.ts` next to source files.
-- Local dev persistence lives in `.data/qwt-store.json` (gitignored); deleting it resets all local sessions/submissions.
+- Local dev persistence lives in `.data/edie-store.json` (gitignored); deleting it resets all local sessions/submissions.
 - `STORE_DELAY_MS=1500 npm run dev` injects artificial storage latency to test loading states.
 
 ## Storage backends
 
-- New backends must implement the ~50-method `QwtStore` type in `src/lib/qwt-store-model.ts`; dispatch happens in `getStore()` in `src/lib/qwt-store.ts`.
-- Backend selection precedence: explicit `QWT_STORAGE_BACKEND` env (`local|neon`) → else Neon if `DATABASE_URL` set → else local JSON file.
-- All domain types, validators, and size limits live centrally in `qwt-store-model.ts` (submissions ≤2000 chars, drawings ≤120 strokes, polls 2–8 options, etc.). Route handlers must call these rather than re-validating.
+- New backends must implement the ~50-method `EdieStore` type in `src/lib/edie-store-model.ts`; dispatch happens in `getStore()` in `src/lib/edie-store.ts`.
+- Backend selection precedence: explicit `EDIE_STORAGE_BACKEND` env (`local|neon`) → else Neon if `DATABASE_URL` set → else local JSON file.
+- All domain types, validators, and size limits live centrally in `edie-store-model.ts` (submissions ≤2000 chars, drawings ≤120 strokes, polls 2–8 options, etc.). Route handlers must call these rather than re-validating.
 - `SubmissionImageData` must never be sent to client components — use the `SubmissionDto` mapping instead.
 
 ## Testing patterns
 
 - Server-only modules require `vi.mock("server-only", () => ({}))` in unit tests.
-- Neon store tests use a hoisted query mock pattern-matching SQL statement prefixes (e.g. `SELECT`, `INSERT INTO qwt_submissions`). Follow this idiom for any new backend tests.
+- Neon store tests use a hoisted query mock pattern-matching SQL statement prefixes (e.g. `SELECT`, `INSERT INTO edie_submissions`). Follow this idiom for any new backend tests.
 
 ## Next.js 16 API conventions
 

@@ -3,7 +3,7 @@ import {
   getLatestPoll,
   getOrCreateSession,
   getPollResults,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { TeacherLogin } from "../TeacherLogin";
 

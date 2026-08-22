@@ -1,5 +1,5 @@
 import { QrPopout } from "@/components/QrPopout";
-import { getOrCreateSessionInSpace, getTeacherSpace } from "@/lib/qwt-store";
+import { getOrCreateSessionInSpace, getTeacherSpace } from "@/lib/edie-store";
 import { isDefaultTeacherPin } from "@/lib/teacher-auth";
 import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
 import { TeacherLogin } from "../../TeacherLogin";

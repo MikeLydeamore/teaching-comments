@@ -1,7 +1,7 @@
 import {
   listGroupQuestions,
   listSubmissions,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 const columns = [

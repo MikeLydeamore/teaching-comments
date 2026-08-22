@@ -4,7 +4,7 @@ import {
   listPromptHistory,
   listSubmissions,
   toSubmissionDto,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
 import { parseSubmissionMinutes } from "@/lib/submission-time-range";
 import { TeacherLogin } from "../TeacherLogin";

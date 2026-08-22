@@ -16,7 +16,7 @@ import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { ImageUploadPanel, type PreparedImage } from "@/components/ImageUploadPanel";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
-import type { DrawingData, GifData, ParticipantPoll } from "@/lib/qwt-store";
+import type { DrawingData, GifData, ParticipantPoll } from "@/lib/edie-store";
 
 type StudentSubmitProps = {
   initialStudentName: string;

@@ -1,4 +1,4 @@
-import type { Submission } from "./qwt-store-model";
+import type { Submission } from "./edie-store-model";
 
 export type PollResult = [response: string, count: number];
 

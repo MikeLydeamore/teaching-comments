@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DRAWING_HEIGHT, DRAWING_WIDTH, renderDrawing } from "@/lib/drawing-render";
-import type { DrawingData } from "@/lib/qwt-store";
+import type { DrawingData } from "@/lib/edie-store";
 
 type DrawingCanvasProps = {
   drawingData: DrawingData;

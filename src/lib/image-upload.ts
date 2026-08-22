@@ -125,5 +125,5 @@ export function imageUploadsEnabled() {
 }
 
 export function uploadClientCookieName(sessionId: string) {
-  return `qwt_image_upload_client_${sessionId}`;
+  return `edie_image_upload_client_${sessionId}`;
 }

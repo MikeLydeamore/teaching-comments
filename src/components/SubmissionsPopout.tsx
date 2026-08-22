@@ -12,7 +12,7 @@ import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
-import type { SubmissionDto } from "@/lib/qwt-store";
+import type { SubmissionDto } from "@/lib/edie-store";
 import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
 
 type SubmissionsPopoutProps = {

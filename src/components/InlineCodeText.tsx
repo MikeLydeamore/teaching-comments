@@ -118,7 +118,7 @@ function renderInlineCode(text: string, keyPrefix: string, className: string) {
     if (part.length >= 2 && part.startsWith("`") && part.endsWith("`")) {
       return (
         <code
-          className={`qwt-inline-code rounded px-1 py-0.5 font-mono text-[0.9em] font-medium ${className}`}
+          className={`edie-inline-code rounded px-1 py-0.5 font-mono text-[0.9em] font-medium ${className}`}
           key={`${keyPrefix}-${index}`}
         >
           {part.slice(1, -1).replaceAll("\\`", "`")}
@@ -156,7 +156,7 @@ export function InlineCodeText({ children, className = "" }: InlineCodeTextProps
 
     rendered.push(
       <code
-        className={`qwt-code-block font-mono text-[0.9em] font-medium ${className}`}
+        className={`edie-code-block font-mono text-[0.9em] font-medium ${className}`}
         key={`block-${blockIndex}`}
       >
         {content}

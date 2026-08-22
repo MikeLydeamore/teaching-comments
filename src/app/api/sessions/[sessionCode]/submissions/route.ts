@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import { addSubmission, getSession, getSubmission, listSubmissions, toSubmissionDto } from "@/lib/qwt-store";
+import { addSubmission, getSession, getSubmission, listSubmissions, toSubmissionDto } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, postInsertRecovery, sessionHash, uploadClientCookieName, verifyImageTicket, type ImageContentType } from "@/lib/image-upload";
-import type { SubmissionImageData } from "@/lib/qwt-store";
-import { assertSubmissionUsesEnabledInputs, validateSubmissionContent, normalizeStudentName } from "@/lib/qwt-store-model";
+import type { SubmissionImageData } from "@/lib/edie-store";
+import { assertSubmissionUsesEnabledInputs, validateSubmissionContent, normalizeStudentName } from "@/lib/edie-store-model";
 
 class ImageReceiptError extends Error {
   constructor(message: string, readonly invalidReceipt: boolean) { super(message); }

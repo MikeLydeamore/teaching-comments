@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { getSessionInSpace, getTeacherSpace } from "@/lib/qwt-store";
+import { getSessionInSpace, getTeacherSpace } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { studentNameCookieName } from "@/lib/student-name-cookie";
 import { StudentSubmit } from "../StudentSubmit";

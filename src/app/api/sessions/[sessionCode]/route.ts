@@ -3,7 +3,7 @@ import {
   listPromptHistory,
   updateSession,
   type SessionPatch,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[sessionCode]">) {

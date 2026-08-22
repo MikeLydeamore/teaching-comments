@@ -62,7 +62,7 @@ npm test
 
 ## Storage
 
-For local development, submissions are stored in `.data/qwt-store.json`.
+For local development, submissions are stored in `.data/edie-store.json`.
 This keeps the first step free and fast to iterate on.
 
 For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/neon-app-role.sql`.
@@ -70,7 +70,7 @@ For a hosted deployment, you will need a PostgreSQL Server. The schema is in `da
 Set these environment variables locally and in Vercel:
 
 ```text
-QWT_STORAGE_BACKEND=<your-hosting>
+EDIE_STORAGE_BACKEND=<your-hosting>
 DATABASE_URL=https://your-project-ref.
 TEACHER_PIN=replace-with-a-private-pin-before-deploying
 ADMIN_PIN=replace-with-a-private-admin-pin-before-deploying

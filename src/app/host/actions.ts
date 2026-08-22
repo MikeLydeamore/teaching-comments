@@ -18,7 +18,7 @@ import {
   getTeacherSpace,
   normalizeSessionCode,
   normalizeSpaceCode,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 
 function safeNextPath(value: FormDataEntryValue | null) {
   const next = typeof value === "string" ? value : "/host";

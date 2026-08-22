@@ -1,4 +1,4 @@
-import type { DrawingData, DrawingStroke } from "./qwt-store-model";
+import type { DrawingData, DrawingStroke } from "./edie-store-model";
 
 export const DRAWING_WIDTH = 720;
 export const DRAWING_HEIGHT = 320;

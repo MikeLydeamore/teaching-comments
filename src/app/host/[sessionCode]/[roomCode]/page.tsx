@@ -6,7 +6,7 @@ import {
   getTeacherSpace,
   listPromptHistory,
   listQuestionBank,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { TeacherDashboard } from "../TeacherDashboard";
 import { TeacherLogin } from "../TeacherLogin";
 

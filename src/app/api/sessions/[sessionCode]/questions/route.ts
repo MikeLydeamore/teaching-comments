@@ -1,4 +1,4 @@
-import { addQuestionToBank, listQuestionBank } from "@/lib/qwt-store";
+import { addQuestionToBank, listQuestionBank } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(

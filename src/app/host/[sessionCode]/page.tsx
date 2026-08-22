@@ -7,7 +7,7 @@ import {
   listSessions,
   listPromptHistory,
   listQuestionBank,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { TeacherSpaceDashboard } from "../TeacherSpaceDashboard";
 import { TeacherDashboard } from "./TeacherDashboard";
 import { TeacherLogin } from "./TeacherLogin";

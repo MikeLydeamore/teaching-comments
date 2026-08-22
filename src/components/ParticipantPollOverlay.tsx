@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { formatTimerSeconds } from "@/components/SessionTimer";
-import type { ParticipantPoll } from "@/lib/qwt-store";
+import type { ParticipantPoll } from "@/lib/edie-store";
 
 type ParticipantPollOverlayProps = {
   participantId: string;

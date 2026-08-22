@@ -19,14 +19,14 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <Script
-          id="qwt-theme-script"
+          id="edie-theme-script"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
 try {
-  var theme = window.localStorage.getItem("qwt_theme");
+  var theme = window.localStorage.getItem("edie_theme");
   if (theme && theme !== "default") {
-    document.documentElement.dataset.qwtTheme = theme;
+    document.documentElement.dataset.edieTheme = theme;
     document.documentElement.style.colorScheme =
       theme === "darkly" || theme === "midnight" ? "dark" : "light";
   }

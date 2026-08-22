@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const storageKey = "qwt_theme";
+const storageKey = "edie_theme";
 
 const themes = [
   { label: "Default", value: "default" },
@@ -34,10 +34,10 @@ function storedTheme(): ThemeName {
 
 function applyTheme(theme: ThemeName) {
   if (theme === "default") {
-    document.documentElement.removeAttribute("data-qwt-theme");
+    document.documentElement.removeAttribute("data-edie-theme");
     document.documentElement.style.colorScheme = "light";
   } else {
-    document.documentElement.dataset.qwtTheme = theme;
+    document.documentElement.dataset.edieTheme = theme;
     document.documentElement.style.colorScheme =
       theme === "darkly" || theme === "midnight" ? "dark" : "light";
   }
@@ -52,13 +52,13 @@ export function ThemeSelector() {
   }, [theme]);
 
   return (
-    <div className="qwt-theme-selector fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-      <label className="font-semibold text-slate-600" htmlFor="qwt-theme">
+    <div className="edie-theme-selector fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+      <label className="font-semibold text-slate-600" htmlFor="edie-theme">
         Theme
       </label>
       <select
         className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-        id="qwt-theme"
+        id="edie-theme"
         value={theme}
         onChange={(event) => setTheme(event.target.value as ThemeName)}
       >

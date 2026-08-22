@@ -8,8 +8,8 @@ const { neonMock, queryMock } = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@neondatabase/serverless", () => ({ neon: neonMock }));
 
-import { neonStore } from "./qwt-neon-store";
-import { selectedStorageBackend } from "./qwt-storage-backend";
+import { neonStore } from "./edie-neon-store";
+import { selectedStorageBackend } from "./edie-storage-backend";
 import { collectNeonReferences } from "../../tools/reconcile-images.mjs";
 
 const imageData = {
@@ -61,8 +61,8 @@ beforeEach(() => {
   queryMock.mockReset();
   neonMock.mockReturnValue({ query: queryMock });
   queryMock.mockImplementation(async (statement: string, values: unknown[] = []) => {
-    if (statement.startsWith("SELECT") && statement.includes("qwt_sessions")) return [sessionRow];
-    if (statement.startsWith("INSERT INTO qwt_submissions")) return [submissionRow(values)];
+    if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) return [sessionRow];
+    if (statement.startsWith("INSERT INTO edie_submissions")) return [submissionRow(values)];
     return [];
   });
 });
@@ -77,7 +77,7 @@ describe("Neon submission serialization", () => {
 
   it.each(cases)("binds %s-only media as SQL JSONB or NULL", async (_kind, input, expected) => {
     const result = await neonStore.addSubmission("demo-lecture", input);
-    const insertCall = queryMock.mock.calls.find(([statement]) => String(statement).startsWith("INSERT INTO qwt_submissions"));
+    const insertCall = queryMock.mock.calls.find(([statement]) => String(statement).startsWith("INSERT INTO edie_submissions"));
     expect(insertCall).toBeTruthy();
     const values = insertCall?.[1] as unknown[];
     const expectedMedia = [
@@ -115,7 +115,7 @@ describe("Neon poll solutions", () => {
 
   it("converts correct option indexes to generated option IDs", async () => {
     queryMock.mockImplementation(async (statement: string, values: unknown[] = []) => {
-      if (statement.startsWith("SELECT") && statement.includes("qwt_sessions")) return [sessionRow];
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) return [sessionRow];
       if (statement.startsWith("WITH ended")) {
         const options = JSON.parse(String(values[4]));
         return [{
@@ -163,14 +163,14 @@ it("maps PostgreSQL duplicate-key errors to status 409", async () => {
 it("scans Neon image references through a mocked SQL client", async () => {
   const query = vi.fn().mockResolvedValue([{ image_data: imageData }]);
   const references = await collectNeonReferences("postgresql://test.invalid/test", () => ({ query }) as never);
-  expect(query).toHaveBeenCalledWith("SELECT image_data FROM qwt_submissions WHERE image_data IS NOT NULL ORDER BY id ASC");
+  expect(query).toHaveBeenCalledWith("SELECT image_data FROM edie_submissions WHERE image_data IS NOT NULL ORDER BY id ASC");
   expect(references).toHaveLength(1);
   expect(references[0].objectKey).toBe(imageData.objectKey);
 });
 
 it("uses explicit backend requests before safe implicit precedence", () => {
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "local", DATABASE_URL: "postgresql://x" })).toBe("local");
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
+  expect(selectedStorageBackend({ EDIE_STORAGE_BACKEND: "local", DATABASE_URL: "postgresql://x" })).toBe("local");
+  expect(selectedStorageBackend({ EDIE_STORAGE_BACKEND: "neon" })).toBe("neon");
   expect(selectedStorageBackend({ DATABASE_URL: "postgresql://x" })).toBe("neon");
   expect(selectedStorageBackend({})).toBe("local");
 });

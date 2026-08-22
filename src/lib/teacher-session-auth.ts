@@ -1,5 +1,5 @@
-import { getSession, getTeacherSpace, type Session } from "@/lib/qwt-store";
-import { DEFAULT_SPACE_CODE } from "@/lib/qwt-store-model";
+import { getSession, getTeacherSpace, type Session } from "@/lib/edie-store";
+import { DEFAULT_SPACE_CODE } from "@/lib/edie-store-model";
 import {
   isTeacherAuthenticated,
   isTeacherSpaceCookieValid,

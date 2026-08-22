@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeDrawingData, normalizeSubmissionImageData, type Session } from "./qwt-store-model";
+import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnabledInputs, normalizeDrawingData, normalizeSubmissionImageData, type Session } from "./edie-store-model";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, isUuid, postInsertRecovery, sessionHash, signImageTicket, verifyImageTicket } from "./image-upload";
-import { toSubmissionDto } from "./qwt-store";
-import { selectedStorageBackend } from "./qwt-storage-backend";
+import { toSubmissionDto } from "./edie-store";
+import { selectedStorageBackend } from "./edie-storage-backend";
 import { collectWorkerObjects, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
 import { outputImageContentType } from "../components/ImageUploadPanel";
 import { submissionImageRetryUrl } from "../components/SubmissionImagePreview";
@@ -46,11 +46,11 @@ describe("reconciliation fail-closed pagination", () => {
 });
 
 it("matches app backend selection", () => {
-  expect(selectedBackend({ QWT_STORAGE_BACKEND: "local" })).toBe("local");
-  expect(selectedBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
+  expect(selectedBackend({ EDIE_STORAGE_BACKEND: "local" })).toBe("local");
+  expect(selectedBackend({ EDIE_STORAGE_BACKEND: "neon" })).toBe("neon");
   expect(selectedBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
   expect(selectedBackend({})).toBe("local");
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "local" })).toBe("local");
+  expect(selectedStorageBackend({ EDIE_STORAGE_BACKEND: "local" })).toBe("local");
   expect(selectedStorageBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
   const row = { image_data: { version: 1, objectKey: `committed/${"A".repeat(43)}/${submissionId}.png`, contentType: "image/png", byteSize: 1, etag: "e" } };
   const refs = [row.image_data];

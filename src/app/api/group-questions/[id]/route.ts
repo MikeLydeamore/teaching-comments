@@ -2,7 +2,7 @@ import {
   getGroupQuestion,
   setGroupQuestionAnswered,
   setGroupQuestionVisible,
-} from "@/lib/qwt-store";
+} from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PATCH(
