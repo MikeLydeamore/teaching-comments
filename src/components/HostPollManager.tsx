@@ -3,12 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
+import { TimerDurationInput } from "@/components/TimerDurationInput";
 import type {
   PollQuestionBankItem,
   PollResults,
   PollSelectionMode,
   SessionPoll,
 } from "@/lib/qwt-store";
+import {
+  clampTimerSeconds,
+  formatTimerSeconds,
+  parseTimerDurationInput,
+  POLL_TIMER_MIN_SECONDS,
+  QUICK_TIMER_ADJUSTMENTS,
+} from "@/lib/timer-duration";
 
 type HostPollManagerProps = {
   dashboardUrl: string;
@@ -17,7 +25,6 @@ type HostPollManagerProps = {
 };
 
 const pollExtensions = [15, 30, 60];
-const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 
 function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
   return (
@@ -102,6 +109,9 @@ export function HostPollManager({
   const [isBankTitleDialogOpen, setIsBankTitleDialogOpen] = useState(false);
   const [bankTitleDraft, setBankTitleDraft] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(30);
+  const [durationDraftValue, setDurationDraftValue] = useState(
+    formatTimerSeconds(30),
+  );
   const [durationWasMinClamped, setDurationWasMinClamped] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState("");
@@ -234,6 +244,7 @@ export function HostPollManager({
       Math.max(1, ...(results?.options.map((option) => option.responseCount) ?? [])),
     [results],
   );
+  const parsedDraftSeconds = parseTimerDurationInput(durationDraftValue);
   const canStart =
     sessionIsOpen &&
     !pollNeedsEnding &&
@@ -241,8 +252,7 @@ export function HostPollManager({
     options.length >= 2 &&
     options.every((option) => option.trim().length > 0) &&
     (selectionMode !== "single" || correctOptionIndexes.length === 1) &&
-    durationSeconds >= 5 &&
-    durationSeconds <= 3600;
+    parsedDraftSeconds !== null;
   const normalizedBankOptions = options.map((option) => option.trim());
   const canAddToBank =
     question.trim().length >= 1 &&
@@ -279,12 +289,20 @@ export function HostPollManager({
     setIsSaving(true);
     setStatus("Starting poll...");
 
+    const nextSeconds = clampTimerSeconds(
+      parsedDraftSeconds ?? durationSeconds,
+      POLL_TIMER_MIN_SECONDS,
+    );
+    setDurationSeconds(nextSeconds);
+    setDurationDraftValue(formatTimerSeconds(nextSeconds));
+    setDurationWasMinClamped(false);
+
     try {
       const response = await fetch(`/api/sessions/${sessionCode}/polls`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          durationSeconds,
+          durationSeconds: nextSeconds,
           correctOptionIndexes,
           options,
           question,
@@ -529,11 +547,11 @@ export function HostPollManager({
   }
 
   function setPollDuration(seconds: number) {
-    const sourceSeconds = Number.isFinite(seconds) ? Math.round(seconds) : 30;
-    const nextSeconds = Math.min(3600, Math.max(5, sourceSeconds));
+    const nextSeconds = clampTimerSeconds(seconds, POLL_TIMER_MIN_SECONDS);
 
     setDurationSeconds(nextSeconds);
-    setDurationWasMinClamped(sourceSeconds < 5);
+    setDurationDraftValue(formatTimerSeconds(nextSeconds));
+    setDurationWasMinClamped(seconds < POLL_TIMER_MIN_SECONDS);
     setStatus("");
   }
 
@@ -1116,25 +1134,27 @@ export function HostPollManager({
                   <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
                     <div>
                       <label className="text-sm font-semibold text-slate-700" htmlFor="poll-duration">
-                        Timer in seconds
+                        Timer (minutes:seconds or seconds)
                       </label>
-                      <input
-                        className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 sm:w-32"
-                        id="poll-duration"
-                        max={3600}
-                        min={5}
-                        type="number"
-                        value={durationSeconds}
-                        onChange={(event) => {
-                          setDurationSeconds(Number(event.target.value));
-                          setDurationWasMinClamped(false);
-                          setStatus("");
-                        }}
-                        onBlur={() => setPollDuration(durationSeconds)}
-                      />
+                      <div className="mt-2">
+                        <TimerDurationInput
+                          id="poll-duration"
+                          value={durationDraftValue}
+                          onValueChange={(value) => {
+                            setDurationDraftValue(value);
+                            setDurationWasMinClamped(false);
+                            setStatus("");
+                          }}
+                          onCommit={(seconds) => {
+                            if (seconds !== null) {
+                              setPollDuration(seconds);
+                            }
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      {pollQuickAdjustments.map((seconds) => (
+                      {QUICK_TIMER_ADJUSTMENTS.map((seconds) => (
                         <button
                           className="h-11 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-400 hover:text-teal-800"
                           key={seconds}

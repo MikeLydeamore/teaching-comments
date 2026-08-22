@@ -14,9 +14,17 @@ import { ToastProvider, useToast } from "@/components/Toast";
 import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
-import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
+import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
+import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
+import {
+  clampTimerSeconds,
+  formatTimerSeconds,
+  parseTimerDurationInput,
+  QUICK_TIMER_ADJUSTMENTS,
+  SESSION_TIMER_MIN_SECONDS,
+} from "@/lib/timer-duration";
 import type {
   DrawingData,
   GifData,
@@ -93,9 +101,6 @@ const chartTypeOptions: { label: string; value: ChartType }[] = [
   { label: "Pie", value: "pie" },
   { label: "Word cloud", value: "wordCloud" },
 ];
-
-const TIMER_MIN_SECONDS = 1;
-const timerQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 
 function minutesAgo(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -196,48 +201,6 @@ function shouldSkipCardDrag(target: EventTarget | null) {
       ),
     )
   );
-}
-
-function clampTimerSeconds(seconds: number) {
-  if (!Number.isFinite(seconds)) {
-    return 30;
-  }
-
-  return Math.min(3600, Math.max(TIMER_MIN_SECONDS, Math.round(seconds)));
-}
-
-function parseTimerDurationInput(value: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  if (!trimmed.includes(":")) {
-    const seconds = Number(trimmed);
-    return Number.isFinite(seconds) ? seconds : null;
-  }
-
-  const parts = trimmed.split(":");
-
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const minutes = Number(parts[0] || "0");
-  const seconds = Number(parts[1]);
-
-  if (
-    !Number.isFinite(minutes) ||
-    !Number.isFinite(seconds) ||
-    minutes < 0 ||
-    seconds < 0 ||
-    seconds >= 60
-  ) {
-    return null;
-  }
-
-  return minutes * 60 + seconds;
 }
 
 async function writeTextToClipboard(text: string) {
@@ -386,7 +349,6 @@ function TeacherDashboardContent({
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
-  const [sessionAccessStatus, setSessionAccessStatus] = useState("");
   const [inputSettingsStatus, setInputSettingsStatus] = useState("");
   const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
@@ -668,7 +630,7 @@ function TeacherDashboardContent({
       return;
     }
 
-    const nextSeconds = clampTimerSeconds(parsedSeconds);
+    const nextSeconds = clampTimerSeconds(parsedSeconds, SESSION_TIMER_MIN_SECONDS);
     setTimerDraftSeconds(nextSeconds);
     setTimerDraftValue(formatTimerSeconds(nextSeconds));
     setTimerDraftWasMinClamped(false);
@@ -790,7 +752,6 @@ function TeacherDashboardContent({
     }
 
     setIsUpdatingSessionAccess(true);
-    setSessionAccessStatus(isOpen ? "Reopening session..." : "Closing session...");
 
     try {
       const response = await fetch(`/api/sessions/${session.id}`, {
@@ -801,37 +762,27 @@ function TeacherDashboardContent({
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setSessionAccessStatus(payload.error ?? "Could not update session access.");
+        const message = payload.error ?? "Could not update session access.";
+        toast.error(message);
         return;
       }
 
       setSessionDetails(payload.session);
       setStats(payload.stats ?? stats);
       setQuestionsPanelKey((currentKey) => currentKey + 1);
-      setSessionAccessStatus(isOpen ? "Session reopened." : "Session closed.");
     } catch {
-      setSessionAccessStatus("Could not update session access.");
+      toast.error("Could not update session access.");
     } finally {
       setIsUpdatingSessionAccess(false);
     }
   }
 
   function setTimerDraftDuration(seconds: number) {
-    const nextSeconds = clampTimerSeconds(seconds);
+    const nextSeconds = clampTimerSeconds(seconds, SESSION_TIMER_MIN_SECONDS);
     setTimerDraftSeconds(nextSeconds);
     setTimerDraftValue(formatTimerSeconds(nextSeconds));
-    setTimerDraftWasMinClamped(seconds < TIMER_MIN_SECONDS);
+    setTimerDraftWasMinClamped(seconds < SESSION_TIMER_MIN_SECONDS);
     setTimerStatus("");
-  }
-
-  function normalizeTimerDraftValue() {
-    const parsedSeconds = parseTimerDurationInput(timerDraftValue);
-
-    if (parsedSeconds === null) {
-      return;
-    }
-
-    setTimerDraftDuration(parsedSeconds);
   }
 
   async function patchSubmission(id: string, patch: Partial<Submission>, opKey?: string) {
@@ -1224,17 +1175,42 @@ function TeacherDashboardContent({
               <h1 className="text-3xl font-semibold tracking-normal text-slate-950">
                 {sessionDetails.title}
               </h1>
-              <span
-                className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-[0.1em] ${
-                  sessionDetails.isOpen
-                    ? "bg-teal-100 text-teal-900"
-                    : "bg-amber-100 text-amber-900"
-                }`}
-              >
-                {sessionDetails.isOpen ? "Session open" : "Session closed"}
-              </span>
             </div>
           </div>
+          <button
+            aria-checked={sessionDetails.isOpen}
+            className={`flex min-h-10 items-center gap-2.5 rounded-full border py-1 pl-1 pr-3 transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60 ${
+              sessionDetails.isOpen
+                ? "border-teal-200 bg-teal-50 hover:border-teal-400 focus-visible:ring-teal-100"
+                : "border-amber-300 bg-amber-50 hover:border-amber-400 focus-visible:ring-amber-100"
+            }`}
+            disabled={isUpdatingSessionAccess}
+            role="switch"
+            type="button"
+            onClick={() => {
+              void setSessionOpen(!sessionDetails.isOpen);
+            }}
+          >
+            <span
+              aria-hidden="true"
+              className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
+                sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                  sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </span>
+            <span
+              className={`text-xs font-semibold uppercase tracking-[0.1em] ${
+                sessionDetails.isOpen ? "text-teal-800" : "text-amber-800"
+              }`}
+            >
+              {sessionDetails.isOpen ? "Session open" : "Session closed"}
+            </span>
+          </button>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
             href={studentUrl}
@@ -1438,23 +1414,21 @@ function TeacherDashboardContent({
               Current timer
             </label>
             <div className="mt-2 flex items-center gap-2">
-              <input
+              <TimerDurationInput
                 id="timer-duration"
-                className="h-10 w-24 rounded-md border border-slate-300 px-3 font-mono tabular-nums text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                inputMode="numeric"
-                placeholder="0:30"
                 value={timerDraftValue}
-                onBlur={normalizeTimerDraftValue}
-                onChange={(event) => {
-                  setTimerDraftValue(event.target.value);
+                onValueChange={(value) => {
+                  setTimerDraftValue(value);
                   setTimerDraftWasMinClamped(false);
                   setTimerStatus("");
                 }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void startTimer();
+                onCommit={(parsedSeconds) => {
+                  if (parsedSeconds !== null) {
+                    setTimerDraftDuration(parsedSeconds);
                   }
+                }}
+                onSubmit={() => {
+                  void startTimer();
                 }}
               />
               <PendingActionButton
@@ -1479,7 +1453,7 @@ function TeacherDashboardContent({
               </PendingActionButton>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              {timerQuickAdjustments.map((seconds) => (
+              {QUICK_TIMER_ADJUSTMENTS.map((seconds) => (
                 <button
                   className="h-9 rounded-md border border-slate-300 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                   key={seconds}
@@ -1617,46 +1591,6 @@ function TeacherDashboardContent({
             </button>
             {showLiveControls ? (
               <div className="border-t border-slate-200" id="teacher-room-controls">
-                <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      Participant access
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Closed sessions remain available at the same link, but do not accept responses.
-                    </p>
-                    {sessionAccessStatus ? (
-                      <p className="mt-1 text-xs font-medium text-slate-600" aria-live="polite">
-                        {sessionAccessStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    aria-checked={sessionDetails.isOpen}
-                    className="grid min-h-11 grid-cols-[auto_auto] items-center gap-3 rounded-md px-2 py-2 text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
-                    disabled={isUpdatingSessionAccess}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      void setSessionOpen(!sessionDetails.isOpen);
-                    }}
-                  >
-                    <span>{sessionDetails.isOpen ? "Session open" : "Session closed"}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
-                        sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
-                          sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </span>
-                  </button>
-                </div>
-
                 <div className="grid divide-y divide-slate-200 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-3">
                   <section className="p-4">
                     <div className="flex items-center justify-between gap-3">

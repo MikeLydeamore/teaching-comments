@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatTimerSeconds } from "@/lib/timer-duration";
 
 type SessionTimerProps = {
   idleText?: string;
@@ -8,13 +9,7 @@ type SessionTimerProps = {
   variant?: "compact" | "student";
 };
 
-export function formatTimerSeconds(totalSeconds: number) {
-  const boundedSeconds = Math.max(0, Math.ceil(totalSeconds));
-  const minutes = Math.floor(boundedSeconds / 60);
-  const seconds = boundedSeconds % 60;
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+export { formatTimerSeconds };
 
 export function getTimerRemainingSeconds(timerEndsAt: string | null, nowMs: number) {
   if (!timerEndsAt || nowMs <= 0) {
