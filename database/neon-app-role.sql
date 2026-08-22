@@ -13,7 +13,7 @@ grant select, insert, delete on qwt_group_question_votes to qwt_app;
 grant select, insert, update on qwt_polls to qwt_app;
 grant select, insert, update on qwt_poll_responses to qwt_app;
 
--- The application is a trusted server-side DAL. Neon has no Supabase service-role bypass,
+-- The application is a trusted server-side DAL. Neon has no service-role bypass,
 -- so the owner must either disable RLS for these private tables or add equivalent policies.
 alter table qwt_teacher_spaces disable row level security;
 alter table qwt_sessions disable row level security;

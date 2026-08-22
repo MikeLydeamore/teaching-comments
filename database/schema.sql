@@ -95,7 +95,8 @@ create index if not exists qwt_polls_session_started_idx on qwt_polls (session_c
 create unique index if not exists qwt_polls_one_active_per_session_idx on qwt_polls (session_code) where status = 'active';
 create index if not exists qwt_poll_responses_poll_updated_idx on qwt_poll_responses (poll_id, updated_at desc);
 
--- Retained for Supabase compatibility. A Neon qwt_app role needs explicit grants instead.
+-- Retained for compatibility with hosted Postgres providers that grant broad owner rights by default.
+-- A Neon qwt_app role needs explicit grants instead.
 alter table qwt_teacher_spaces enable row level security;
 alter table qwt_sessions enable row level security;
 alter table qwt_submissions enable row level security;

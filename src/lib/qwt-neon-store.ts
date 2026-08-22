@@ -61,7 +61,7 @@ function databaseUrl() {
   return value;
 }
 
-/** Kept lazy so local and Supabase builds never require a Neon connection. */
+/** Kept lazy so local builds never require a Neon connection. */
 function sql() {
   return neon(databaseUrl());
 }

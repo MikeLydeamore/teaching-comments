@@ -5,7 +5,7 @@ import { applySessionPatch, assertSubmissionHasContent, assertSubmissionUsesEnab
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, isUuid, postInsertRecovery, sessionHash, signImageTicket, verifyImageTicket } from "./image-upload";
 import { toSubmissionDto } from "./qwt-store";
 import { selectedStorageBackend } from "./qwt-storage-backend";
-import { collectSupabaseReferences, collectWorkerObjects, parseContentRange, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
+import { collectWorkerObjects, planReconciliation, selectedBackend, validateReference } from "../../tools/reconcile-images.mjs";
 import { outputImageContentType } from "../components/ImageUploadPanel";
 import { submissionImageRetryUrl } from "../components/SubmissionImagePreview";
 
@@ -45,22 +45,15 @@ describe("reconciliation fail-closed pagination", () => {
   });
 });
 
-it("matches app backend selection and exact Supabase page counts", async () => {
-  expect(selectedBackend({ QWT_STORAGE_BACKEND: "supabase" })).toBe("supabase");
-  expect(selectedBackend({ QWT_STORAGE_BACKEND: "local", SUPABASE_URL: "x" })).toBe("local");
-  expect(selectedBackend({ SUPABASE_URL: "x" })).toBe("supabase");
+it("matches app backend selection", () => {
+  expect(selectedBackend({ QWT_STORAGE_BACKEND: "local" })).toBe("local");
+  expect(selectedBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
   expect(selectedBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
-  expect(selectedBackend({ SUPABASE_URL: "x", DATABASE_URL: "postgresql://example" })).toBe("supabase");
   expect(selectedBackend({})).toBe("local");
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
-  expect(selectedStorageBackend({ SUPABASE_URL: "x", DATABASE_URL: "postgresql://example" })).toBe("supabase");
+  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "local" })).toBe("local");
   expect(selectedStorageBackend({ DATABASE_URL: "postgresql://example" })).toBe("neon");
-  expect(parseContentRange("0-999/1001", 0, 1000)).toBe(1001);
-  expect(() => parseContentRange("0-999/1000", 1000, 1)).toThrow("mismatch");
-  let call = 0;
   const row = { image_data: { version: 1, objectKey: `committed/${"A".repeat(43)}/${submissionId}.png`, contentType: "image/png", byteSize: 1, etag: "e" } };
-  const refs = await collectSupabaseReferences(async () => new Response(JSON.stringify(call++ ? [row] : Array.from({ length: 1000 }, () => row)), { headers: { "content-range": call === 1 ? "0-999/1001" : "1000-1000/1001" } }), "https://db.test", "token");
-  expect(refs).toHaveLength(1001);
+  const refs = [row.image_data];
   expect(() => planReconciliation([refs[0]], [{ key: refs[0].objectKey, etag: "wrong", size: 1, contentType: "image/png", uploaded: "2020-01-01T00:00:00.000Z" }])).toThrow("mismatch");
 });
 

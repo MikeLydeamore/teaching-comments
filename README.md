@@ -82,8 +82,7 @@ GIF search is optional. To enable it, create a GIPHY API key and set:
 NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key
 ```
 
-GIPHY's browser API key is public by design, unlike the Supabase service role
-key.
+GIPHY's browser API key is public by design, unlike the server-only secrets.
 
 Private image uploads are disabled unless all of these server-only values are set:
 

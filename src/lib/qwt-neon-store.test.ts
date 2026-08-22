@@ -169,9 +169,8 @@ it("scans Neon image references through a mocked SQL client", async () => {
 });
 
 it("uses explicit backend requests before safe implicit precedence", () => {
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "local", SUPABASE_URL: "x" })).toBe("local");
-  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "neon", SUPABASE_URL: "x" })).toBe("neon");
-  expect(selectedStorageBackend({ SUPABASE_URL: "x", DATABASE_URL: "postgresql://x" })).toBe("supabase");
+  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "local", DATABASE_URL: "postgresql://x" })).toBe("local");
+  expect(selectedStorageBackend({ QWT_STORAGE_BACKEND: "neon" })).toBe("neon");
   expect(selectedStorageBackend({ DATABASE_URL: "postgresql://x" })).toBe("neon");
   expect(selectedStorageBackend({})).toBe("local");
 });

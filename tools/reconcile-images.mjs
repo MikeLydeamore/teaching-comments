@@ -16,10 +16,8 @@ function assertWorkerUrl(value) {
 /** @param {Record<string, string | undefined>} env */
 export function selectedBackend(env = process.env) {
   const requested = env.QWT_STORAGE_BACKEND?.toLowerCase();
-  if (requested === "supabase") return "supabase";
   if (requested === "local") return "local";
   if (requested === "neon") return "neon";
-  if (env.SUPABASE_URL || env.SUPABASE_SERVICE_ROLE_KEY) return "supabase";
   return env.DATABASE_URL ? "neon" : "local";
 }
 
@@ -53,27 +51,6 @@ export async function collectWorkerObjects(fetchImpl, workerUrl, token) {
   return all;
 }
 
-export function parseContentRange(value, offset, received) {
-  const match = /^(\d+)-(\d+)\/(\d+)$/.exec(value ?? "");
-  if (!match) throw new Error("Supabase did not provide an exact complete count.");
-  const [, start, end, total] = match.map(Number);
-  if (start !== offset || end - start + 1 !== received || total < received) throw new Error("Supabase pagination range mismatch.");
-  return total;
-}
-
-export async function collectSupabaseReferences(fetchImpl, base, token) {
-  const all = []; const pageSize = 1000;
-  for (let offset = 0;; offset += pageSize) {
-    const response = await fetchImpl(`${base}/rest/v1/qwt_submissions?select=image_data&image_data=not.is.null&order=id.asc`, { headers: { apikey: token, Authorization: `Bearer ${token}`, Prefer: "count=exact", Range: `${offset}-${offset + pageSize - 1}`, "Range-Unit": "items" }, cache: "no-store" });
-    if (!response.ok) throw new Error(`Supabase reference scan failed (${response.status}).`);
-    const page = await response.json(); if (!Array.isArray(page) || page.length > pageSize) throw new Error("Malformed Supabase page.");
-    const total = parseContentRange(response.headers.get("content-range"), offset, page.length);
-    all.push(...page.map((row) => validateReference(row.image_data)));
-    if (all.length === total) return all;
-    if (all.length > total || page.length !== pageSize) throw new Error("Incomplete Supabase pagination.");
-  }
-}
-
 /** The CLI runs outside Next, so this is intentionally a direct SQL scan. */
 export async function collectNeonReferences(databaseUrl, sqlFactory = neon) {
   if (!databaseUrl) throw new Error("Neon reconciliation requires DATABASE_URL.");
@@ -93,9 +70,6 @@ export function planReconciliation(references, objects, now = Date.now()) {
 async function collectReferences() {
   if (selectedBackend() === "local") { const data = JSON.parse(await readFile(new URL("../.data/qwt-store.json", import.meta.url), "utf8")); return (data.submissions ?? []).flatMap((submission) => submission.imageData ? [validateReference(submission.imageData)] : []); }
   if (selectedBackend() === "neon") return collectNeonReferences(process.env.DATABASE_URL);
-  const base = process.env.SUPABASE_URL?.replace(/\/$/, ""); const token = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!base || !token) throw new Error("Supabase reconciliation requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
-  return collectSupabaseReferences(fetch, base, token);
 }
 
 async function main() {

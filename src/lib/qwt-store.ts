@@ -1,7 +1,6 @@
 import { localStore } from "./qwt-local-store";
 import { neonStore } from "./qwt-neon-store";
 import { selectedStorageBackend } from "./qwt-storage-backend";
-import { supabaseStore } from "./qwt-supabase-store";
 import {
   normalizeSpaceCode,
   normalizeSessionCode,
@@ -55,7 +54,6 @@ function getStore(): QwtStore {
 
   const store = (() => {
     switch (selectedStorageBackend()) {
-      case "supabase": return supabaseStore;
       case "neon": return neonStore;
       default: return localStore;
     }
