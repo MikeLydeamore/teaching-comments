@@ -48,12 +48,37 @@ export type {
   TeacherSpaceSummary,
 } from "./qwt-store-model";
 
+// Artificial per-call latency for local testing, e.g. STORE_DELAY_MS=1500 npm run dev.
+// Applies to every store method (reads and writes) on any backend.
 function getStore(): QwtStore {
-  switch (selectedStorageBackend()) {
-    case "supabase": return supabaseStore;
-    case "neon": return neonStore;
-    default: return localStore;
+  const delayMs = Number(process.env.STORE_DELAY_MS ?? 0);
+
+  const store = (() => {
+    switch (selectedStorageBackend()) {
+      case "supabase": return supabaseStore;
+      case "neon": return neonStore;
+      default: return localStore;
+    }
+  })();
+
+  if (!Number.isFinite(delayMs) || delayMs <= 0) {
+    return store;
   }
+
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+
+      if (typeof value !== "function") {
+        return value;
+      }
+
+      return async (...args: unknown[]) => {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return value.apply(target, args);
+      };
+    },
+  });
 }
 
 export async function getSession(code: string) {

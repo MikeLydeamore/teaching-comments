@@ -7,8 +7,10 @@ import { GifPreview } from "@/components/GifPreview";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { HostPollManager } from "@/components/HostPollManager";
 import { InlineCodeText } from "@/components/InlineCodeText";
+import { PendingActionButton } from "@/components/PendingActionButton";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import { ToastProvider, useToast } from "@/components/Toast";
 import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
@@ -336,7 +338,15 @@ function promptHistoryOptionLabel(item: PromptHistoryItem) {
   return `${startedAt} - ${prompt}`;
 }
 
-export function TeacherDashboard({
+export function TeacherDashboard(props: TeacherDashboardProps) {
+  return (
+    <ToastProvider>
+      <TeacherDashboardContent {...props} />
+    </ToastProvider>
+  );
+}
+
+function TeacherDashboardContent({
   initialPromptHistory,
   initialQuestionBank,
   session,
@@ -393,11 +403,30 @@ export function TeacherDashboard({
   const [isArchiving, setIsArchiving] = useState(false);
   const [isUnarchiving, setIsUnarchiving] = useState(false);
   const [questionsPanelKey, setQuestionsPanelKey] = useState(0);
+  const [pendingOps, setPendingOps] = useState<string[]>([]);
+  const toast = useToast();
 
-  const refresh = useCallback(async () => {
+  const beginOp = useCallback((key: string) => {
+    setPendingOps((currentOps) =>
+      currentOps.includes(key) ? currentOps : [...currentOps, key],
+    );
+  }, []);
+
+  const endOp = useCallback((key: string) => {
+    setPendingOps((currentOps) => currentOps.filter((op) => op !== key));
+  }, []);
+
+  const isPending = useCallback(
+    (key: string) => pendingOps.includes(key),
+    [pendingOps],
+  );
+
+
+  const refresh = useCallback(async (overrides?: { includeHidden?: boolean }) => {
+    const effectiveIncludeHidden = overrides?.includeHidden ?? includeHidden;
     const query = new URLSearchParams({
       minutes: String(minutes),
-      includeHidden: String(includeHidden),
+      includeHidden: String(effectiveIncludeHidden),
     });
 
     if (selectedPromptHistoryId) {
@@ -459,26 +488,41 @@ export function TeacherDashboard({
   ]);
 
   async function savePrompt() {
-    setPromptStatus("Saving...");
-    const response = await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: promptDraft }),
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setPromptStatus(payload.error ?? "Could not save prompt.");
+    if (isPending("save-prompt")) {
       return;
     }
 
-    setSessionDetails(payload.session);
-    setPromptDraft(payload.session.prompt);
-    if (payload.promptHistory) {
-      setPromptHistory(payload.promptHistory);
+    beginOp("save-prompt");
+    setPromptStatus("Saving...");
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptDraft }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload.error ?? "Could not save prompt.";
+        setPromptStatus(message);
+        toast.error(message);
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setPromptDraft(payload.session.prompt);
+      if (payload.promptHistory) {
+        setPromptHistory(payload.promptHistory);
+      }
+      setStats(payload.stats ?? stats);
+      setPromptStatus("Prompt saved.");
+    } catch {
+      setPromptStatus("Could not save prompt.");
+      toast.error("Could not save prompt.");
+    } finally {
+      endOp("save-prompt");
     }
-    setStats(payload.stats ?? stats);
-    setPromptStatus("Prompt saved.");
   }
 
   function openQuestionTitleDialog() {
@@ -540,45 +584,80 @@ export function TeacherDashboard({
       (bankQuestion) => bankQuestion.id === selectedQuestionId,
     );
 
-    if (!question) {
+    if (!question || isPending("delete-question")) {
       return;
     }
 
+    beginOp("delete-question");
     setQuestionBankStatus("Deleting question...");
-    const response = await fetch(`/api/questions/${encodeURIComponent(question.id)}`, {
-      method: "DELETE",
-    });
-    const payload = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setQuestionBankStatus(payload.error ?? "Could not delete question.");
-      return;
+    try {
+      const response = await fetch(`/api/questions/${encodeURIComponent(question.id)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload.error ?? "Could not delete question.";
+        setQuestionBankStatus(message);
+        toast.error(message);
+        return;
+      }
+
+      setQuestionBank((currentQuestionBank) =>
+        currentQuestionBank.filter((bankQuestion) => bankQuestion.id !== question.id),
+      );
+      setSelectedQuestionId("");
+      setQuestionBankStatus("Question deleted from bank.");
+    } catch {
+      setQuestionBankStatus("Could not delete question.");
+      toast.error("Could not delete question.");
+    } finally {
+      endOp("delete-question");
     }
-
-    setQuestionBank((currentQuestionBank) =>
-      currentQuestionBank.filter((bankQuestion) => bankQuestion.id !== question.id),
-    );
-    setSelectedQuestionId("");
-    setQuestionBankStatus("Question deleted from bank.");
   }
 
-  async function patchSession(patch: Record<string, unknown>, loadingMessage: string) {
-    setTimerStatus(loadingMessage);
-    const response = await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    const payload = await response.json();
+  async function patchSession(
+    patch: Record<string, unknown>,
+    loadingMessage: string,
+    opKey?: string,
+  ) {
+    if (opKey) {
+      if (isPending(opKey)) {
+        return;
+      }
 
-    if (!response.ok) {
-      setTimerStatus(payload.error ?? "Could not update timer.");
-      return;
+      beginOp(opKey);
     }
 
-    setSessionDetails(payload.session);
-    setStats(payload.stats ?? stats);
-    setTimerStatus("");
+    setTimerStatus(loadingMessage);
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload.error ?? "Could not update session.";
+        setTimerStatus(message);
+        toast.error(message);
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setStats(payload.stats ?? stats);
+      setTimerStatus("");
+    } catch {
+      setTimerStatus("Could not update session.");
+      toast.error("Could not update session.");
+    } finally {
+      if (opKey) {
+        endOp(opKey);
+      }
+    }
   }
 
   async function startTimer() {
@@ -597,64 +676,112 @@ export function TeacherDashboard({
     await patchSession(
       { timerDurationSeconds: nextSeconds },
       "Starting timer...",
+      "timer-start",
     );
   }
 
   async function clearTimer() {
-    await patchSession({ clearTimer: true }, "Clearing timer...");
+    await patchSession({ clearTimer: true }, "Clearing timer...", "timer-clear");
   }
 
   async function setGroupQuestionsScreeningMode(isEnabled: boolean) {
-    const response = await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupQuestionsScreeningEnabled: isEnabled }),
-    });
-    const payload = await response.json().catch(() => ({}));
+    const opKey = "screen-group-questions";
 
-    if (!response.ok) {
+    if (isPending(opKey)) {
       return;
     }
 
-    setSessionDetails(payload.session);
-    setStats(payload.stats ?? stats);
+    beginOp(opKey);
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupQuestionsScreeningEnabled: isEnabled }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(payload.error ?? "Could not update screening.");
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setStats(payload.stats ?? stats);
+    } catch {
+      toast.error("Could not update screening.");
+    } finally {
+      endOp(opKey);
+    }
   }
 
   async function setSubmissionsScreeningMode(isEnabled: boolean) {
-    const response = await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionsScreeningEnabled: isEnabled }),
-    });
-    const payload = await response.json().catch(() => ({}));
+    const opKey = "screen-submissions";
 
-    if (!response.ok) {
+    if (isPending(opKey)) {
       return;
     }
 
-    setSessionDetails(payload.session);
-    setStats(payload.stats ?? stats);
+    beginOp(opKey);
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionsScreeningEnabled: isEnabled }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(payload.error ?? "Could not update screening.");
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setStats(payload.stats ?? stats);
+    } catch {
+      toast.error("Could not update screening.");
+    } finally {
+      endOp(opKey);
+    }
   }
 
   async function setSubmissionInputEnabled(
     input: "textInputEnabled" | "gifInputEnabled" | "drawingInputEnabled" | "imageInputEnabled",
     isEnabled: boolean,
   ) {
-    setInputSettingsStatus("Saving...");
-    const response = await fetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [input]: isEnabled }),
-    });
-    const payload = await response.json().catch(() => ({}));
+    const opKey = `input-${input}`;
 
-    if (!response.ok) {
-      setInputSettingsStatus(payload.error ?? "Could not update response inputs.");
+    if (isPending(opKey)) {
       return;
     }
 
-    setSessionDetails(payload.session);
-    setInputSettingsStatus("");
+    beginOp(opKey);
+    setInputSettingsStatus("Saving...");
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [input]: isEnabled }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = payload.error ?? "Could not update response inputs.";
+        setInputSettingsStatus(message);
+        toast.error(message);
+        return;
+      }
+
+      setSessionDetails(payload.session);
+      setInputSettingsStatus("");
+    } catch {
+      setInputSettingsStatus("Could not update response inputs.");
+      toast.error("Could not update response inputs.");
+    } finally {
+      endOp(opKey);
+    }
   }
 
   async function setSessionOpen(isOpen: boolean) {
@@ -707,24 +834,73 @@ export function TeacherDashboard({
     setTimerDraftDuration(parsedSeconds);
   }
 
-  async function patchSubmission(id: string, patch: Partial<Submission>) {
-    const response = await fetch(`/api/submissions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    const payload = await response.json().catch(() => ({}));
+  async function patchSubmission(id: string, patch: Partial<Submission>, opKey?: string) {
+    if (opKey) {
+      if (isPending(opKey)) {
+        return { error: "", ok: false };
+      }
 
-    if (!response.ok) {
-      return {
-        error: payload.error ?? "Could not update submission.",
-        ok: false,
-      };
+      beginOp(opKey);
     }
 
-    await refresh();
+    try {
+      const response = await fetch(`/api/submissions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const payload = await response.json().catch(() => ({}));
 
-    return { ok: true };
+      if (!response.ok) {
+        const message = payload.error ?? "Could not update submission.";
+
+        toast.error(message);
+
+        return {
+          error: message,
+          ok: false,
+        };
+      }
+
+      await refresh();
+
+      return { ok: true };
+    } catch {
+      toast.error("Could not update submission.");
+
+      return {
+        error: "Could not update submission.",
+        ok: false,
+      };
+    } finally {
+      if (opKey) {
+        endOp(opKey);
+      }
+    }
+  }
+
+  function toggleSubmissionStar(submission: Submission) {
+    return patchSubmission(
+      submission.id,
+      { starred: !submission.starred },
+      `submission:${submission.id}:star`,
+    );
+  }
+
+  function toggleSubmissionFlag(submission: Submission) {
+    return patchSubmission(
+      submission.id,
+      { flagged: !submission.flagged },
+      `submission:${submission.id}:flag`,
+    );
+  }
+
+  function toggleSubmissionVisibility(submission: Submission) {
+    return patchSubmission(
+      submission.id,
+      { status: submission.status === "hidden" ? "visible" : "hidden" },
+      `submission:${submission.id}:status`,
+    );
   }
 
   function startEditingSubmission(submission: Submission) {
@@ -1002,8 +1178,22 @@ export function TeacherDashboard({
     }
   }
 
-  function toggleHiddenSubmissions() {
-    setIncludeHidden((isIncludingHidden) => !isIncludingHidden);
+  async function toggleHiddenSubmissions() {
+    const opKey = "toggle-hidden-submissions";
+
+    if (isPending(opKey)) {
+      return;
+    }
+
+    beginOp(opKey);
+    const nextIncludeHidden = !includeHidden;
+    setIncludeHidden(nextIncludeHidden);
+
+    try {
+      await refresh({ includeHidden: nextIncludeHidden });
+    } finally {
+      endOp(opKey);
+    }
   }
 
   useEffect(() => {
@@ -1167,16 +1357,16 @@ export function TeacherDashboard({
                   </option>
                 ))}
               </select>
-              <button
+              <PendingActionButton
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!selectedQuestion}
-                type="button"
+                pending={isPending("delete-question")}
                 onClick={() => {
                   void deleteSelectedQuestionFromBank();
                 }}
               >
                 Delete
-              </button>
+              </PendingActionButton>
             </div>
             <label className="sr-only" htmlFor="prompt">
               Session prompt
@@ -1212,14 +1402,15 @@ export function TeacherDashboard({
                 >
                   Add to bank
                 </button>
-                <button
+                <PendingActionButton
                   className="h-9 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={promptDraft.trim() === sessionDetails.prompt}
+                  pending={isPending("save-prompt")}
+                  pendingChildren="Saving..."
                   onClick={savePrompt}
-                  type="button"
                 >
                   Show
-                </button>
+                </PendingActionButton>
               </div>
             </div>
             {questionBankStatus ? (
@@ -1266,24 +1457,26 @@ export function TeacherDashboard({
                   }
                 }}
               />
-              <button
+              <PendingActionButton
                 className="h-10 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-                type="button"
+                pending={isPending("timer-start")}
+                pendingChildren="Starting..."
                 onClick={() => {
                   void startTimer();
                 }}
               >
                 Start
-              </button>
-              <button
+              </PendingActionButton>
+              <PendingActionButton
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
-                type="button"
+                pending={isPending("timer-clear")}
+                pendingChildren="Clearing..."
                 onClick={() => {
                   void clearTimer();
                 }}
               >
                 Clear
-              </button>
+              </PendingActionButton>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {timerQuickAdjustments.map((seconds) => (
@@ -1491,7 +1684,7 @@ export function TeacherDashboard({
                             <option value={0}>All time</option>
                           </select>
                         </label>
-                        <button aria-label="Refresh responses" className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-800" type="button" onClick={refresh}>
+                        <button aria-label="Refresh responses" className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-800" type="button" onClick={() => void refresh()}>
                           <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" /></svg>
                         </button>
                       </div>
@@ -1513,7 +1706,8 @@ export function TeacherDashboard({
                     <div className="mt-3 divide-y divide-slate-200">
                   <button
                     aria-checked={sessionDetails.groupQuestionsScreeningEnabled}
-                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+                    disabled={isPending("screen-group-questions")}
                     role="switch"
                     type="button"
                     onClick={() => {
@@ -1538,7 +1732,8 @@ export function TeacherDashboard({
                   </button>
                   <button
                     aria-checked={sessionDetails.submissionsScreeningEnabled}
-                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+                    disabled={isPending("screen-submissions")}
                     role="switch"
                     type="button"
                     onClick={() => {
@@ -1563,10 +1758,13 @@ export function TeacherDashboard({
                   </button>
                   <button
                     aria-checked={includeHidden}
-                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
+                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+                    disabled={isPending("toggle-hidden-submissions")}
                     role="switch"
                     type="button"
-                    onClick={toggleHiddenSubmissions}
+                    onClick={() => {
+                      void toggleHiddenSubmissions();
+                    }}
                   >
                     <span className="leading-5">Show hidden submissions</span>
                     <span
@@ -1598,7 +1796,8 @@ export function TeacherDashboard({
                     return (
                       <button
                         aria-checked={isEnabled}
-                        className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800"
+                        className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+                        disabled={isPending(`input-${input}`)}
                         key={input}
                         role="switch"
                         type="button"
@@ -1785,7 +1984,7 @@ export function TeacherDashboard({
                       {minutesAgo(submission.createdAt)}
                     </p>
                     <div className="flex gap-1" data-no-card-drag="true">
-                      <button
+                      <PendingActionButton
                         aria-label={
                           submission.starred ? "Remove star from response" : "Star response"
                         }
@@ -1794,13 +1993,14 @@ export function TeacherDashboard({
                             ? "border-amber-300 bg-amber-100 text-amber-900"
                             : "border-slate-200 text-slate-600 hover:border-amber-300"
                         }`}
+                        pending={isPending(`submission:${submission.id}:star`)}
+                        pendingChildren={null}
                         title={submission.starred ? "Remove star" : "Star"}
-                        onClick={() => patchSubmission(submission.id, { starred: !submission.starred })}
-                        type="button"
+                        onClick={() => void toggleSubmissionStar(submission)}
                       >
                         <StarIcon isActive={submission.starred} />
-                      </button>
-                      <button
+                      </PendingActionButton>
+                      <PendingActionButton
                         aria-label={
                           submission.flagged ? "Remove flag from response" : "Flag response"
                         }
@@ -1809,12 +2009,13 @@ export function TeacherDashboard({
                             ? "border-red-300 bg-red-100 text-red-900"
                             : "border-slate-200 text-slate-600 hover:border-red-300"
                         }`}
+                        pending={isPending(`submission:${submission.id}:flag`)}
+                        pendingChildren={null}
                         title={submission.flagged ? "Remove flag" : "Flag"}
-                        onClick={() => patchSubmission(submission.id, { flagged: !submission.flagged })}
-                        type="button"
+                        onClick={() => void toggleSubmissionFlag(submission)}
                       >
                         <FlagIcon isActive={submission.flagged} />
-                      </button>
+                      </PendingActionButton>
                     </div>
                   </div>
                   {editingSubmissionId === submission.id ? (
@@ -1921,17 +2122,14 @@ export function TeacherDashboard({
                     >
                       Edit
                     </button>
-                    <button
+                    <PendingActionButton
                       className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                      onClick={() =>
-                        patchSubmission(submission.id, {
-                          status: submission.status === "hidden" ? "visible" : "hidden",
-                        })
-                      }
-                      type="button"
+                      pending={isPending(`submission:${submission.id}:status`)}
+                      pendingChildren="Working..."
+                      onClick={() => void toggleSubmissionVisibility(submission)}
                     >
                       {submission.status === "hidden" ? "Show response" : "Hide response"}
-                    </button>
+                    </PendingActionButton>
                   </div>
                   </article>
                 </div>
