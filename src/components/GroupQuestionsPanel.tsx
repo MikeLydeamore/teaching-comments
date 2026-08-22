@@ -157,12 +157,22 @@ export function GroupQuestionsPanel({
       void refreshQuestions();
     }, 0);
     const timer = window.setInterval(() => {
-      void refreshQuestions();
+      if (document.visibilityState === "visible") {
+        void refreshQuestions();
+      }
     }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshQuestions();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearTimeout(firstRefresh);
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshQuestions, voterId]);
 

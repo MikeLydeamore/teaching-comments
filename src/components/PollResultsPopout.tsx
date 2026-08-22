@@ -45,10 +45,22 @@ export function PollResultsPopout({
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      void refresh();
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
     }, 2000);
 
-    return () => window.clearInterval(timer);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [refresh]);
 
   useEffect(() => {

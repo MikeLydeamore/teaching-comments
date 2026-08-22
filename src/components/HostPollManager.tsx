@@ -188,12 +188,22 @@ export function HostPollManager({
       void refreshPoll();
     }, 0);
     const timer = window.setInterval(() => {
-      void refreshPoll();
+      if (document.visibilityState === "visible") {
+        void refreshPoll();
+      }
     }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshPoll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearTimeout(firstRefresh);
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshPoll]);
 

@@ -167,12 +167,22 @@ export function StudentSubmit({
       void refreshSession();
     }, 0);
     const timer = window.setInterval(() => {
-      void refreshSession();
+      if (document.visibilityState === "visible") {
+        void refreshSession();
+      }
     }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshSession();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearTimeout(firstRefresh);
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshSession]);
 
