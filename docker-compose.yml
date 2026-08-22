@@ -1,0 +1,17 @@
+# Local development Postgres used by Better Auth (accounts/sessions).
+# Start with: docker compose up -d
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: edie-auth-postgres
+    environment:
+      POSTGRES_USER: edie
+      POSTGRES_PASSWORD: edie
+      POSTGRES_DB: edie_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - edie-auth-pgdata:/var/lib/postgresql/data
+
+volumes:
+  edie-auth-pgdata:
