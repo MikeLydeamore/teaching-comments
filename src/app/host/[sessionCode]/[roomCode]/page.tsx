@@ -58,6 +58,7 @@ export default async function TeacherSpaceSessionPage({
         initialSubmissionViewSettings={submissionViewSettings}
         session={session}
         spaceCode={space.code}
+        spaceName={space.name}
       />
     </>
   );

@@ -17,12 +17,12 @@ export function ThemeSelector() {
   }, [theme]);
 
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-semibold text-slate-600" htmlFor="edie-theme">
-        Theme
+    <div className="grid gap-1.5">
+      <label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500" htmlFor="edie-theme">
+        Appearance
       </label>
       <select
-        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
         id="edie-theme"
         value={theme}
         onChange={(event) => setTheme(event.target.value as ThemeName)}
