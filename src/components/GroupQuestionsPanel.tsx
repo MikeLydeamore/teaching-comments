@@ -13,6 +13,7 @@ type GroupQuestionsPanelProps = {
 };
 
 const voterIdStorageKey = "edie_group_question_voter_id";
+const groupQuestionsRefreshIntervalMs = 10_000;
 
 function createVoterId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -160,7 +161,7 @@ export function GroupQuestionsPanel({
       if (document.visibilityState === "visible") {
         void refreshQuestions();
       }
-    }, 3000);
+    }, groupQuestionsRefreshIntervalMs);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {

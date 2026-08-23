@@ -14,6 +14,13 @@ type PollResultsPopoutProps = {
   sessionTitle: string;
 };
 
+const activePollRefreshIntervalMs = 2_000;
+const idlePollRefreshIntervalMs = 15_000;
+
+function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
+  return poll.status === "active" && new Date(poll.endsAt).getTime() > nowMs;
+}
+
 export function PollResultsPopout({
   dashboardUrl,
   initialPoll,
@@ -43,12 +50,17 @@ export function PollResultsPopout({
     setResults(payload.results ?? null);
   }, [sessionCode]);
 
+  const pollRefreshIntervalMs =
+    poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs)
+      ? activePollRefreshIntervalMs
+      : idlePollRefreshIntervalMs;
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void refresh();
       }
-    }, 2000);
+    }, pollRefreshIntervalMs);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -61,7 +73,7 @@ export function PollResultsPopout({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [refresh]);
+  }, [pollRefreshIntervalMs, refresh]);
 
   useEffect(() => {
     const updateNow = () => setNowMs(Date.now());

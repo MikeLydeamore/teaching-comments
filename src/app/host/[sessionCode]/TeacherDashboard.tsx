@@ -338,6 +338,11 @@ function promptHistoryOptionLabel(item: PromptHistoryItem) {
   return `${startedAt} - ${prompt}`;
 }
 
+const submissionsRefreshIntervalMs = 3_000;
+const sessionStateRefreshIntervalMs = 20_000;
+
+type DashboardRefreshScope = "all" | "session" | "submissions";
+
 export function TeacherDashboard(props: TeacherDashboardProps) {
   return (
     <ToastProvider>
@@ -422,8 +427,12 @@ function TeacherDashboardContent({
   );
 
 
-  const refresh = useCallback(async (overrides?: { includeHidden?: boolean }) => {
+  const refresh = useCallback(async (overrides?: {
+    includeHidden?: boolean;
+    scope?: DashboardRefreshScope;
+  }) => {
     const effectiveIncludeHidden = overrides?.includeHidden ?? includeHidden;
+    const scope = overrides?.scope ?? "all";
     const query = new URLSearchParams({
       minutes: String(minutes),
       includeHidden: String(effectiveIncludeHidden),
@@ -433,13 +442,17 @@ function TeacherDashboardContent({
       query.set("promptHistoryId", selectedPromptHistoryId);
     }
 
-    let submissionsResponse: Response;
-    let sessionResponse: Response;
+    let submissionsResponse: Response | null;
+    let sessionResponse: Response | null;
 
     try {
       [submissionsResponse, sessionResponse] = await Promise.all([
-        fetch(`/api/sessions/${session.id}/submissions?${query}`),
-        fetch(`/api/sessions/${session.id}`),
+        scope === "session"
+          ? Promise.resolve(null)
+          : fetch(`/api/sessions/${session.id}/submissions?${query}`),
+        scope === "submissions"
+          ? Promise.resolve(null)
+          : fetch(`/api/sessions/${session.id}`),
       ]);
     } catch {
       setRefreshError("Could not refresh the dashboard. Trying again shortly.");
@@ -447,12 +460,23 @@ function TeacherDashboardContent({
       return;
     }
 
-    const [submissionsPayload, sessionPayload] = await Promise.all([
-      submissionsResponse.json().catch(() => ({})),
-      sessionResponse.json().catch(() => ({})),
-    ]);
+    const [submissionsPayload, sessionPayload] = (await Promise.all([
+      submissionsResponse?.json().catch(() => ({})) ?? {},
+      sessionResponse?.json().catch(() => ({})) ?? {},
+    ])) as [
+      { error?: string; submissions?: Submission[] },
+      {
+        error?: string;
+        promptHistory?: typeof initialPromptHistory;
+        session?: typeof session;
+        stats?: typeof initialStats;
+      },
+    ];
 
-    if (!submissionsResponse.ok || !sessionResponse.ok) {
+    if (
+      (submissionsResponse && !submissionsResponse.ok) ||
+      (sessionResponse && !sessionResponse.ok)
+    ) {
       setRefreshError(
         submissionsPayload.error ??
           sessionPayload.error ??
@@ -462,19 +486,23 @@ function TeacherDashboardContent({
       return;
     }
 
-    const nextSubmissions = submissionsPayload.submissions ?? [];
+    if (submissionsResponse) {
+      const nextSubmissions = submissionsPayload.submissions ?? [];
 
-    setSubmissions(nextSubmissions);
-    setOrderedSubmissionIds((currentOrder) =>
-      mergeSubmissionOrder(currentOrder, nextSubmissions, submissionSortOrder),
-    );
-    if (sessionPayload.session) {
-      setSessionDetails(sessionPayload.session);
+      setSubmissions(nextSubmissions);
+      setOrderedSubmissionIds((currentOrder) =>
+        mergeSubmissionOrder(currentOrder, nextSubmissions, submissionSortOrder),
+      );
     }
-    if (sessionPayload.promptHistory) {
-      setPromptHistory(sessionPayload.promptHistory);
+    if (sessionResponse) {
+      if (sessionPayload.session) {
+        setSessionDetails(sessionPayload.session);
+      }
+      if (sessionPayload.promptHistory) {
+        setPromptHistory(sessionPayload.promptHistory);
+      }
+      setStats(sessionPayload.stats ?? initialStats);
     }
-    setStats(sessionPayload.stats ?? initialStats);
     setRefreshError("");
     setLastRefresh(new Date());
     setIsLoading(false);
@@ -1057,15 +1085,21 @@ function TeacherDashboardContent({
     const firstRefresh = window.setTimeout(() => {
       void refresh();
     }, 0);
-    const timer = window.setInterval(() => {
+    const submissionsTimer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void refresh();
+        void refresh({ scope: "submissions" });
       }
-    }, 3000);
+    }, submissionsRefreshIntervalMs);
+    const sessionStateTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refresh({ scope: "session" });
+      }
+    }, sessionStateRefreshIntervalMs);
 
     return () => {
       window.clearTimeout(firstRefresh);
-      window.clearInterval(timer);
+      window.clearInterval(submissionsTimer);
+      window.clearInterval(sessionStateTimer);
     };
   }, [refresh]);
 

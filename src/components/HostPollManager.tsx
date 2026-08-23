@@ -18,6 +18,8 @@ type HostPollManagerProps = {
 
 const pollExtensions = [15, 30, 60];
 const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
+const activePollRefreshIntervalMs = 3_000;
+const idlePollRefreshIntervalMs = 15_000;
 
 function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
   return (
@@ -183,6 +185,13 @@ export function HostPollManager({
     }
   }, [sessionCode]);
 
+  const pollIsLive = Boolean(
+    poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs),
+  );
+  const pollRefreshIntervalMs = pollIsLive
+    ? activePollRefreshIntervalMs
+    : idlePollRefreshIntervalMs;
+
   useEffect(() => {
     const firstRefresh = window.setTimeout(() => {
       void refreshPoll();
@@ -191,7 +200,7 @@ export function HostPollManager({
       if (document.visibilityState === "visible") {
         void refreshPoll();
       }
-    }, 3000);
+    }, pollRefreshIntervalMs);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -205,7 +214,7 @@ export function HostPollManager({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [refreshPoll]);
+  }, [pollRefreshIntervalMs, refreshPoll]);
 
   useEffect(() => {
     const updateTime = () => setNowMs(Date.now());
@@ -218,9 +227,6 @@ export function HostPollManager({
     };
   }, []);
 
-  const pollIsLive = Boolean(
-    poll && nowMs > 0 && pollIsCurrentlyLive(poll, nowMs),
-  );
   const pollNeedsEnding = poll?.status === "active";
   const pastPollResults = useMemo(
     () =>
