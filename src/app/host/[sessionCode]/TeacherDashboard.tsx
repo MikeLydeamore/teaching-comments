@@ -8,9 +8,7 @@ import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
 import { HostPollManager } from "@/components/HostPollManager";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingActionButton } from "@/components/PendingActionButton";
-import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { ToastProvider, useToast } from "@/components/Toast";
-import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
@@ -23,7 +21,6 @@ import type {
   PromptHistoryItem,
   QuestionBankItem,
 } from "@/lib/edie-store";
-import { logoutTeacher } from "../actions";
 
 type Session = {
   id: string;
@@ -78,6 +75,7 @@ type TeacherDashboardProps = {
   session: Session;
   initialStats: Stats;
   spaceCode?: string;
+  spaceName?: string;
 };
 
 type SubmissionSortOrder = "newest" | "oldest";
@@ -351,6 +349,7 @@ function TeacherDashboardContent({
   session,
   initialStats,
   spaceCode,
+  spaceName,
 }: TeacherDashboardProps) {
   const [sessionDetails, setSessionDetails] = useState(session);
   const [promptDraft, setPromptDraft] = useState(session.prompt);
@@ -379,20 +378,16 @@ function TeacherDashboardContent({
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showLiveControls, setShowLiveControls] = useState(false);
   const [showResultsChart, setShowResultsChart] = useState(false);
-  const [showStudentQr, setShowStudentQr] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
   const [timerDraftWasMinClamped, setTimerDraftWasMinClamped] = useState(false);
   const [timerStatus, setTimerStatus] = useState("");
-  const [sessionAccessStatus, setSessionAccessStatus] = useState("");
   const [inputSettingsStatus, setInputSettingsStatus] = useState("");
   const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
   const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
-  const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
-  const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState("");
@@ -789,7 +784,6 @@ function TeacherDashboardContent({
     }
 
     setIsUpdatingSessionAccess(true);
-    setSessionAccessStatus(isOpen ? "Reopening session..." : "Closing session...");
 
     try {
       const response = await fetch(`/api/sessions/${session.id}`, {
@@ -800,16 +794,15 @@ function TeacherDashboardContent({
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setSessionAccessStatus(payload.error ?? "Could not update session access.");
+        toast.error(payload.error ?? "Could not update session access.");
         return;
       }
 
       setSessionDetails(payload.session);
       setStats(payload.stats ?? stats);
       setQuestionsPanelKey((currentKey) => currentKey + 1);
-      setSessionAccessStatus(isOpen ? "Session reopened." : "Session closed.");
     } catch {
-      setSessionAccessStatus("Could not update session access.");
+      toast.error("Could not update session access.");
     } finally {
       setIsUpdatingSessionAccess(false);
     }
@@ -931,31 +924,6 @@ function TeacherDashboardContent({
         currentId === submission.id ? null : currentId,
       );
     }, 1400);
-  }
-
-  async function copyStudentLink(studentShareUrl: string) {
-    if (!studentShareUrl) {
-      return;
-    }
-
-    try {
-      await writeTextToClipboard(studentShareUrl);
-    } catch {
-      setStudentLinkCopyStatus("Could not copy link.");
-      return;
-    }
-
-    setStudentLinkCopyStatus("Copied.");
-    window.setTimeout(() => {
-      setStudentLinkCopyStatus("");
-    }, 1400);
-  }
-
-  function toggleStudentQr() {
-    setStudentLinkOrigin((currentOrigin) =>
-      currentOrigin || window.location.origin,
-    );
-    setShowStudentQr((isShown) => !isShown);
   }
 
   function changeSubmissionSortOrder(nextSortOrder: SubmissionSortOrder) {
@@ -1129,10 +1097,6 @@ function TeacherDashboardContent({
   const studentUrl = spaceCode
     ? `/spaces/${spaceCode}/${session.code}`
     : `/spaces/${session.code}`;
-  const studentShareUrl = studentLinkOrigin
-    ? `${studentLinkOrigin}${studentUrl}`
-    : "";
-  const teacherHomeUrl = spaceCode ? `/host/${spaceCode}` : "/host";
   const dashboardUrl = spaceCode
     ? `/host/${spaceCode}/${session.code}`
     : `/host/${session.code}`;
@@ -1212,119 +1176,84 @@ function TeacherDashboardContent({
   }, [submissionsPopoutOpen, submissionsPopoutUrl]);
 
   return (
-    <main className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
-              Host view
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-normal text-slate-950">
+    <main className="min-h-screen bg-slate-100 px-5 py-8">
+      <div className="mx-auto w-full max-w-7xl">
+        <nav className="mb-4 flex flex-wrap items-center gap-2 pr-14 text-sm font-semibold text-slate-500 sm:pr-0">
+          <Link className="hover:text-teal-800" href="/host">
+            Your spaces
+          </Link>
+          {spaceCode ? (
+            <>
+              <svg aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+              </svg>
+              <Link className="hover:text-teal-800" href={`/host/${spaceCode}`}>
+                {spaceName ?? spaceCode}
+              </Link>
+            </>
+          ) : null}
+          <svg aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+          </svg>
+          <span className="text-slate-700">{sessionDetails.title}</span>
+        </nav>
+
+        <header className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-6">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
+                Host view
+              </p>
+              <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
                 {sessionDetails.title}
               </h1>
-              <span
-                className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-[0.1em] ${
-                  sessionDetails.isOpen
-                    ? "bg-teal-100 text-teal-900"
-                    : "bg-amber-100 text-amber-900"
-                }`}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                aria-checked={sessionDetails.isOpen}
+                className="inline-flex h-10 items-center gap-2.5 rounded-full border border-slate-300 bg-white pl-3 pr-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+                disabled={isUpdatingSessionAccess}
+                role="switch"
+                title={sessionDetails.isOpen ? "Close session" : "Open session"}
+                type="button"
+                onClick={() => {
+                  void setSessionOpen(!sessionDetails.isOpen);
+                }}
               >
-                {sessionDetails.isOpen ? "Session open" : "Session closed"}
-              </span>
+                <span>Accepting responses</span>
+                <span
+                  aria-hidden="true"
+                  className={`flex h-6 w-10 items-center rounded-full p-1 transition ${
+                    sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`block size-4 rounded-full bg-white shadow-sm transition ${
+                      sessionDetails.isOpen ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </span>
+              </button>
+              <Link
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                href={studentUrl}
+              >
+                Open student page
+              </Link>
+              <Link
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                href={qrPopoutUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                QR popout
+              </Link>
             </div>
           </div>
-          <Link
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={studentUrl}
-          >
-            Open student page
-          </Link>
-          <button
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            type="button"
-            onClick={toggleStudentQr}
-          >
-            {showStudentQr ? "Hide QR code" : "Show QR code"}
-          </button>
-          <Link
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            href={qrPopoutUrl}
-            rel="noreferrer"
-            target="_blank"
-          >
-            QR popout
-          </Link>
-          <form action={logoutTeacher}>
-            <input name="next" type="hidden" value={teacherHomeUrl} />
-            <PendingSubmitButton
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700"
-              pendingChildren="Signing out..."
-            >
-              Sign out
-            </PendingSubmitButton>
-          </form>
-        </div>
-      </header>
+        </header>
 
-      {showStudentQr ? (
-        <section className="border-b border-slate-200 bg-white">
-          <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 md:grid-cols-[240px_minmax(0,1fr)]">
-            <div className="aspect-square rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-              {studentShareUrl ? (
-                <QrCode className="size-full" value={studentShareUrl} />
-              ) : (
-                <div className="flex aspect-square items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-500">
-                  Preparing QR code...
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col justify-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
-                Student QR code
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
-                Scan to join {sessionDetails.title}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Put this on screen at the start of class. It opens the student
-                response page for this space and session.
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <code className="max-w-full overflow-x-auto rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {studentShareUrl || studentUrl}
-                </code>
-                <button
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={!studentShareUrl}
-                  type="button"
-                  onClick={() => {
-                    void copyStudentLink(studentShareUrl);
-                  }}
-                >
-                  Copy link
-                </button>
-                <Link
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                  href={qrPopoutUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open popout
-                </Link>
-                {studentLinkCopyStatus ? (
-                  <span className="text-sm font-medium text-slate-600">
-                    {studentLinkCopyStatus}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="space-y-5">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="space-y-5">
           <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-slate-500">Prompt</p>
@@ -1609,46 +1538,6 @@ function TeacherDashboardContent({
             </button>
             {showLiveControls ? (
               <div className="border-t border-slate-200" id="teacher-room-controls">
-                <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      Participant access
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Closed sessions remain available at the same link, but do not accept responses.
-                    </p>
-                    {sessionAccessStatus ? (
-                      <p className="mt-1 text-xs font-medium text-slate-600" aria-live="polite">
-                        {sessionAccessStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    aria-checked={sessionDetails.isOpen}
-                    className="grid min-h-11 grid-cols-[auto_auto] items-center gap-3 rounded-md px-2 py-2 text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
-                    disabled={isUpdatingSessionAccess}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      void setSessionOpen(!sessionDetails.isOpen);
-                    }}
-                  >
-                    <span>{sessionDetails.isOpen ? "Session open" : "Session closed"}</span>
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
-                        sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
-                          sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </span>
-                  </button>
-                </div>
-
                 <div className="grid divide-y divide-slate-200 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-3">
                   <section className="p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -2135,6 +2024,7 @@ function TeacherDashboardContent({
             </div>
           )}
         </section>
+        </div>
       </div>
       {isQuestionTitleDialogOpen ? (
         <div

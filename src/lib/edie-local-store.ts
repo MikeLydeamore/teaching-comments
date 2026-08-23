@@ -182,7 +182,7 @@ async function readStore(): Promise<StoreData> {
   const teacherSpaces = data.teacherSpaces?.length
     ? data.teacherSpaces.map((space) => ({
         code: normalizeSpaceCode(space.code) || DEFAULT_SPACE_CODE,
-        name: space.name ?? (titleFromCode(space.code) || "Teaching Space"),
+        name: space.name ?? (titleFromCode(space.code) || "Hosted Space"),
         createdAt: space.createdAt ?? createdAt,
       }))
     : [
@@ -504,7 +504,7 @@ export const localStore: EdieStore = {
     );
 
     if (!session) {
-      throw new Error("Default teaching space is missing.");
+      throw new Error("Default hosted space is missing.");
     }
 
     return session;

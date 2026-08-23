@@ -51,6 +51,7 @@ export default async function TeacherSpaceSessionPage({
         initialStats={stats}
         session={session}
         spaceCode={space.code}
+        spaceName={space.name}
       />
     </>
   );

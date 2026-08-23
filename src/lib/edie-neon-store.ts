@@ -304,7 +304,7 @@ export const neonStore: EdieStore = {
   async getSessionInSpace(spaceCode, code) { const row = await getSessionInSpaceRow(spaceCode, code); return row ? sessionFromRow(row) : null; },
   async getOrCreateSession(code) {
     const result = await this.getOrCreateSessionInSpace(DEFAULT_SPACE_CODE, code);
-    if (!result) throw new Error("Default teaching space is missing.");
+    if (!result) throw new Error("Default hosted space is missing.");
     return result;
   },
   async getOrCreateSessionInSpace(spaceCode, code) {
