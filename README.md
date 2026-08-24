@@ -67,6 +67,8 @@ For local development, submissions are stored in `.data/edie-store.json`.
 This keeps the first step free and fast to iterate on.
 
 For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/neon-app-role.sql`.
+Existing databases with `edie_space_members` must also apply
+`database/add-space-invitations.sql` before deploying invitation-aware code.
 
 Set these environment variables locally and in Vercel:
 

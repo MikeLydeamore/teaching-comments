@@ -65,8 +65,11 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
   if (isAdmin) {
     for (const space of spaces) {
       const members = await listSpaceMembers(space.code);
-      memberCounts.set(space.code, members.length);
-      const ownerEmails = members
+      const activeMembers = members.filter(
+        (member) => member.status === "active",
+      );
+      memberCounts.set(space.code, activeMembers.length);
+      const ownerEmails = activeMembers
         .filter((member) => member.role === "owner")
         .map((member) => member.email);
       ownersBySpace.set(space.code, ownerEmails);

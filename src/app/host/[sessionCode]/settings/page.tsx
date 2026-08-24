@@ -14,7 +14,7 @@ import {
 } from "./actions";
 
 const memberMessages: Record<string, string> = {
-  added: "Member invited. They get access as soon as they sign in with that email.",
+  added: "Invitation sent. They will get access after accepting it.",
   removed: "Member removed.",
   exists: "That person is already a member of this space.",
   invalid: "Enter a valid email address.",
@@ -45,6 +45,10 @@ export default async function SpaceSettingsPage({
   const members = await listSpaceMembers(space.code);
   const profiles = await findUserProfilesByEmail(members.map((member) => member.email));
   const isOwner = role === "owner";
+  const activeMemberCount = members.filter(
+    (member) => member.status === "active",
+  ).length;
+  const pendingInviteCount = members.length - activeMemberCount;
   const message = query.member ? memberMessages[query.member] ?? "" : "";
   const succeeded = query.member === "added" || query.member === "removed";
 
@@ -90,7 +94,8 @@ export default async function SpaceSettingsPage({
               </p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
-              {members.length} {members.length === 1 ? "member" : "members"}
+              {activeMemberCount} {activeMemberCount === 1 ? "member" : "members"}
+              {pendingInviteCount ? ` · ${pendingInviteCount} pending` : ""}
             </span>
           </div>
         </header>
@@ -152,7 +157,7 @@ export default async function SpaceSettingsPage({
                   className="h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
                   pendingChildren="Inviting..."
                 >
-                  Add member
+                  Send invite
                 </PendingSubmitButton>
               </div>
             </form>
@@ -174,7 +179,7 @@ export default async function SpaceSettingsPage({
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Members</h2>
-              <p className="mt-1 text-sm text-slate-500">People with access to this space.</p>
+              <p className="mt-1 text-sm text-slate-500">People with access and pending invitations.</p>
             </div>
           </div>
           {members.length ? (
@@ -206,17 +211,15 @@ export default async function SpaceSettingsPage({
                               you
                             </span>
                           ) : null}
-                          {!profile ? (
+                          {member.status === "pending" ? (
                             <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">
                               invite pending
                             </span>
                           ) : null}
                         </p>
                         <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-slate-500">
-                          {profile ? (
-                            <span className="truncate">{member.email}</span>
-                          ) : null}
-                          {profile ? <span aria-hidden>·</span> : null}
+                          <span className="truncate">{member.email}</span>
+                          <span aria-hidden>·</span>
                           <span className="shrink-0 font-semibold capitalize text-slate-600">
                             {member.role}
                           </span>
@@ -247,7 +250,7 @@ export default async function SpaceSettingsPage({
                             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-400"
                             pendingChildren="Removing..."
                           >
-                            Remove
+                            {member.status === "pending" ? "Cancel invite" : "Remove"}
                           </PendingSubmitButton>
                         </form>
                       </div>

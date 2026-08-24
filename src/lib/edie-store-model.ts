@@ -64,10 +64,13 @@ export type TeacherSpaceSummary = TeacherSpace;
 
 export type SpaceRole = "owner" | "editor";
 
+export type SpaceMembershipStatus = "pending" | "active";
+
 export type SpaceMember = {
   spaceCode: string;
   email: string;
   role: SpaceRole;
+  status: SpaceMembershipStatus;
   createdAt: string;
 };
 
@@ -75,7 +78,16 @@ export type SpaceWithRole = TeacherSpaceSummary & {
   role: SpaceRole;
 };
 
+export type SpaceInvitation = TeacherSpaceSummary & {
+  role: SpaceRole;
+  invitedAt: string;
+};
+
 const SPACE_ROLE_ROLES: readonly SpaceRole[] = ["owner", "editor"];
+const SPACE_MEMBERSHIP_STATUSES: readonly SpaceMembershipStatus[] = [
+  "pending",
+  "active",
+];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeSpaceEmail(email: string) {
@@ -94,6 +106,16 @@ export function validateSpaceRole(role: string): SpaceRole {
   }
 
   return role as SpaceRole;
+}
+
+export function validateSpaceMembershipStatus(
+  status: string,
+): SpaceMembershipStatus {
+  if (!(SPACE_MEMBERSHIP_STATUSES as readonly string[]).includes(status)) {
+    throw new Error("Unknown space membership status.");
+  }
+
+  return status as SpaceMembershipStatus;
 }
 
 export type Session = {
@@ -272,6 +294,9 @@ export type EdieStore = {
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
   listTeacherSpacesForUser(email: string): Promise<SpaceWithRole[]>;
+  listPendingSpaceInvitationsForUser(
+    email: string,
+  ): Promise<SpaceInvitation[]>;
   getSpaceMemberRole(
     spaceCode: string,
     email: string,
@@ -281,7 +306,11 @@ export type EdieStore = {
     spaceCode: string,
     email: string,
     role?: SpaceRole,
+    status?: SpaceMembershipStatus,
   ): Promise<SpaceMember>;
+  acceptSpaceInvitation(spaceCode: string, email: string): Promise<boolean>;
+  declineSpaceInvitation(spaceCode: string, email: string): Promise<boolean>;
+  leaveSpace(spaceCode: string, email: string): Promise<boolean>;
   updateSpaceMemberRole(
     spaceCode: string,
     email: string,

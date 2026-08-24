@@ -29,6 +29,7 @@ import {
   validateSubmissionContent,
   validateTeacherSpaceName,
   normalizeSpaceEmail,
+  validateSpaceMembershipStatus,
   validateSpaceRole,
   type GroupQuestion,
   type PollOption,
@@ -48,6 +49,7 @@ function spaceMemberFromRow(row: Row): SpaceMember {
     spaceCode: text(row, "space_code"),
     email: text(row, "email"),
     role: validateSpaceRole(text(row, "role")),
+    status: validateSpaceMembershipStatus(text(row, "status") || "active"),
     createdAt: text(row, "created_at"),
   };
 }
@@ -255,7 +257,7 @@ export const neonStore: EdieStore = {
   async listTeacherSpacesForUser(email) {
     const normalizedEmail = normalizeSpaceEmail(email);
     const rows = await query(
-      "SELECT s.code, s.name, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.email = $1 ORDER BY s.name ASC",
+      "SELECT s.code, s.name, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.email = $1 AND m.status = 'active' ORDER BY s.name ASC",
       [normalizedEmail],
     );
     return rows.map((row) => ({
@@ -265,33 +267,61 @@ export const neonStore: EdieStore = {
       role: validateSpaceRole(text(row, "role")),
     }));
   },
+  async listPendingSpaceInvitationsForUser(email) {
+    const rows = await query(
+      "SELECT s.code, s.name, s.created_at, m.role, m.created_at AS invited_at FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.email = $1 AND m.status = 'pending' ORDER BY s.name ASC",
+      [normalizeSpaceEmail(email)],
+    );
+    return rows.map((row) => ({
+      code: text(row, "code"),
+      name: text(row, "name"),
+      createdAt: text(row, "created_at"),
+      role: validateSpaceRole(text(row, "role")),
+      invitedAt: text(row, "invited_at"),
+    }));
+  },
   async getSpaceMemberRole(spaceCode, email) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
-    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND email = $2 LIMIT 1", [normalized, normalizeSpaceEmail(email)]);
+    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND email = $2 AND status = 'active' LIMIT 1", [normalized, normalizeSpaceEmail(email)]);
     return rows[0] ? validateSpaceRole(text(rows[0], "role")) : null;
   },
   async listSpaceMembers(spaceCode) {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) return [];
-    const rows = await query("SELECT space_code, email, role, created_at FROM edie_space_members WHERE space_code = $1 ORDER BY email ASC", [normalized]);
+    const rows = await query("SELECT space_code, email, role, status, created_at FROM edie_space_members WHERE space_code = $1 ORDER BY email ASC", [normalized]);
     return rows.map(spaceMemberFromRow);
   },
-  async addSpaceMember(spaceCode, email, role = "editor") {
+  async addSpaceMember(spaceCode, email, role = "editor", status = "pending") {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) throw new Error("Space code is required.");
     const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1", [normalized]);
     if (!space.length) throw new Error("That space could not be found.");
     try {
-      const rows = await query("INSERT INTO edie_space_members (space_code, email, role) VALUES ($1, $2, $3) RETURNING space_code, email, role, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role)]);
+      const rows = await query("INSERT INTO edie_space_members (space_code, email, role, status) VALUES ($1, $2, $3, $4) RETURNING space_code, email, role, status, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role), validateSpaceMembershipStatus(status)]);
       return spaceMemberFromRow(rows[0]);
     } catch (error) {
       if (error instanceof NeonStoreError && error.status === 409) throw new Error("That person is already a member of this space.");
       throw error;
     }
   },
+  async acceptSpaceInvitation(spaceCode, email) {
+    const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
+    const rows = await query("UPDATE edie_space_members SET status = 'active' WHERE space_code = $1 AND email = $2 AND status = 'pending' RETURNING space_code", [normalized, normalizeSpaceEmail(email)]);
+    return rows.length > 0;
+  },
+  async declineSpaceInvitation(spaceCode, email) {
+    const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
+    const rows = await query("DELETE FROM edie_space_members WHERE space_code = $1 AND email = $2 AND status = 'pending' RETURNING space_code", [normalized, normalizeSpaceEmail(email)]);
+    return rows.length > 0;
+  },
+  async leaveSpace(spaceCode, email) {
+    const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
+    const rows = await query("DELETE FROM edie_space_members AS member WHERE member.space_code = $1 AND member.email = $2 AND member.status = 'active' AND (member.role = 'editor' OR EXISTS (SELECT 1 FROM edie_space_members AS other WHERE other.space_code = member.space_code AND other.email <> member.email AND other.status = 'active' AND other.role = 'owner')) RETURNING member.space_code", [normalized, normalizeSpaceEmail(email)]);
+    return rows.length > 0;
+  },
   async updateSpaceMemberRole(spaceCode, email, role) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
-    const rows = await query("UPDATE edie_space_members SET role = $3 WHERE space_code = $1 AND email = $2 RETURNING space_code, email, role, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role)]);
+    const rows = await query("UPDATE edie_space_members SET role = $3 WHERE space_code = $1 AND email = $2 RETURNING space_code, email, role, status, created_at", [normalized, normalizeSpaceEmail(email), validateSpaceRole(role)]);
     return rows[0] ? spaceMemberFromRow(rows[0]) : null;
   },
   async removeSpaceMember(spaceCode, email) {
