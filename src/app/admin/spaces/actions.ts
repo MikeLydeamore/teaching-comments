@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  acceptSpaceInvitation,
   addSpaceMember,
   createTeacherSpace,
   getTeacherSpace,
@@ -74,7 +75,7 @@ export async function createTeachingSpace(formData: FormData) {
 
   try {
     const space = await createTeacherSpace(spaceCode, name || spaceCode);
-    await addSpaceMember(space.code, ownerEmail, "owner");
+    await addSpaceMember(space.code, ownerEmail, "owner", "active");
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const reason = message.includes("already exists")
@@ -93,12 +94,14 @@ export async function claimTeacherSpace(formData: FormData) {
 
   const existingMembers = await listSpaceMembers(spaceCode);
 
-  if (existingMembers.some((member) => member.role === "owner")) {
+  if (existingMembers.some(
+    (member) => member.role === "owner" && member.status === "active",
+  )) {
     redirect(claimPath("claimed", spaceCode));
   }
 
   try {
-    await addSpaceMember(spaceCode, admin.email, "owner");
+    await addSpaceMember(spaceCode, admin.email, "owner", "active");
   } catch {
     redirect(claimPath("not-found", spaceCode));
   }
@@ -128,19 +131,26 @@ export async function transferSpaceOwnership(formData: FormData) {
   const members = await listSpaceMembers(space.code);
 
   for (const member of members) {
-    if (member.role === "owner" && member.email !== ownerEmail) {
+    if (
+      member.role === "owner" &&
+      member.status === "active" &&
+      member.email !== ownerEmail
+    ) {
       await updateSpaceMemberRole(space.code, member.email, "editor");
     }
   }
 
   const target = members.find((member) => member.email === ownerEmail);
 
-  if (target?.role === "owner") {
-    // Already the sole owner; nothing to change.
-  } else if (target) {
-    await updateSpaceMemberRole(space.code, ownerEmail, "owner");
+  if (target) {
+    if (target.role !== "owner") {
+      await updateSpaceMemberRole(space.code, ownerEmail, "owner");
+    }
+    if (target.status === "pending") {
+      await acceptSpaceInvitation(space.code, ownerEmail);
+    }
   } else {
-    await addSpaceMember(space.code, ownerEmail, "owner");
+    await addSpaceMember(space.code, ownerEmail, "owner", "active");
   }
 
   revalidatePath("/admin/spaces");

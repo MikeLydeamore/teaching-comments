@@ -14,6 +14,7 @@ import {
   type CreateSubmissionInput,
   type SubmissionPatch,
   type SpaceRole,
+  type SpaceMembershipStatus,
 } from "./edie-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
@@ -51,6 +52,8 @@ export type {
   TeacherSpace,
   TeacherSpaceSummary,
   SpaceMember,
+  SpaceInvitation,
+  SpaceMembershipStatus,
   SpaceRole,
   SpaceWithRole,
 } from "./edie-store-model";
@@ -107,6 +110,10 @@ export async function listTeacherSpacesForUser(email: string) {
   return getStore().listTeacherSpacesForUser(email);
 }
 
+export async function listPendingSpaceInvitationsForUser(email: string) {
+  return getStore().listPendingSpaceInvitationsForUser(email);
+}
+
 export async function getSpaceMemberRole(spaceCode: string, email: string) {
   return getStore().getSpaceMemberRole(spaceCode, email);
 }
@@ -119,8 +126,21 @@ export async function addSpaceMember(
   spaceCode: string,
   email: string,
   role?: SpaceRole,
+  status?: SpaceMembershipStatus,
 ) {
-  return getStore().addSpaceMember(spaceCode, email, role);
+  return getStore().addSpaceMember(spaceCode, email, role, status);
+}
+
+export async function acceptSpaceInvitation(spaceCode: string, email: string) {
+  return getStore().acceptSpaceInvitation(spaceCode, email);
+}
+
+export async function declineSpaceInvitation(spaceCode: string, email: string) {
+  return getStore().declineSpaceInvitation(spaceCode, email);
+}
+
+export async function leaveSpace(spaceCode: string, email: string) {
+  return getStore().leaveSpace(spaceCode, email);
 }
 
 export async function updateSpaceMemberRole(

@@ -15,7 +15,7 @@ export function AccountMenu({
   children,
   user,
 }: {
-  /** Extra nav entries rendered under "Your spaces" (future options). */
+  /** Extra nav entries rendered under the standard account navigation. */
   children?: React.ReactNode;
   user: AccountMenuUser;
 }) {
@@ -95,6 +95,17 @@ export function AccountMenu({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.5 12 3l9 7.5M5.25 9.75V21h13.5V9.75M9 21v-6h6v6" />
               </svg>
               Your spaces
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              href="/host/invitations"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+            >
+              <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0 1 19.5 19.5h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0-8.659 5.197a2.25 2.25 0 0 1-2.182 0L2.25 6.75" />
+              </svg>
+              Invitations
             </Link>
             {children}
           </nav>

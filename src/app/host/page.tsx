@@ -44,15 +44,32 @@ function relativeTime(iso: string | null): string {
   return days === 1 ? "last active yesterday" : `last active ${days}d ago`;
 }
 
-export default async function TeacherHomePage() {
+const membershipMessages: Record<string, string> = {
+  left: "You have left the hosted space.",
+  "owner-cannot-leave": "The last active owner cannot leave. Make someone else an owner first.",
+  "membership-unavailable": "That membership is no longer available.",
+};
+
+export default async function TeacherHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ membership?: string }>;
+}) {
   const teacher = await getCurrentTeacher();
 
   if (!teacher) {
     redirect(loginRedirectPath("/host"));
   }
 
-  const spaces = await listTeacherSpacesForUser(teacher.email);
+  const [spaces, query] = await Promise.all([
+    listTeacherSpacesForUser(teacher.email),
+    searchParams,
+  ]);
   const stats = new Map<string, SpaceStats>();
+  const membershipMessage = query.membership
+    ? membershipMessages[query.membership] ?? ""
+    : "";
+  const membershipSucceeded = query.membership === "left";
 
   for (const space of spaces) {
     const sessions = await listSessions(space.code);
@@ -94,11 +111,23 @@ export default async function TeacherHomePage() {
           </div>
         </header>
 
+        {membershipMessage ? (
+          <p
+            className={`mt-4 rounded-md border px-4 py-3 text-sm font-medium ${
+              membershipSucceeded
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+            role="status"
+          >
+            {membershipMessage}
+          </p>
+        ) : null}
+
         <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Hosted spaces</h2>
-              <p className="mt-0.5 text-sm text-slate-500">Spaces shared with your account.</p>
             </div>
           </div>
           {spaces.length ? (
