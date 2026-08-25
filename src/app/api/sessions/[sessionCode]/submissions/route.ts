@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { addSubmission, getSession, getSubmission, listSubmissions, toSubmissionDto } from "@/lib/edie-store";
+import { parseSubmissionMinutes } from "@/lib/submission-time-range";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, postInsertRecovery, sessionHash, uploadClientCookieName, verifyImageTicket, type ImageContentType } from "@/lib/image-upload";
@@ -39,11 +40,11 @@ export async function GET(
 
   const url = new URL(request.url);
   const minutesParam = url.searchParams.get("minutes");
-  const minutes = minutesParam ? Number(minutesParam) : undefined;
+  const minutes = minutesParam ? parseSubmissionMinutes(minutesParam) : undefined;
   const includeHidden = url.searchParams.get("includeHidden") === "true";
   const promptHistoryId = url.searchParams.get("promptHistoryId") || undefined;
   const submissions = await listSubmissions(sessionCode, {
-    minutes: Number.isFinite(minutes) ? minutes : undefined,
+    minutes,
     includeHidden,
     promptHistoryId,
   });
