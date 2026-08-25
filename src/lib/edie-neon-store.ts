@@ -15,6 +15,7 @@ import {
   normalizeSubmissionImageData,
   normalizeSubmissionPatch,
   now,
+  QuestionBankConflictError,
   titleFromCode,
   validateGroupQuestionText,
   validateGroupQuestionVoterId,
@@ -331,12 +332,54 @@ export const neonStore: EdieStore = {
   },
   async getSessionStats(code) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; return calculateStats((await query(`SELECT ${SUBMISSION_COLUMNS} FROM edie_submissions WHERE session_code=$1 AND archived_at IS NULL`,[sessionCode])).map(submissionFromRow)); },
   async listQuestionBank(code) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; return (await query("SELECT id,session_code,title,text,created_at,updated_at FROM edie_question_bank WHERE session_code=$1 ORDER BY title ASC",[sessionCode])).map((r)=>({id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title")||text(r,"text"),text:text(r,"text"),createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")})); },
-  async addQuestionToBank(code, question, title) { const row=await getSessionRow(code); if(!row)return null; const timestamp=now(); const rows=await query("INSERT INTO edie_question_bank (session_code,title,text,created_at,updated_at) VALUES ($1,$2,$3,$4,$4) RETURNING id,session_code,title,text,created_at,updated_at",[text(row,"id"),validateQuestionTitle(title,question),validateQuestionText(question),timestamp]); const r=rows[0]; return {id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title"),text:text(r,"text"),createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")}; },
+  async addQuestionToBank(code, question, title) {
+    const row = await getSessionRow(code); if (!row) return null;
+    const timestamp = now();
+    try {
+      const rows = await query("INSERT INTO edie_question_bank (session_code,title,text,created_at,updated_at) VALUES ($1,$2,$3,$4,$4) RETURNING id,session_code,title,text,created_at,updated_at", [text(row,"id"),validateQuestionTitle(title,question),validateQuestionText(question),timestamp]);
+      const r = rows[0];
+      return {id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title"),text:text(r,"text"),createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")};
+    } catch (error) {
+      if (error instanceof NeonStoreError && error.status === 409) {
+        throw new QuestionBankConflictError("That question is already in the bank.");
+      }
+      throw error;
+    }
+  },
   async getQuestionFromBank(id) { const rows=await query("SELECT id,session_code,title,text,created_at,updated_at FROM edie_question_bank WHERE id=$1::uuid",[id]); const r=rows[0]; return r?{id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title")||text(r,"text"),text:text(r,"text"),createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")}:null; },
   async deleteQuestionFromBank(sessionCode,id) { return (await query("DELETE FROM edie_question_bank WHERE id=$1::uuid AND session_code=$2 RETURNING id",[id,sessionCode])).length>0; },
   async listPollQuestionBank(code) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; return (await query(`SELECT ${POLL_QUESTION_COLUMNS} FROM edie_poll_question_bank WHERE session_code=$1 ORDER BY title ASC`,[sessionCode])).map((r)=>({id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title")||text(r,"question"),question:text(r,"question"),selectionMode:text(r,"selection_mode") as "single"|"multiple",options:(json(r,"options") as string[])??[],correctOptionIndexes:(json(r,"correct_option_indexes") as number[])??[],createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")})); },
-  async addPollQuestionToBank(code,title,question,selectionMode,options,correctOptionIndexes) { const row=await getSessionRow(code); if(!row)return null; const d=validatePollQuestionDefinition(question,selectionMode,options); const correctIndexes=validateCorrectOptionIndexes(d.selectionMode,d.optionLabels,correctOptionIndexes); const timestamp=now(); const rows=await query(`INSERT INTO edie_poll_question_bank (session_code,title,question,selection_mode,options,correct_option_indexes,created_at,updated_at) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$7) RETURNING ${POLL_QUESTION_COLUMNS}`,[text(row,"id"),validatePollQuestionTitle(title,d.question),d.question,d.selectionMode,JSON.stringify(d.optionLabels),JSON.stringify(correctIndexes),timestamp]); const r=rows[0]; return {id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title"),question:text(r,"question"),selectionMode:text(r,"selection_mode") as "single"|"multiple",options:(json(r,"options") as string[])??[],correctOptionIndexes:(json(r,"correct_option_indexes") as number[])??[],createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")}; },
-  async updatePollQuestionInBank(code,id,question,selectionMode,options,correctOptionIndexes) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; const d=validatePollQuestionDefinition(question,selectionMode,options); const correctIndexes=validateCorrectOptionIndexes(d.selectionMode,d.optionLabels,correctOptionIndexes); const rows=await query(`UPDATE edie_poll_question_bank SET question=$3,selection_mode=$4,options=$5::jsonb,correct_option_indexes=$6::jsonb,updated_at=$7 WHERE id=$1::uuid AND session_code=$2 RETURNING ${POLL_QUESTION_COLUMNS}`,[id,sessionCode,d.question,d.selectionMode,JSON.stringify(d.optionLabels),JSON.stringify(correctIndexes),now()]); const r=rows[0]; return r?{id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title")||text(r,"question"),question:text(r,"question"),selectionMode:text(r,"selection_mode") as "single"|"multiple",options:(json(r,"options") as string[])??[],correctOptionIndexes:(json(r,"correct_option_indexes") as number[])??[],createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")}:null; },
+  async addPollQuestionToBank(code,title,question,selectionMode,options,correctOptionIndexes) {
+    const row=await getSessionRow(code); if(!row)return null;
+    const d=validatePollQuestionDefinition(question,selectionMode,options);
+    const correctIndexes=validateCorrectOptionIndexes(d.selectionMode,d.optionLabels,correctOptionIndexes);
+    const timestamp=now();
+    try {
+      const rows=await query(`INSERT INTO edie_poll_question_bank (session_code,title,question,selection_mode,options,correct_option_indexes,created_at,updated_at) VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$7) RETURNING ${POLL_QUESTION_COLUMNS}`,[text(row,"id"),validatePollQuestionTitle(title,d.question),d.question,d.selectionMode,JSON.stringify(d.optionLabels),JSON.stringify(correctIndexes),timestamp]);
+      const r=rows[0];
+      return {id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title"),question:text(r,"question"),selectionMode:text(r,"selection_mode") as "single"|"multiple",options:(json(r,"options") as string[])??[],correctOptionIndexes:(json(r,"correct_option_indexes") as number[])??[],createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")};
+    } catch (error) {
+      if (error instanceof NeonStoreError && error.status === 409) {
+        throw new QuestionBankConflictError("That poll question is already in the bank.");
+      }
+      throw error;
+    }
+  },
+  async updatePollQuestionInBank(code,id,question,selectionMode,options,correctOptionIndexes) {
+    const sessionCode=normalizeSessionCode(code)||"demo-lecture";
+    const d=validatePollQuestionDefinition(question,selectionMode,options);
+    const correctIndexes=validateCorrectOptionIndexes(d.selectionMode,d.optionLabels,correctOptionIndexes);
+    try {
+      const rows=await query(`UPDATE edie_poll_question_bank SET question=$3,selection_mode=$4,options=$5::jsonb,correct_option_indexes=$6::jsonb,updated_at=$7 WHERE id=$1::uuid AND session_code=$2 RETURNING ${POLL_QUESTION_COLUMNS}`,[id,sessionCode,d.question,d.selectionMode,JSON.stringify(d.optionLabels),JSON.stringify(correctIndexes),now()]);
+      const r=rows[0];
+      return r?{id:text(r,"id"),sessionCode:text(r,"session_code"),title:text(r,"title")||text(r,"question"),question:text(r,"question"),selectionMode:text(r,"selection_mode") as "single"|"multiple",options:(json(r,"options") as string[])??[],correctOptionIndexes:(json(r,"correct_option_indexes") as number[])??[],createdAt:text(r,"created_at"),updatedAt:text(r,"updated_at")}:null;
+    } catch (error) {
+      if (error instanceof NeonStoreError && error.status === 409) {
+        throw new QuestionBankConflictError("That poll question is already in the bank.");
+      }
+      throw error;
+    }
+  },
   async deletePollQuestionFromBank(code,id) { return (await query("DELETE FROM edie_poll_question_bank WHERE id=$1::uuid AND session_code=$2 RETURNING id",[id,normalizeSessionCode(code)||"demo-lecture"])).length>0; },
   async listGroupQuestions(code,voterId,options={}) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; const voter=voterId?validateGroupQuestionVoterId(voterId):""; const values:unknown[]=[sessionCode,voter]; const clauses=["q.session_code=$1"]; if(!options.includeAnswered)clauses.push("q.is_answered=false");if(!options.includeHidden)clauses.push("q.is_visible=true");if(!options.includeArchived)clauses.push("q.archived_at IS NULL"); const rows=await query(`SELECT q.*,COUNT(v.question_id)::integer AS vote_count,CASE WHEN $2::text='' THEN false ELSE BOOL_OR(v.voter_id=$2) END AS has_voted FROM edie_group_questions q LEFT JOIN edie_group_question_votes v ON v.question_id=q.id WHERE ${clauses.join(" AND ")} GROUP BY q.id ORDER BY q.is_answered ASC, COUNT(v.question_id) DESC, q.created_at DESC`,values);return rows.map((r)=>groupQuestionFromRow(r,voter)); },
   async addGroupQuestion(code,question,studentName) { const s=await getSessionRow(code);if(!s)return null;const session=sessionFromRow(s);if(!session.isOpen)throw new Error("This session is closed.");const timestamp=now();const rows=await query(`INSERT INTO edie_group_questions (session_code,student_name,text,is_answered,is_visible,archived_at,created_at,updated_at) VALUES ($1,$2,$3,false,$4,NULL,$5,$5) RETURNING ${GROUP_QUESTION_COLUMNS}`,[session.id,normalizeStudentName(studentName??""),validateGroupQuestionText(question),!session.groupQuestionsScreeningEnabled,timestamp]);return groupQuestionFromRow({...rows[0],vote_count:0}); },

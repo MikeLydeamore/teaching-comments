@@ -3,6 +3,7 @@ import {
   type PollSelectionMode,
   updatePollQuestionInBank,
 } from "@/lib/edie-store";
+import { QuestionBankConflictError } from "@/lib/edie-store-model";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function PUT(
@@ -51,7 +52,7 @@ export async function PUT(
             ? error.message
             : "Could not update poll question.",
       },
-      { status: 400 },
+      { status: error instanceof QuestionBankConflictError ? 409 : 400 },
     );
   }
 }

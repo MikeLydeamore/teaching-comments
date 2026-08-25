@@ -10,6 +10,7 @@ vi.mock("@neondatabase/serverless", () => ({ neon: neonMock }));
 
 import { neonStore } from "./edie-neon-store";
 import { selectedStorageBackend } from "./edie-storage-backend";
+import { QuestionBankConflictError } from "./edie-store-model";
 import { collectNeonReferences } from "../../tools/reconcile-images.mjs";
 
 const imageData = {
@@ -158,6 +159,57 @@ it("maps PostgreSQL duplicate-key errors to status 409", async () => {
     expect(error).toMatchObject({ name: "NeonStoreError", status: 409 });
     expect(error).toHaveProperty("message", "duplicate key");
   }
+});
+
+describe("Neon question bank uniqueness", () => {
+  it("returns a friendly conflict for a duplicate question", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      if (statement.startsWith("INSERT INTO edie_question_bank")) {
+        throw Object.assign(new Error("duplicate key"), { code: "23505" });
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.addQuestionToBank(
+        "demo-lecture",
+        "What does this result mean?",
+        "Interpretation",
+      ),
+    ).rejects.toEqual(
+      new QuestionBankConflictError("That question is already in the bank."),
+    );
+  });
+
+  it("returns a friendly conflict for a duplicate poll question", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      if (statement.startsWith("INSERT INTO edie_poll_question_bank")) {
+        throw Object.assign(new Error("duplicate key"), { code: "23505" });
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.addPollQuestionToBank(
+        "demo-lecture",
+        "Interpretation",
+        "Which interpretation is correct?",
+        "single",
+        ["A", "B"],
+        [0],
+      ),
+    ).rejects.toEqual(
+      new QuestionBankConflictError(
+        "That poll question is already in the bank.",
+      ),
+    );
+  });
 });
 
 it("scans Neon image references through a mocked SQL client", async () => {

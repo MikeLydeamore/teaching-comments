@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
 import type {
@@ -20,6 +20,7 @@ const pollExtensions = [15, 30, 60];
 const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 const activePollRefreshIntervalMs = 3_000;
 const idlePollRefreshIntervalMs = 15_000;
+const pollQuestionBankRefreshIntervalMs = 10_000;
 
 function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
   return (
@@ -76,6 +77,10 @@ function sortPollQuestionBank(questions: PollQuestionBankItem[]) {
   );
 }
 
+function questionBankTextKey(text: string) {
+  return text.trim().toLowerCase();
+}
+
 export function HostPollManager({
   dashboardUrl,
   sessionIsOpen,
@@ -107,6 +112,7 @@ export function HostPollManager({
   const [durationWasMinClamped, setDurationWasMinClamped] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const pollQuestionBankRefreshRequestIdRef = useRef(0);
 
   const refreshPoll = useCallback(async () => {
     try {
@@ -124,25 +130,45 @@ export function HostPollManager({
     }
   }, [sessionCode]);
 
-  const refreshPollQuestionBank = useCallback(async () => {
+  const refreshPollQuestionBank = useCallback(async (reportErrors = false) => {
+    const requestId = ++pollQuestionBankRefreshRequestIdRef.current;
+
     try {
       const response = await fetch(
         `/api/sessions/${sessionCode}/poll-questions`,
+        { cache: "no-store" },
       );
       const payload = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        setBankStatus(
-          payload.error ?? "Could not load the poll question bank.",
-        );
+      if (requestId !== pollQuestionBankRefreshRequestIdRef.current) {
         return;
       }
 
-      setPollQuestionBank(
-        sortPollQuestionBank(payload.pollQuestionBank ?? []),
+      if (!response.ok) {
+        if (reportErrors) {
+          setBankStatus(
+            payload.error ?? "Could not load the poll question bank.",
+          );
+        }
+        return;
+      }
+
+      const nextQuestionBank = sortPollQuestionBank(
+        payload.pollQuestionBank ?? [],
+      );
+      setPollQuestionBank(nextQuestionBank);
+      setSelectedBankQuestionId((currentId) =>
+        nextQuestionBank.some((question) => question.id === currentId)
+          ? currentId
+          : "",
       );
     } catch {
-      setBankStatus("Could not load the poll question bank.");
+      if (
+        reportErrors &&
+        requestId === pollQuestionBankRefreshRequestIdRef.current
+      ) {
+        setBankStatus("Could not load the poll question bank.");
+      }
     }
   }, [sessionCode]);
 
@@ -217,6 +243,34 @@ export function HostPollManager({
   }, [pollRefreshIntervalMs, refreshPoll]);
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const firstRefresh = window.setTimeout(() => {
+      void refreshPollQuestionBank(true);
+    }, 0);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshPollQuestionBank();
+      }
+    }, pollQuestionBankRefreshIntervalMs);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshPollQuestionBank();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(firstRefresh);
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isOpen, refreshPollQuestionBank]);
+
+  useEffect(() => {
     const updateTime = () => setNowMs(Date.now());
     const firstUpdate = window.setTimeout(updateTime, 0);
     const timer = window.setInterval(updateTime, 250);
@@ -270,6 +324,15 @@ export function HostPollManager({
     ) &&
     new Set(normalizedBankOptions.map((option) => option.toLowerCase())).size ===
       normalizedBankOptions.length;
+  const duplicateBankQuestion = pollQuestionBank.find(
+    (bankQuestion) =>
+      questionBankTextKey(bankQuestion.question) ===
+      questionBankTextKey(question),
+  );
+  const canAddNewQuestionToBank = canAddToBank && !duplicateBankQuestion;
+  const canUpdateQuestionInBank =
+    canAddToBank &&
+    (!duplicateBankQuestion || duplicateBankQuestion.id === selectedBankQuestionId);
   const hasValidSingleChoiceSolution =
     selectionMode !== "single" || correctOptionIndexes.length === 1;
   const solutionIsVisible = Boolean(
@@ -284,7 +347,6 @@ export function HostPollManager({
     setIsOpen(true);
     void refreshPoll();
     void refreshHistory();
-    void refreshPollQuestionBank();
   }
 
   async function startPoll() {
@@ -413,7 +475,7 @@ export function HostPollManager({
     const title = bankTitleDraft.trim();
 
     if (
-      !canAddToBank ||
+      !canAddNewQuestionToBank ||
       !title ||
       title.length > 500 ||
       isBankSaving
@@ -443,6 +505,7 @@ export function HostPollManager({
 
       if (!response.ok) {
         setBankStatus(payload.error ?? "Could not add poll question.");
+        await refreshPollQuestionBank();
         return;
       }
 
@@ -453,6 +516,7 @@ export function HostPollManager({
       setSelectedBankQuestionId(bankQuestion.id);
       setBankStatus("Poll question added to bank.");
       setIsBankTitleDialogOpen(false);
+      await refreshPollQuestionBank();
     } catch {
       setBankStatus("Could not add poll question.");
     } finally {
@@ -463,7 +527,7 @@ export function HostPollManager({
   async function updateCurrentPollInBank() {
     if (
       !selectedBankQuestionId ||
-      !canAddToBank ||
+      !canUpdateQuestionInBank ||
       !hasValidSingleChoiceSolution ||
       isBankSaving
     ) {
@@ -491,6 +555,7 @@ export function HostPollManager({
 
       if (!response.ok) {
         setBankStatus(payload.error ?? "Could not update poll question.");
+        await refreshPollQuestionBank();
         return;
       }
 
@@ -503,6 +568,7 @@ export function HostPollManager({
         ),
       );
       setBankStatus("Poll question updated.");
+      await refreshPollQuestionBank();
     } catch {
       setBankStatus("Could not update poll question.");
     } finally {
@@ -527,6 +593,7 @@ export function HostPollManager({
 
       if (!response.ok) {
         setBankStatus(payload.error ?? "Could not delete poll question.");
+        await refreshPollQuestionBank();
         return;
       }
 
@@ -537,6 +604,7 @@ export function HostPollManager({
       );
       setSelectedBankQuestionId("");
       setBankStatus("Poll question deleted.");
+      await refreshPollQuestionBank();
     } catch {
       setBankStatus("Could not delete poll question.");
     } finally {
@@ -961,7 +1029,11 @@ export function HostPollManager({
                       </select>
                       <button
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canAddToBank || !hasValidSingleChoiceSolution || isBankSaving}
+                        disabled={
+                          !canAddNewQuestionToBank ||
+                          !hasValidSingleChoiceSolution ||
+                          isBankSaving
+                        }
                         type="button"
                         onClick={() => {
                           setBankTitleDraft(question);
@@ -975,7 +1047,7 @@ export function HostPollManager({
                         className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={
                           !selectedBankQuestionId ||
-                          !canAddToBank ||
+                          !canUpdateQuestionInBank ||
                           !hasValidSingleChoiceSolution ||
                           isBankSaving
                         }

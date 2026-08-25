@@ -84,7 +84,9 @@ create index if not exists edie_submissions_session_archived_created_idx on edie
 create index if not exists edie_sessions_space_created_idx on edie_sessions (space_code, created_at desc);
 create unique index if not exists edie_sessions_space_code_idx on edie_sessions (space_code, code);
 create index if not exists edie_question_bank_session_title_idx on edie_question_bank (session_code, title);
+create unique index if not exists edie_question_bank_session_text_unique_idx on edie_question_bank (session_code, lower(btrim(text)));
 create index if not exists edie_poll_question_bank_session_title_idx on edie_poll_question_bank (session_code, title);
+create unique index if not exists edie_poll_question_bank_session_question_unique_idx on edie_poll_question_bank (session_code, lower(btrim(question)));
 create index if not exists edie_prompt_history_session_started_idx on edie_prompt_history (session_code, started_at desc);
 create index if not exists edie_group_questions_session_created_idx on edie_group_questions (session_code, created_at desc);
 create index if not exists edie_group_questions_session_answered_created_idx on edie_group_questions (session_code, is_answered, created_at desc);

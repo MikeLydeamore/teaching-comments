@@ -615,6 +615,19 @@ export function validateQuestionText(text: string) {
   return trimmed;
 }
 
+export function normalizeQuestionBankText(text: string) {
+  return text.trim().toLowerCase();
+}
+
+export class QuestionBankConflictError extends Error {
+  readonly status = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "QuestionBankConflictError";
+  }
+}
+
 export function validateQuestionTitle(title: string | undefined, fallbackText: string) {
   const trimmed = title?.trim() || fallbackText.trim();
 

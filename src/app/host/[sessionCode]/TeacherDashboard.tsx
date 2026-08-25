@@ -17,6 +17,7 @@ import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
+import { comparePromptRevisions } from "@/lib/prompt-sync";
 import type {
   DrawingData,
   GifData,
@@ -327,6 +328,10 @@ function sortQuestionBank(questionBank: QuestionBankItem[]) {
   return [...questionBank].sort((a, b) => a.title.localeCompare(b.title));
 }
 
+function questionBankTextKey(text: string) {
+  return text.trim().toLowerCase();
+}
+
 function promptHistoryOptionLabel(item: PromptHistoryItem) {
   const startedAt = new Date(item.startedAt).toLocaleTimeString([], {
     hour: "2-digit",
@@ -340,6 +345,7 @@ function promptHistoryOptionLabel(item: PromptHistoryItem) {
 
 const submissionsRefreshIntervalMs = 3_000;
 const sessionStateRefreshIntervalMs = 20_000;
+const questionBankRefreshIntervalMs = 10_000;
 
 type DashboardRefreshScope = "all" | "session" | "submissions";
 
@@ -395,6 +401,8 @@ function TeacherDashboardContent({
   const [inputSettingsStatus, setInputSettingsStatus] = useState("");
   const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
   const submissionsPopoutWindowRef = useRef<Window | null>(null);
+  const questionBankRefreshRequestIdRef = useRef(0);
+  const latestPromptUpdatedAtRef = useRef(session.promptUpdatedAt);
   const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
@@ -426,6 +434,70 @@ function TeacherDashboardContent({
     [pendingOps],
   );
 
+  const refreshQuestionBank = useCallback(async (reportErrors = false) => {
+    const requestId = ++questionBankRefreshRequestIdRef.current;
+
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/questions`, {
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (requestId !== questionBankRefreshRequestIdRef.current) {
+        return;
+      }
+
+      if (!response.ok) {
+        if (reportErrors) {
+          setQuestionBankStatus(
+            payload.error ?? "Could not refresh the question bank.",
+          );
+        }
+        return;
+      }
+
+      const nextQuestionBank = sortQuestionBank(payload.questionBank ?? []);
+      setQuestionBank(nextQuestionBank);
+      setSelectedQuestionId((currentId) =>
+        nextQuestionBank.some((question) => question.id === currentId)
+          ? currentId
+          : "",
+      );
+    } catch {
+      if (
+        reportErrors &&
+        requestId === questionBankRefreshRequestIdRef.current
+      ) {
+        setQuestionBankStatus("Could not refresh the question bank.");
+      }
+    }
+  }, [session.id]);
+
+  const applyRefreshedSession = useCallback((nextSession: Session) => {
+    const revisionOrder = comparePromptRevisions(
+      latestPromptUpdatedAtRef.current,
+      nextSession.promptUpdatedAt,
+    );
+
+    if (revisionOrder === "older") {
+      setSessionDetails((currentSession) => ({
+        ...nextSession,
+        prompt: currentSession.prompt,
+        promptUpdatedAt: currentSession.promptUpdatedAt,
+      }));
+      return;
+    }
+
+    setSessionDetails(nextSession);
+
+    if (revisionOrder === "newer") {
+      latestPromptUpdatedAtRef.current = nextSession.promptUpdatedAt;
+      setPromptDraft(nextSession.prompt);
+      setSelectedQuestionId("");
+      setQuestionBankStatus("");
+      setPromptStatus("Prompt shown by another host.");
+    }
+  }, []);
 
   const refresh = useCallback(async (overrides?: {
     includeHidden?: boolean;
@@ -464,7 +536,11 @@ function TeacherDashboardContent({
       submissionsResponse?.json().catch(() => ({})) ?? {},
       sessionResponse?.json().catch(() => ({})) ?? {},
     ])) as [
-      { error?: string; submissions?: Submission[] },
+      {
+        error?: string;
+        session?: typeof session;
+        submissions?: Submission[];
+      },
       {
         error?: string;
         promptHistory?: typeof initialPromptHistory;
@@ -493,10 +569,13 @@ function TeacherDashboardContent({
       setOrderedSubmissionIds((currentOrder) =>
         mergeSubmissionOrder(currentOrder, nextSubmissions, submissionSortOrder),
       );
+      if (submissionsPayload.session) {
+        applyRefreshedSession(submissionsPayload.session);
+      }
     }
     if (sessionResponse) {
       if (sessionPayload.session) {
-        setSessionDetails(sessionPayload.session);
+        applyRefreshedSession(sessionPayload.session);
       }
       if (sessionPayload.promptHistory) {
         setPromptHistory(sessionPayload.promptHistory);
@@ -507,6 +586,7 @@ function TeacherDashboardContent({
     setLastRefresh(new Date());
     setIsLoading(false);
   }, [
+    applyRefreshedSession,
     includeHidden,
     initialStats,
     minutes,
@@ -538,6 +618,7 @@ function TeacherDashboardContent({
         return;
       }
 
+      latestPromptUpdatedAtRef.current = payload.session.promptUpdatedAt;
       setSessionDetails(payload.session);
       setPromptDraft(payload.session.prompt);
       if (payload.promptHistory) {
@@ -555,8 +636,13 @@ function TeacherDashboardContent({
 
   function openQuestionTitleDialog() {
     const promptText = promptDraft.trim();
+    const promptKey = questionBankTextKey(promptText);
 
-    if (questionBank.some((question) => question.text === promptText)) {
+    if (
+      questionBank.some(
+        (question) => questionBankTextKey(question.text) === promptKey,
+      )
+    ) {
       setQuestionBankStatus("That question is already in the bank.");
       return;
     }
@@ -571,26 +657,38 @@ function TeacherDashboardContent({
     const questionTitle = questionTitleDraft.trim() || promptText;
 
     setQuestionBankStatus("Adding question...");
-    const response = await fetch(`/api/sessions/${session.id}/questions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: promptText, title: questionTitle }),
-    });
-    const payload = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setQuestionBankStatus(payload.error ?? "Could not add question.");
-      return;
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: promptText, title: questionTitle }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setQuestionBankStatus(payload.error ?? "Could not add question.");
+        await refreshQuestionBank();
+        return;
+      }
+
+      const nextQuestion = payload.question as QuestionBankItem;
+      setQuestionBank((currentQuestionBank) =>
+        sortQuestionBank([
+          ...currentQuestionBank.filter(
+            (question) => question.id !== nextQuestion.id,
+          ),
+          nextQuestion,
+        ]),
+      );
+      setSelectedQuestionId(nextQuestion.id);
+      setIsQuestionTitleDialogOpen(false);
+      setQuestionTitleDraft("");
+      setQuestionBankStatus("Question added to bank.");
+      await refreshQuestionBank();
+    } catch {
+      setQuestionBankStatus("Could not add question.");
     }
-
-    const nextQuestion = payload.question as QuestionBankItem;
-    setQuestionBank((currentQuestionBank) =>
-      sortQuestionBank([...currentQuestionBank, nextQuestion]),
-    );
-    setSelectedQuestionId(nextQuestion.id);
-    setIsQuestionTitleDialogOpen(false);
-    setQuestionTitleDraft("");
-    setQuestionBankStatus("Question added to bank.");
   }
 
   function selectQuestionFromBank(questionId: string) {
@@ -629,6 +727,7 @@ function TeacherDashboardContent({
         const message = payload.error ?? "Could not delete question.";
         setQuestionBankStatus(message);
         toast.error(message);
+        await refreshQuestionBank();
         return;
       }
 
@@ -637,6 +736,7 @@ function TeacherDashboardContent({
       );
       setSelectedQuestionId("");
       setQuestionBankStatus("Question deleted from bank.");
+      await refreshQuestionBank();
     } catch {
       setQuestionBankStatus("Could not delete question.");
       toast.error("Could not delete question.");
@@ -1095,13 +1195,45 @@ function TeacherDashboardContent({
         void refresh({ scope: "session" });
       }
     }, sessionStateRefreshIntervalMs);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearTimeout(firstRefresh);
       window.clearInterval(submissionsTimer);
       window.clearInterval(sessionStateTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    const firstRefresh = window.setTimeout(() => {
+      void refreshQuestionBank();
+    }, 0);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshQuestionBank();
+      }
+    }, questionBankRefreshIntervalMs);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshQuestionBank();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(firstRefresh);
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshQuestionBank]);
 
   const orderedSubmissions = useMemo(() => {
     const submissionsById = new Map(
@@ -1150,8 +1282,9 @@ function TeacherDashboardContent({
     (item) => item.id === selectedPromptHistoryId,
   );
   const promptDraftText = promptDraft.trim();
+  const promptDraftKey = questionBankTextKey(promptDraftText);
   const promptIsAlreadyInBank = questionBank.some(
-    (question) => question.text === promptDraftText,
+    (question) => questionBankTextKey(question.text) === promptDraftKey,
   );
   const canAddPromptToBank =
     promptDraftText.length >= 5 &&

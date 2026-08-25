@@ -9,6 +9,7 @@ import {
   assertSubmissionHasContent,
   calculateStats,
   normalizeSessionCode,
+  normalizeQuestionBankText,
   normalizeSpaceCode,
   normalizeStudentName,
   normalizeSubmissionPatch,
@@ -32,6 +33,7 @@ import {
   type PromptHistoryItem,
   type PollResponse,
   type PollQuestionBankItem,
+  QuestionBankConflictError,
   type QuestionBankItem,
   type EdieStore,
   type Session,
@@ -272,6 +274,25 @@ async function readStore(): Promise<StoreData> {
 async function writeStore(data: StoreData) {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(STORE_PATH, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+let bankMutationTail = Promise.resolve();
+
+async function serializeBankMutation<T>(operation: () => Promise<T>) {
+  const previousMutation = bankMutationTail;
+  let finishMutation = () => {};
+
+  bankMutationTail = new Promise<void>((resolve) => {
+    finishMutation = resolve;
+  });
+
+  await previousMutation;
+
+  try {
+    return await operation();
+  } finally {
+    finishMutation();
+  }
 }
 
 export const localStore: EdieStore = {
@@ -638,20 +659,37 @@ export const localStore: EdieStore = {
 
     const questionText = validateQuestionText(text);
     const questionTitle = validateQuestionTitle(title, questionText);
-    const data = await readStore();
-    const timestamp = now();
-    const question: QuestionBankItem = {
-      id: randomUUID(),
-      sessionCode: session.id,
-      title: questionTitle,
-      text: questionText,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
 
-    data.questionBank.push(question);
-    await writeStore(data);
-    return question;
+    return serializeBankMutation(async () => {
+      const data = await readStore();
+      const questionKey = normalizeQuestionBankText(questionText);
+
+      if (
+        data.questionBank.some(
+          (question) =>
+            question.sessionCode === session.id &&
+            normalizeQuestionBankText(question.text) === questionKey,
+        )
+      ) {
+        throw new QuestionBankConflictError(
+          "That question is already in the bank.",
+        );
+      }
+
+      const timestamp = now();
+      const question: QuestionBankItem = {
+        id: randomUUID(),
+        sessionCode: session.id,
+        title: questionTitle,
+        text: questionText,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+
+      data.questionBank.push(question);
+      await writeStore(data);
+      return question;
+    });
   },
 
   async getQuestionFromBank(id) {
@@ -660,19 +698,21 @@ export const localStore: EdieStore = {
   },
 
   async deleteQuestionFromBank(sessionCode, id) {
-    const data = await readStore();
-    const nextQuestionBank = data.questionBank.filter(
-      (question) =>
-        question.id !== id || question.sessionCode !== sessionCode,
-    );
+    return serializeBankMutation(async () => {
+      const data = await readStore();
+      const nextQuestionBank = data.questionBank.filter(
+        (question) =>
+          question.id !== id || question.sessionCode !== sessionCode,
+      );
 
-    if (nextQuestionBank.length === data.questionBank.length) {
-      return false;
-    }
+      if (nextQuestionBank.length === data.questionBank.length) {
+        return false;
+      }
 
-    data.questionBank = nextQuestionBank;
-    await writeStore(data);
-    return true;
+      data.questionBank = nextQuestionBank;
+      await writeStore(data);
+      return true;
+    });
   },
 
   async listPollQuestionBank(code) {
@@ -696,68 +736,109 @@ export const localStore: EdieStore = {
       selectionMode,
       options,
     );
-    const data = await readStore();
-    const timestamp = now();
-    const bankQuestion: PollQuestionBankItem = {
-      id: randomUUID(),
-      sessionCode: session.id,
-      title: validatePollQuestionTitle(title, definition.question),
-      question: definition.question,
-      selectionMode: definition.selectionMode,
-      options: definition.optionLabels,
-      correctOptionIndexes: validateCorrectOptionIndexes(
-        definition.selectionMode,
-        definition.optionLabels,
-        correctOptionIndexes,
-      ),
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
+    const questionTitle = validatePollQuestionTitle(title, definition.question);
+    const normalizedCorrectOptionIndexes = validateCorrectOptionIndexes(
+      definition.selectionMode,
+      definition.optionLabels,
+      correctOptionIndexes,
+    );
 
-    data.pollQuestionBank.push(bankQuestion);
-    await writeStore(data);
-    return bankQuestion;
+    return serializeBankMutation(async () => {
+      const data = await readStore();
+      const questionKey = normalizeQuestionBankText(definition.question);
+
+      if (
+        data.pollQuestionBank.some(
+          (bankQuestion) =>
+            bankQuestion.sessionCode === session.id &&
+            normalizeQuestionBankText(bankQuestion.question) === questionKey,
+        )
+      ) {
+        throw new QuestionBankConflictError(
+          "That poll question is already in the bank.",
+        );
+      }
+
+      const timestamp = now();
+      const bankQuestion: PollQuestionBankItem = {
+        id: randomUUID(),
+        sessionCode: session.id,
+        title: questionTitle,
+        question: definition.question,
+        selectionMode: definition.selectionMode,
+        options: definition.optionLabels,
+        correctOptionIndexes: normalizedCorrectOptionIndexes,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+
+      data.pollQuestionBank.push(bankQuestion);
+      await writeStore(data);
+      return bankQuestion;
+    });
   },
 
   async updatePollQuestionInBank(code, id, question, selectionMode, options, correctOptionIndexes) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const definition = validatePollQuestionDefinition(question, selectionMode, options);
-    const data = await readStore();
-    const bankQuestion = data.pollQuestionBank.find(
-      (item) => item.id === id && item.sessionCode === sessionCode,
-    );
-
-    if (!bankQuestion) {
-      return null;
-    }
-
-    bankQuestion.question = definition.question;
-    bankQuestion.selectionMode = definition.selectionMode;
-    bankQuestion.options = definition.optionLabels;
-    bankQuestion.correctOptionIndexes = validateCorrectOptionIndexes(
+    const normalizedCorrectOptionIndexes = validateCorrectOptionIndexes(
       definition.selectionMode,
       definition.optionLabels,
       correctOptionIndexes,
     );
-    bankQuestion.updatedAt = now();
-    await writeStore(data);
-    return bankQuestion;
+
+    return serializeBankMutation(async () => {
+      const data = await readStore();
+      const bankQuestion = data.pollQuestionBank.find(
+        (item) => item.id === id && item.sessionCode === sessionCode,
+      );
+
+      if (!bankQuestion) {
+        return null;
+      }
+
+      const questionKey = normalizeQuestionBankText(definition.question);
+
+      if (
+        data.pollQuestionBank.some(
+          (item) =>
+            item.id !== id &&
+            item.sessionCode === sessionCode &&
+            normalizeQuestionBankText(item.question) === questionKey,
+        )
+      ) {
+        throw new QuestionBankConflictError(
+          "That poll question is already in the bank.",
+        );
+      }
+
+      bankQuestion.question = definition.question;
+      bankQuestion.selectionMode = definition.selectionMode;
+      bankQuestion.options = definition.optionLabels;
+      bankQuestion.correctOptionIndexes = normalizedCorrectOptionIndexes;
+      bankQuestion.updatedAt = now();
+      await writeStore(data);
+      return bankQuestion;
+    });
   },
 
   async deletePollQuestionFromBank(code, id) {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
-    const data = await readStore();
-    const nextBank = data.pollQuestionBank.filter(
-      (question) => question.id !== id || question.sessionCode !== sessionCode,
-    );
 
-    if (nextBank.length === data.pollQuestionBank.length) {
-      return false;
-    }
+    return serializeBankMutation(async () => {
+      const data = await readStore();
+      const nextBank = data.pollQuestionBank.filter(
+        (question) => question.id !== id || question.sessionCode !== sessionCode,
+      );
 
-    data.pollQuestionBank = nextBank;
-    await writeStore(data);
-    return true;
+      if (nextBank.length === data.pollQuestionBank.length) {
+        return false;
+      }
+
+      data.pollQuestionBank = nextBank;
+      await writeStore(data);
+      return true;
+    });
   },
 
   async listGroupQuestions(code, voterId, options = {}) {

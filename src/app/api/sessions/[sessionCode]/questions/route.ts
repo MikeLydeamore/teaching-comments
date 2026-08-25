@@ -1,4 +1,5 @@
 import { addQuestionToBank, listQuestionBank } from "@/lib/edie-store";
+import { QuestionBankConflictError } from "@/lib/edie-store-model";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
@@ -48,7 +49,7 @@ export async function POST(
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Could not add question." },
-      { status: 400 },
+      { status: error instanceof QuestionBankConflictError ? 409 : 400 },
     );
   }
 }

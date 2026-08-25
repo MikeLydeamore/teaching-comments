@@ -48,7 +48,10 @@ export async function GET(
     promptHistoryId,
   });
 
-  return Response.json({ submissions: submissions.map(toSubmissionDto) });
+  return Response.json({
+    session: authorization.session,
+    submissions: submissions.map(toSubmissionDto),
+  });
 }
 
 export async function POST(

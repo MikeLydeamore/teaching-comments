@@ -3,6 +3,7 @@ import {
   listPollQuestionBank,
   type PollSelectionMode,
 } from "@/lib/edie-store";
+import { QuestionBankConflictError } from "@/lib/edie-store-model";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
@@ -66,7 +67,7 @@ export async function POST(
             ? error.message
             : "Could not add poll question.",
       },
-      { status: 400 },
+      { status: error instanceof QuestionBankConflictError ? 409 : 400 },
     );
   }
 }
