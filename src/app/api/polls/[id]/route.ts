@@ -3,6 +3,7 @@ import {
   extendPoll,
   getPoll,
   getPollResults,
+  restartPoll,
   revealPollSolution,
 } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
@@ -25,7 +26,7 @@ export async function PATCH(
   }
 
   const body = (await request.json().catch(() => ({}))) as {
-    action?: "end" | "extend" | "reveal-solution";
+    action?: "end" | "extend" | "reveal-solution" | "restart";
     seconds?: number;
   };
 
@@ -37,7 +38,9 @@ export async function PATCH(
           ? await extendPoll(id, Number(body.seconds))
           : body.action === "reveal-solution"
             ? await revealPollSolution(id)
-          : null;
+            : body.action === "restart"
+              ? await restartPoll(id)
+              : null;
 
     if (!poll) {
       return Response.json(

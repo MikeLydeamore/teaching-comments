@@ -1,4 +1,5 @@
 import {
+  getActivePoll,
   getLatestPoll,
   getPollResults,
   startPoll,
@@ -17,7 +18,8 @@ export async function GET(
     return authorization.response;
   }
 
-  const poll = await getLatestPoll(authorization.session.id);
+  const activePoll = await getActivePoll(authorization.session.id);
+  const poll = activePoll ?? (await getLatestPoll(authorization.session.id));
   const results = poll ? await getPollResults(poll.id) : null;
   return Response.json({ poll, results });
 }

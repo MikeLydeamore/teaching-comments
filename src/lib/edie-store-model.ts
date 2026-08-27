@@ -444,6 +444,7 @@ export type EdieStore = {
   ): Promise<SessionPoll | null>;
   extendPoll(id: string, seconds: number): Promise<SessionPoll | null>;
   endPoll(id: string): Promise<SessionPoll | null>;
+  restartPoll(id: string): Promise<SessionPoll | null>;
   revealPollSolution(id: string): Promise<SessionPoll | null>;
   getPollResponse(
     pollId: string,

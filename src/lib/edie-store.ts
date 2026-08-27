@@ -342,6 +342,10 @@ export async function endPoll(id: string) {
   return getStore().endPoll(id);
 }
 
+export async function restartPoll(id: string) {
+  return getStore().restartPoll(id);
+}
+
 export async function revealPollSolution(id: string) {
   return getStore().revealPollSolution(id);
 }

@@ -413,7 +413,7 @@ export function HostPollManager({
   }
 
   async function updatePoll(
-    action: "end" | "extend" | "reveal-solution",
+    action: "end" | "extend" | "reveal-solution" | "restart",
     seconds?: number,
   ) {
     if (!poll || isSaving) {
@@ -426,7 +426,9 @@ export function HostPollManager({
         ? "Ending poll..."
         : action === "reveal-solution"
           ? "Revealing solutions..."
-          : "Extending poll...",
+          : action === "restart"
+            ? "Restarting poll..."
+            : "Extending poll...",
     );
 
     try {
@@ -449,13 +451,45 @@ export function HostPollManager({
           ? "Poll ended."
           : action === "reveal-solution"
             ? "Solutions revealed."
-            : `Added ${seconds} seconds.`,
+            : action === "restart"
+              ? "Poll restarted."
+              : `Added ${seconds} seconds.`,
       );
-      if (action === "end") {
+      if (action === "end" || action === "restart") {
         void refreshHistory();
       }
     } catch {
       setStatus("Could not update poll.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function restartHistoryPoll() {
+    const historyPoll = selectedHistoryResults?.poll;
+    if (!historyPoll || isSaving) return;
+    setIsSaving(true);
+    setHistoryStatus("Restarting poll...");
+    try {
+      const response = await fetch(`/api/polls/${historyPoll.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restart" }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setHistoryStatus(payload.error ?? "Could not restart poll.");
+        return;
+      }
+      setPoll(payload.poll);
+      setResults(payload.results);
+      setTab("current");
+      setStatus("Poll restarted.");
+      setHistoryStatus("");
+      void refreshHistory();
+      void refreshPoll();
+    } catch {
+      setHistoryStatus("Could not restart poll.");
     } finally {
       setIsSaving(false);
     }
@@ -849,7 +883,17 @@ export function HostPollManager({
                             >
                               +{seconds}s
                             </button>
-                          )) : null}
+                          )                          ) : (
+                            <button
+                              className="h-10 rounded-md border border-teal-300 bg-teal-50 px-3 text-sm font-semibold text-teal-900 transition hover:border-teal-500 disabled:opacity-60"
+                              disabled={isSaving || !sessionIsOpen}
+                              type="button"
+                              onClick={() => void updatePoll("restart")}
+                              title="Restart poll with same answers"
+                            >
+                              Restart poll
+                            </button>
+                          )}
                           <button
                             className="h-10 rounded-md border border-red-200 px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:opacity-60"
                             disabled={isSaving}
@@ -860,13 +904,24 @@ export function HostPollManager({
                           </button>
                           </>
                         ) : (
-                          <button
-                            className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-                            type="button"
-                            onClick={() => setTab("new")}
-                          >
-                            Create another poll
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="h-10 rounded-md border border-teal-300 bg-teal-50 px-3 text-sm font-semibold text-teal-900 transition hover:border-teal-500 disabled:opacity-60"
+                              disabled={isSaving || !sessionIsOpen}
+                              type="button"
+                              onClick={() => void updatePoll("restart")}
+                              title="Restart poll with same answers"
+                            >
+                              Restart poll
+                            </button>
+                            <button
+                              className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+                              type="button"
+                              onClick={() => setTab("new")}
+                            >
+                              Create another poll
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -954,15 +1009,26 @@ export function HostPollManager({
                             </InlineCodeText>
                           </h3>
                         </div>
-                        <button
-                          className="h-10 shrink-0 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                          type="button"
-                          onClick={() =>
-                            downloadPollResults(selectedHistoryResults)
-                          }
-                        >
-                          Download CSV
-                        </button>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button
+                            className="h-10 rounded-md border border-teal-300 bg-teal-50 px-3 text-sm font-semibold text-teal-900 transition hover:border-teal-500 disabled:opacity-60"
+                            disabled={isSaving || !sessionIsOpen}
+                            type="button"
+                            onClick={() => void restartHistoryPoll()}
+                            title="Restart poll with same answers"
+                          >
+                            Restart poll
+                          </button>
+                          <button
+                            className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                            type="button"
+                            onClick={() =>
+                              downloadPollResults(selectedHistoryResults)
+                            }
+                          >
+                            Download CSV
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-6 space-y-4">

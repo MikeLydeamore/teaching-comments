@@ -1349,6 +1349,51 @@ export const localStore: EdieStore = {
     return poll;
   },
 
+  async restartPoll(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    const isExpired =
+      poll.status === "active" && Date.parse(poll.endsAt) <= Date.now();
+    const restartable = poll.status === "ended" || isExpired;
+
+    if (!restartable) {
+      throw new Error("Only finished polls can be restarted.");
+    }
+
+    const session = data.sessions.find(
+      (storedSession) => storedSession.id === poll.sessionCode,
+    );
+
+    if (!session?.isOpen) {
+      throw new Error("This session is closed.");
+    }
+
+    const timestamp = now();
+    // Auto-end other active polls for this session (like startPoll)
+    data.polls = data.polls.map((item) =>
+      item.sessionCode === poll.sessionCode &&
+      item.status === "active" &&
+      item.id !== id
+        ? { ...item, status: "ended", endedAt: timestamp, updatedAt: timestamp }
+        : item,
+    );
+
+    poll.status = "active";
+    poll.endedAt = null;
+    poll.solutionRevealed = false;
+    poll.endsAt = new Date(
+      Date.now() + poll.durationSeconds * 1000,
+    ).toISOString();
+    poll.updatedAt = timestamp;
+    await writeStore(data);
+    return poll;
+  },
+
   async revealPollSolution(id) {
     const data = await readStore();
     const poll = data.polls.find((item) => item.id === id);
