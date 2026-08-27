@@ -42,6 +42,15 @@ const pollRow = {
   created_at: new Date("2026-01-02T03:04:05.000Z"),
   updated_at: new Date("2026-01-02T03:04:06.000Z"),
 };
+const submissionViewSettingsRow = {
+  session_code: "demo-lecture",
+  prompt_history_id: null,
+  minutes: 3,
+  sort_order: "newest",
+  starred_only: false,
+  revision: 2,
+  updated_at: new Date("2026-01-02T03:04:07.000Z"),
+};
 
 function submissionRow(values: unknown[]) {
   return {
@@ -97,6 +106,73 @@ describe("Neon submission serialization", () => {
     expect(result.imageData).toEqual(expectedMedia[2]);
     expect(result.createdAt).toBe("2026-01-02T03:04:06.000Z");
     expect(result.updatedAt).toBe("2026-01-02T03:04:06.000Z");
+  });
+});
+
+describe("Neon submission view settings", () => {
+  it("maps a persisted settings row", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      if (statement.includes("FROM edie_submission_view_settings")) {
+        return [submissionViewSettingsRow];
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.getSubmissionViewSettings("demo-lecture"),
+    ).resolves.toEqual({
+      sessionCode: "demo-lecture",
+      promptHistoryId: null,
+      minutes: 3,
+      sortOrder: "newest",
+      starredOnly: false,
+      revision: 2,
+      updatedAt: "2026-01-02T03:04:07.000Z",
+    });
+  });
+
+  it("uses an atomic partial upsert and increments the revision", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      if (statement.startsWith("INSERT INTO edie_submission_view_settings")) {
+        return [{
+          ...submissionViewSettingsRow,
+          minutes: 10,
+          revision: 3,
+        }];
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.updateSubmissionViewSettings("demo-lecture", { minutes: 10 }),
+    ).resolves.toMatchObject({ minutes: 10, revision: 3 });
+
+    const upsert = queryMock.mock.calls.find(([statement]) =>
+      String(statement).startsWith("INSERT INTO edie_submission_view_settings"),
+    );
+    expect(upsert?.[0]).toContain("current_settings.revision + 1");
+    expect(upsert?.[1]?.slice(6)).toEqual([false, true, false, false]);
+  });
+
+  it("rejects a prompt filter from another session", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.updateSubmissionViewSettings("demo-lecture", {
+        promptHistoryId: "123e4567-e89b-42d3-a456-426614174099",
+      }),
+    ).rejects.toThrow("Prompt filter does not belong to this session.");
   });
 });
 

@@ -5,6 +5,7 @@ import {
   DEFAULT_SPACE_CODE,
   DEFAULT_PROMPT,
   applySessionPatch,
+  defaultSubmissionViewSettings,
   assertSubmissionUsesEnabledInputs,
   assertSubmissionHasContent,
   calculateStats,
@@ -13,6 +14,7 @@ import {
   normalizeSpaceCode,
   normalizeStudentName,
   normalizeSubmissionPatch,
+  normalizeSubmissionViewSettingsPatch,
   now,
   titleFromCode,
   validateGroupQuestionText,
@@ -39,6 +41,8 @@ import {
   type Session,
   type SessionPoll,
   type Submission,
+  type SubmissionViewSettings,
+  type SubmissionViewSettingsPatch,
   type TeacherSpace,
 } from "./edie-store-model";
 
@@ -50,6 +54,7 @@ type StoreData = {
   promptHistory: PromptHistoryItem[];
   questionBank: QuestionBankItem[];
   sessions: Session[];
+  submissionViewSettings: SubmissionViewSettings[];
   submissions: Submission[];
   teacherSpaces: TeacherSpace[];
 };
@@ -108,6 +113,7 @@ function defaultStore(): StoreData {
         timerEndsAt: null,
       },
     ],
+    submissionViewSettings: [],
     submissions: [
       {
         id: randomUUID(),
@@ -260,6 +266,7 @@ async function readStore(): Promise<StoreData> {
         })),
     ],
     sessions,
+    submissionViewSettings: data.submissionViewSettings ?? [],
     submissions: (data.submissions ?? []).map((submission) => ({
       ...submission,
       drawingData: submission.drawingData ?? null,
@@ -277,12 +284,32 @@ async function writeStore(data: StoreData) {
 }
 
 let bankMutationTail = Promise.resolve();
+let submissionViewMutationTail = Promise.resolve();
 
 async function serializeBankMutation<T>(operation: () => Promise<T>) {
   const previousMutation = bankMutationTail;
   let finishMutation = () => {};
 
   bankMutationTail = new Promise<void>((resolve) => {
+    finishMutation = resolve;
+  });
+
+  await previousMutation;
+
+  try {
+    return await operation();
+  } finally {
+    finishMutation();
+  }
+}
+
+async function serializeSubmissionViewMutation<T>(
+  operation: () => Promise<T>,
+) {
+  const previousMutation = submissionViewMutationTail;
+  let finishMutation = () => {};
+
+  submissionViewMutationTail = new Promise<void>((resolve) => {
     finishMutation = resolve;
   });
 
@@ -501,6 +528,72 @@ export const localStore: EdieStore = {
 
     await writeStore(data);
     return data.sessions[index];
+  },
+
+  async getSubmissionViewSettings(code) {
+    const sessionCode = normalizeSessionCode(code);
+    const data = await readStore();
+    const session = data.sessions.find((item) => item.id === sessionCode);
+
+    if (!session) {
+      return null;
+    }
+
+    return (
+      data.submissionViewSettings.find(
+        (settings) => settings.sessionCode === session.id,
+      ) ?? defaultSubmissionViewSettings(session.id, session.createdAt)
+    );
+  },
+
+  async updateSubmissionViewSettings(
+    code,
+    patch: SubmissionViewSettingsPatch,
+  ) {
+    return serializeSubmissionViewMutation(async () => {
+      const sessionCode = normalizeSessionCode(code);
+      const normalizedPatch = normalizeSubmissionViewSettingsPatch(patch);
+      const data = await readStore();
+      const session = data.sessions.find((item) => item.id === sessionCode);
+
+      if (!session) {
+        return null;
+      }
+
+      if (
+        normalizedPatch.promptHistoryId &&
+        !data.promptHistory.some(
+          (item) =>
+            item.sessionCode === session.id &&
+            item.id === normalizedPatch.promptHistoryId,
+        )
+      ) {
+        throw new Error("Prompt filter does not belong to this session.");
+      }
+
+      const index = data.submissionViewSettings.findIndex(
+        (settings) => settings.sessionCode === session.id,
+      );
+      const current =
+        index === -1
+          ? defaultSubmissionViewSettings(session.id, session.createdAt)
+          : data.submissionViewSettings[index];
+      const next: SubmissionViewSettings = {
+        ...current,
+        ...normalizedPatch,
+        revision: current.revision + 1,
+        updatedAt: now(),
+      };
+
+      if (index === -1) {
+        data.submissionViewSettings.push(next);
+      } else {
+        data.submissionViewSettings[index] = next;
+      }
+
+      await writeStore(data);
+      return next;
+    });
   },
 
   async listPromptHistory(code) {

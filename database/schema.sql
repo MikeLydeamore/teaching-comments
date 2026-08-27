@@ -53,6 +53,15 @@ create table if not exists edie_prompt_history (
   prompt text not null check (char_length(prompt) between 5 and 1200), started_at timestamptz not null, ended_at timestamptz,
   check (ended_at is null or ended_at > started_at)
 );
+create table if not exists edie_submission_view_settings (
+  session_code text primary key references edie_sessions(id) on delete cascade,
+  prompt_history_id uuid references edie_prompt_history(id) on delete set null,
+  minutes integer not null default 3 check (minutes in (0,1,3,5,10)),
+  sort_order text not null default 'newest' check (sort_order in ('newest','oldest')),
+  starred_only boolean not null default false,
+  revision integer not null default 0 check (revision >= 0),
+  updated_at timestamptz not null default now()
+);
 create table if not exists edie_group_questions (
   id uuid primary key default gen_random_uuid(), session_code text not null references edie_sessions(id) on delete cascade,
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80), text text not null check (char_length(text) between 5 and 500),
@@ -105,6 +114,7 @@ alter table edie_submissions enable row level security;
 alter table edie_question_bank enable row level security;
 alter table edie_poll_question_bank enable row level security;
 alter table edie_prompt_history enable row level security;
+alter table edie_submission_view_settings enable row level security;
 alter table edie_group_questions enable row level security;
 alter table edie_group_question_votes enable row level security;
 alter table edie_polls enable row level security;

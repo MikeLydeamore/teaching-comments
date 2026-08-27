@@ -1,50 +1,19 @@
 import { SubmissionsPopout } from "@/components/SubmissionsPopout";
-import {
-  getOrCreateSession,
-  listPromptHistory,
-  listSubmissions,
-  toSubmissionDto,
-} from "@/lib/edie-store";
+import { getOrCreateSession } from "@/lib/edie-store";
 import { isDefaultTeacherPin, isTeacherAuthenticated } from "@/lib/teacher-auth";
-import { parseSubmissionMinutes } from "@/lib/submission-time-range";
+import { getSubmissionViewPayload } from "@/lib/submission-view";
 import { TeacherLogin } from "../TeacherLogin";
-
-function parseSortOrder(value: string | undefined) {
-  return value === "oldest" ? "oldest" : "newest";
-}
 
 export default async function TeacherSubmissionsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ sessionCode: string }>;
-  searchParams: Promise<{
-    auth?: string;
-    minutes?: string;
-    promptHistoryId?: string;
-    sortOrder?: string;
-    starredOnly?: string;
-  }>;
+  searchParams: Promise<{ auth?: string }>;
 }) {
   const { sessionCode } = await params;
   const query = await searchParams;
-  const minutes = parseSubmissionMinutes(query.minutes);
-  const includeHidden = false;
-  const promptHistoryId = query.promptHistoryId ?? "";
-  const sortOrder = parseSortOrder(query.sortOrder);
-  const starredOnly = query.starredOnly === "true";
-  const search = new URLSearchParams({
-    includeHidden: String(includeHidden),
-    minutes: String(minutes),
-    sortOrder,
-    starredOnly: String(starredOnly),
-  });
-
-  if (promptHistoryId) {
-    search.set("promptHistoryId", promptHistoryId);
-  }
-
-  const nextPath = `/host/${sessionCode}/submissions?${search.toString()}`;
+  const nextPath = `/host/${sessionCode}/submissions`;
 
   if (!(await isTeacherAuthenticated())) {
     return (
@@ -58,32 +27,14 @@ export default async function TeacherSubmissionsPage({
   }
 
   const session = await getOrCreateSession(sessionCode);
-  const promptHistory = await listPromptHistory(session.id);
-  const selectedPromptHistory = promptHistory.find(
-    (item) => item.id === promptHistoryId,
-  );
-  const submissions = await listSubmissions(session.id, {
-    includeHidden,
-    minutes,
-    promptHistoryId: selectedPromptHistory?.id,
-  });
-  const displayedSubmissions = starredOnly
-    ? submissions.filter((submission) => submission.starred)
-    : submissions;
+  const initialView = await getSubmissionViewPayload(session, false);
 
   return (
     <SubmissionsPopout
       dashboardUrl={`/host/${session.code}`}
-      includeHidden={includeHidden}
-      initialSubmissions={displayedSubmissions.map(toSubmissionDto)}
-      minutes={minutes}
-      promptHistoryId={selectedPromptHistory?.id}
-      promptOptions={promptHistory.map(({ id, prompt }) => ({ id, prompt }))}
-      promptText={selectedPromptHistory?.prompt ?? session.prompt}
+      initialView={initialView}
       sessionCode={session.id}
       sessionTitle={session.title}
-      sortOrder={sortOrder}
-      starredOnly={starredOnly}
     />
   );
 }

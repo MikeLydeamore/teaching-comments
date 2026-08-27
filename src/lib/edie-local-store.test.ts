@@ -96,3 +96,49 @@ describe("local question bank uniqueness", () => {
     });
   });
 });
+
+describe("local submission view settings", () => {
+  it("loads defaults when a legacy JSON store has no settings collection", async () => {
+    await localStore.getSession("demo-lecture");
+    const legacy = JSON.parse(memory.value ?? "{}") as Record<string, unknown>;
+    delete legacy.submissionViewSettings;
+    memory.value = JSON.stringify(legacy);
+
+    await expect(
+      localStore.getSubmissionViewSettings("demo-lecture"),
+    ).resolves.toMatchObject({
+      promptHistoryId: null,
+      minutes: 3,
+      sortOrder: "newest",
+      starredOnly: false,
+      revision: 0,
+    });
+  });
+
+  it("serializes partial updates without losing independent fields", async () => {
+    await Promise.all([
+      localStore.updateSubmissionViewSettings("demo-lecture", { minutes: 10 }),
+      localStore.updateSubmissionViewSettings("demo-lecture", {
+        starredOnly: true,
+      }),
+    ]);
+
+    await expect(
+      localStore.getSubmissionViewSettings("demo-lecture"),
+    ).resolves.toMatchObject({ minutes: 10, starredOnly: true, revision: 2 });
+  });
+
+  it("rejects a prompt filter from another session", async () => {
+    const [prompt] = await localStore.listPromptHistory("demo-lecture");
+    const otherSession = await localStore.getOrCreateSessionInSpace(
+      "default",
+      "other-room",
+    );
+
+    await expect(
+      localStore.updateSubmissionViewSettings(otherSession!.id, {
+        promptHistoryId: prompt.id,
+      }),
+    ).rejects.toThrow("Prompt filter does not belong to this session.");
+  });
+});

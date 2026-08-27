@@ -4,6 +4,7 @@ import {
   getOrCreateSession,
   getTeacherSpace,
   getSessionStats,
+  getSubmissionViewSettings,
   listSessions,
   listPromptHistory,
   listQuestionBank,
@@ -65,12 +66,18 @@ export default async function TeacherPage({
   const stats = await getSessionStats(session.id);
   const promptHistory = await listPromptHistory(session.id);
   const questionBank = await listQuestionBank(session.id);
+  const submissionViewSettings = await getSubmissionViewSettings(session.id);
+
+  if (!submissionViewSettings) {
+    throw new Error("Session display settings are unavailable.");
+  }
 
   return (
     <TeacherDashboard
       initialPromptHistory={promptHistory}
       initialQuestionBank={questionBank}
       initialStats={stats}
+      initialSubmissionViewSettings={submissionViewSettings}
       session={session}
     />
   );

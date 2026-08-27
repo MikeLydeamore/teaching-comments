@@ -3,6 +3,7 @@ import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
 import {
   getOrCreateSessionInSpace,
   getSessionStats,
+  getSubmissionViewSettings,
   getTeacherSpace,
   listPromptHistory,
   listQuestionBank,
@@ -62,12 +63,18 @@ export default async function TeacherSpaceSessionPage({
   const stats = await getSessionStats(session.id);
   const promptHistory = await listPromptHistory(session.id);
   const questionBank = await listQuestionBank(session.id);
+  const submissionViewSettings = await getSubmissionViewSettings(session.id);
+
+  if (!submissionViewSettings) {
+    throw new Error("Session display settings are unavailable.");
+  }
 
   return (
     <TeacherDashboard
       initialPromptHistory={promptHistory}
       initialQuestionBank={questionBank}
       initialStats={stats}
+      initialSubmissionViewSettings={submissionViewSettings}
       session={session}
       spaceCode={space.code}
     />

@@ -6,6 +6,7 @@ import {
   DEFAULT_PROMPT,
   DEFAULT_SPACE_CODE,
   applySessionPatch,
+  defaultSubmissionViewSettings,
   assertSubmissionHasContent,
   assertSubmissionUsesEnabledInputs,
   calculateStats,
@@ -14,6 +15,7 @@ import {
   normalizeStudentName,
   normalizeSubmissionImageData,
   normalizeSubmissionPatch,
+  normalizeSubmissionViewSettingsPatch,
   now,
   QuestionBankConflictError,
   titleFromCode,
@@ -37,6 +39,8 @@ import {
   type Session,
   type SessionPoll,
   type Submission,
+  type SubmissionViewSettings,
+  type SubmissionViewSettingsPatch,
   type TeacherSpace,
 } from "./edie-store-model";
 
@@ -164,6 +168,18 @@ function promptHistoryFromRow(row: Row): PromptHistoryItem {
   return { id: text(row, "id"), sessionCode: text(row, "session_code"), prompt: text(row, "prompt"), startedAt: text(row, "started_at"), endedAt: nullableText(row, "ended_at") };
 }
 
+function submissionViewSettingsFromRow(row: Row): SubmissionViewSettings {
+  return {
+    sessionCode: text(row, "session_code"),
+    promptHistoryId: nullableText(row, "prompt_history_id"),
+    minutes: number(row, "minutes", 3) as SubmissionViewSettings["minutes"],
+    sortOrder: text(row, "sort_order") as SubmissionViewSettings["sortOrder"],
+    starredOnly: bool(row, "starred_only"),
+    revision: number(row, "revision"),
+    updatedAt: text(row, "updated_at"),
+  };
+}
+
 function groupQuestionFromRow(row: Row, voterId = ""): GroupQuestion {
   return {
     id: text(row, "id"), sessionCode: text(row, "session_code"), studentName: text(row, "student_name") || "Anonymous", text: text(row, "text"),
@@ -186,6 +202,7 @@ const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, 
 const GROUP_QUESTION_COLUMNS = "id, session_code, student_name, text, is_answered, is_visible, archived_at, created_at, updated_at";
 const POLL_QUESTION_COLUMNS = "id, session_code, title, question, selection_mode, options, correct_option_indexes, created_at, updated_at";
 const POLL_COLUMNS = "id, session_code, question, selection_mode, options, correct_option_ids, solution_revealed, status, duration_seconds, started_at, ends_at, ended_at, created_at, updated_at";
+const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, minutes, sort_order, starred_only, revision, updated_at";
 
 async function getSessionRow(code: string) {
   const normalized = normalizeSessionCode(code);
@@ -289,6 +306,65 @@ export const neonStore: EdieStore = {
       );
     }
     return rows[0] ? sessionFromRow(rows[0]) : null;
+  },
+  async getSubmissionViewSettings(code) {
+    const row = await getSessionRow(code);
+    if (!row) return null;
+    const session = sessionFromRow(row);
+    const rows = await query(
+      `SELECT ${SUBMISSION_VIEW_SETTINGS_COLUMNS} FROM edie_submission_view_settings WHERE session_code = $1 LIMIT 1`,
+      [session.id],
+    );
+    return rows[0]
+      ? submissionViewSettingsFromRow(rows[0])
+      : defaultSubmissionViewSettings(session.id, session.createdAt);
+  },
+  async updateSubmissionViewSettings(
+    code,
+    patch: SubmissionViewSettingsPatch,
+  ) {
+    const row = await getSessionRow(code);
+    if (!row) return null;
+    const session = sessionFromRow(row);
+    const normalizedPatch = normalizeSubmissionViewSettingsPatch(patch);
+
+    if (normalizedPatch.promptHistoryId) {
+      const promptRows = await query(
+        "SELECT 1 FROM edie_prompt_history WHERE session_code = $1 AND id = $2 LIMIT 1",
+        [session.id, normalizedPatch.promptHistoryId],
+      );
+      if (!promptRows.length) {
+        throw new Error("Prompt filter does not belong to this session.");
+      }
+    }
+
+    const timestamp = now();
+    const rows = await query(
+      `INSERT INTO edie_submission_view_settings AS current_settings
+         (session_code, prompt_history_id, minutes, sort_order, starred_only, revision, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, $6)
+       ON CONFLICT (session_code) DO UPDATE SET
+         prompt_history_id = CASE WHEN $7 THEN EXCLUDED.prompt_history_id ELSE current_settings.prompt_history_id END,
+         minutes = CASE WHEN $8 THEN EXCLUDED.minutes ELSE current_settings.minutes END,
+         sort_order = CASE WHEN $9 THEN EXCLUDED.sort_order ELSE current_settings.sort_order END,
+         starred_only = CASE WHEN $10 THEN EXCLUDED.starred_only ELSE current_settings.starred_only END,
+         revision = current_settings.revision + 1,
+         updated_at = EXCLUDED.updated_at
+       RETURNING ${SUBMISSION_VIEW_SETTINGS_COLUMNS}`,
+      [
+        session.id,
+        normalizedPatch.promptHistoryId ?? null,
+        normalizedPatch.minutes ?? 3,
+        normalizedPatch.sortOrder ?? "newest",
+        normalizedPatch.starredOnly ?? false,
+        timestamp,
+        "promptHistoryId" in normalizedPatch,
+        "minutes" in normalizedPatch,
+        "sortOrder" in normalizedPatch,
+        "starredOnly" in normalizedPatch,
+      ],
+    );
+    return rows[0] ? submissionViewSettingsFromRow(rows[0]) : null;
   },
   async listPromptHistory(code) {
     const row = await getSessionRow(code); if (!row) return [];

@@ -32,6 +32,9 @@ import type {
   SubmissionImageDto,
   PromptHistoryItem,
   QuestionBankItem,
+  SubmissionViewMinutes,
+  SubmissionViewSettings,
+  SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { logoutTeacher } from "../actions";
 
@@ -85,6 +88,7 @@ type ArchiveSummary = {
 type TeacherDashboardProps = {
   initialPromptHistory: PromptHistoryItem[];
   initialQuestionBank: QuestionBankItem[];
+  initialSubmissionViewSettings: SubmissionViewSettings;
   session: Session;
   initialStats: Stats;
   spaceCode?: string;
@@ -323,6 +327,7 @@ export function TeacherDashboard(props: TeacherDashboardProps) {
 function TeacherDashboardContent({
   initialPromptHistory,
   initialQuestionBank,
+  initialSubmissionViewSettings,
   session,
   initialStats,
   spaceCode,
@@ -338,13 +343,19 @@ function TeacherDashboardContent({
   const [isQuestionTitleDialogOpen, setIsQuestionTitleDialogOpen] =
     useState(false);
   const [questionTitleDraft, setQuestionTitleDraft] = useState("");
-  const [minutes, setMinutes] = useState(3);
+  const [minutes, setMinutes] = useState<SubmissionViewMinutes>(
+    initialSubmissionViewSettings.minutes,
+  );
   const [includeHidden, setIncludeHidden] = useState(false);
   const [promptHistory, setPromptHistory] = useState(initialPromptHistory);
-  const [selectedPromptHistoryId, setSelectedPromptHistoryId] = useState("");
-  const [starredOnly, setStarredOnly] = useState(false);
+  const [selectedPromptHistoryId, setSelectedPromptHistoryId] = useState(
+    initialSubmissionViewSettings.promptHistoryId ?? "",
+  );
+  const [starredOnly, setStarredOnly] = useState(
+    initialSubmissionViewSettings.starredOnly,
+  );
   const [submissionSortOrder, setSubmissionSortOrder] =
-    useState<SubmissionSortOrder>("newest");
+    useState<SubmissionSortOrder>(initialSubmissionViewSettings.sortOrder);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [orderedSubmissionIds, setOrderedSubmissionIds] = useState<string[]>([]);
   const [draggedSubmissionId, setDraggedSubmissionId] = useState<string | null>(null);
@@ -362,10 +373,15 @@ function TeacherDashboardContent({
   const [timerStatus, setTimerStatus] = useState("");
   const [inputSettingsStatus, setInputSettingsStatus] = useState("");
   const [isUpdatingSessionAccess, setIsUpdatingSessionAccess] = useState(false);
-  const submissionsPopoutWindowRef = useRef<Window | null>(null);
+  const submissionViewRevisionRef = useRef(
+    initialSubmissionViewSettings.revision,
+  );
+  const submissionViewUpdatePendingRef = useRef(false);
   const questionBankRefreshRequestIdRef = useRef(0);
   const latestPromptUpdatedAtRef = useRef(session.promptUpdatedAt);
-  const [submissionsPopoutOpen, setSubmissionsPopoutOpen] = useState(false);
+  const [isUpdatingSubmissionView, setIsUpdatingSubmissionView] =
+    useState(false);
+  const [submissionViewStatus, setSubmissionViewStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
   const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
   const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
@@ -468,13 +484,8 @@ function TeacherDashboardContent({
     const effectiveIncludeHidden = overrides?.includeHidden ?? includeHidden;
     const scope = overrides?.scope ?? "all";
     const query = new URLSearchParams({
-      minutes: String(minutes),
       includeHidden: String(effectiveIncludeHidden),
     });
-
-    if (selectedPromptHistoryId) {
-      query.set("promptHistoryId", selectedPromptHistoryId);
-    }
 
     let submissionsResponse: Response | null;
     let sessionResponse: Response | null;
@@ -483,7 +494,7 @@ function TeacherDashboardContent({
       [submissionsResponse, sessionResponse] = await Promise.all([
         scope === "session"
           ? Promise.resolve(null)
-          : fetch(`/api/sessions/${session.id}/submissions?${query}`),
+          : fetch(`/api/sessions/${session.id}/submission-view?${query}`),
         scope === "submissions"
           ? Promise.resolve(null)
           : fetch(`/api/sessions/${session.id}`),
@@ -500,8 +511,9 @@ function TeacherDashboardContent({
     ])) as [
       {
         error?: string;
-        session?: typeof session;
+        promptHistory?: PromptHistoryItem[];
         submissions?: Submission[];
+        viewSettings?: SubmissionViewSettings;
       },
       {
         error?: string;
@@ -526,13 +538,33 @@ function TeacherDashboardContent({
 
     if (submissionsResponse) {
       const nextSubmissions = submissionsPayload.submissions ?? [];
+      const nextViewSettings = submissionsPayload.viewSettings;
 
-      setSubmissions(nextSubmissions);
-      setOrderedSubmissionIds((currentOrder) =>
-        mergeSubmissionOrder(currentOrder, nextSubmissions, submissionSortOrder),
-      );
-      if (submissionsPayload.session) {
-        applyRefreshedSession(submissionsPayload.session);
+      if (
+        nextViewSettings &&
+        !submissionViewUpdatePendingRef.current &&
+        nextViewSettings.revision >= submissionViewRevisionRef.current
+      ) {
+        const sortOrderChanged =
+          nextViewSettings.sortOrder !== submissionSortOrder;
+        submissionViewRevisionRef.current = nextViewSettings.revision;
+        setMinutes(nextViewSettings.minutes);
+        if (submissionsPayload.promptHistory) {
+          setPromptHistory(submissionsPayload.promptHistory);
+        }
+        setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
+        setStarredOnly(nextViewSettings.starredOnly);
+        setSubmissionSortOrder(nextViewSettings.sortOrder);
+        setSubmissions(nextSubmissions);
+        setOrderedSubmissionIds((currentOrder) =>
+          sortOrderChanged
+            ? submissionIdsForOrder(nextSubmissions, nextViewSettings.sortOrder)
+            : mergeSubmissionOrder(
+                currentOrder,
+                nextSubmissions,
+                nextViewSettings.sortOrder,
+              ),
+        );
       }
     }
     if (sessionResponse) {
@@ -551,8 +583,6 @@ function TeacherDashboardContent({
     applyRefreshedSession,
     includeHidden,
     initialStats,
-    minutes,
-    selectedPromptHistoryId,
     session.id,
     submissionSortOrder,
   ]);
@@ -1038,9 +1068,71 @@ function TeacherDashboardContent({
     setShowStudentQr((isShown) => !isShown);
   }
 
+  async function updateSubmissionView(
+    patch: SubmissionViewSettingsPatch,
+  ) {
+    if (submissionViewUpdatePendingRef.current) return;
+
+    submissionViewUpdatePendingRef.current = true;
+    setIsUpdatingSubmissionView(true);
+    setSubmissionViewStatus("Saving display settings...");
+
+    if ("promptHistoryId" in patch) {
+      setSelectedPromptHistoryId(patch.promptHistoryId ?? "");
+      setOrderedSubmissionIds([]);
+    }
+    if (typeof patch.minutes === "number") {
+      setMinutes(patch.minutes);
+    }
+    if (patch.sortOrder) {
+      setSubmissionSortOrder(patch.sortOrder);
+      setOrderedSubmissionIds(
+        submissionIdsForOrder(submissions, patch.sortOrder),
+      );
+    }
+    if (typeof patch.starredOnly === "boolean") {
+      setStarredOnly(patch.starredOnly);
+    }
+
+    try {
+      const response = await fetch(
+        `/api/sessions/${session.id}/submission-view`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message =
+          payload.error ?? "Could not save the display settings.";
+        setSubmissionViewStatus(message);
+        toast.error(message);
+      } else {
+        const nextViewSettings = payload.viewSettings as SubmissionViewSettings;
+        submissionViewRevisionRef.current = nextViewSettings.revision;
+        setMinutes(nextViewSettings.minutes);
+        setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
+        setSubmissionSortOrder(nextViewSettings.sortOrder);
+        setStarredOnly(nextViewSettings.starredOnly);
+        setSubmissionViewStatus("Display settings synced.");
+      }
+    } catch {
+      const message = "Could not save the display settings.";
+      setSubmissionViewStatus(message);
+      toast.error(message);
+    } finally {
+      submissionViewUpdatePendingRef.current = false;
+      setIsUpdatingSubmissionView(false);
+    }
+
+    await refresh({ scope: "submissions" });
+  }
+
   function changeSubmissionSortOrder(nextSortOrder: SubmissionSortOrder) {
-    setSubmissionSortOrder(nextSortOrder);
-    setOrderedSubmissionIds(submissionIdsForOrder(submissions, nextSortOrder));
+    void updateSubmissionView({ sortOrder: nextSortOrder });
   }
 
   async function saveEditedSubmission(id: string) {
@@ -1274,26 +1366,13 @@ function TeacherDashboardContent({
   const resultsSearch = buildViewSearch();
   resultsSearch.set("chartType", chartType);
   const resultsUrl = `${dashboardUrl}/results?${resultsSearch.toString()}`;
-  const submissionsPopoutSearch = buildViewSearch(false);
-  submissionsPopoutSearch.set("sortOrder", submissionSortOrder);
-  const submissionsPopoutUrl = `${dashboardUrl}/submissions?${submissionsPopoutSearch.toString()}`;
-
-  function openSubmissionsPopout(url: string) {
-    const popoutWindow = window.open(url, "edie-submissions-popout");
-
-    if (!popoutWindow) {
-      return false;
-    }
-
-    submissionsPopoutWindowRef.current = popoutWindow;
-    popoutWindow.focus();
-    return true;
-  }
+  const submissionsPopoutUrl = `${dashboardUrl}/submissions`;
 
   function popOutSubmissions() {
-    if (openSubmissionsPopout(submissionsPopoutUrl)) {
-      setSubmissionsPopoutOpen(true);
-    }
+    window.open(
+      submissionsPopoutUrl,
+      "edie-submissions-popout",
+    )?.focus();
   }
 
   async function toggleHiddenSubmissions() {
@@ -1313,22 +1392,6 @@ function TeacherDashboardContent({
       endOp(opKey);
     }
   }
-
-  useEffect(() => {
-    if (!submissionsPopoutOpen) {
-      return;
-    }
-
-    const popoutWindow = submissionsPopoutWindowRef.current;
-
-    if (!popoutWindow || popoutWindow.closed) {
-      submissionsPopoutWindowRef.current = null;
-      setSubmissionsPopoutOpen(false);
-      return;
-    }
-
-    popoutWindow.location.href = submissionsPopoutUrl;
-  }, [submissionsPopoutOpen, submissionsPopoutUrl]);
 
   return (
     <main className="min-h-screen bg-slate-100">
@@ -1769,7 +1832,7 @@ function TeacherDashboardContent({
                     <div className="mt-4 space-y-3">
                       <label className="block text-sm font-medium text-slate-700" htmlFor="prompt-history-filter">
                         Prompt
-                        <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100" id="prompt-history-filter" value={selectedPromptHistoryId} onChange={(event) => { setSelectedPromptHistoryId(event.target.value); setOrderedSubmissionIds([]); }}>
+                        <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60" disabled={isUpdatingSubmissionView} id="prompt-history-filter" value={selectedPromptHistoryId} onChange={(event) => void updateSubmissionView({ promptHistoryId: event.target.value || null })}>
                           <option value="">All prompts</option>
                           {promptHistory.map((item) => <option key={item.id} value={item.id}>{promptHistoryOptionLabel(item)}</option>)}
                         </select>
@@ -1777,7 +1840,7 @@ function TeacherDashboardContent({
                       <div className="flex items-end gap-2">
                         <label className="min-w-0 flex-1 text-sm font-medium text-slate-700" htmlFor="minutes">
                           Time range
-                          <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100" id="minutes" value={minutes} onChange={(event) => setMinutes(Number(event.target.value))}>
+                          <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60" disabled={isUpdatingSubmissionView} id="minutes" value={minutes} onChange={(event) => void updateSubmissionView({ minutes: Number(event.target.value) as SubmissionViewMinutes })}>
                             <option value={1}>Last minute</option>
                             <option value={3}>Last 3 minutes</option>
                             <option value={5}>Last 5 minutes</option>
@@ -1792,13 +1855,14 @@ function TeacherDashboardContent({
                       <div>
                         <p className="text-sm font-medium text-slate-700">Card order</p>
                         <div aria-label="Card order" className="mt-1.5 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1">
-                          {submissionSortOptions.map((option) => <button className={`h-8 rounded px-2 text-sm font-semibold transition ${submissionSortOrder === option.value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-teal-800"}`} key={option.value} type="button" onClick={() => changeSubmissionSortOrder(option.value)}>{option.label}</button>)}
+                          {submissionSortOptions.map((option) => <button className={`h-8 rounded px-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${submissionSortOrder === option.value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-teal-800"}`} disabled={isUpdatingSubmissionView} key={option.value} type="button" onClick={() => changeSubmissionSortOrder(option.value)}>{option.label}</button>)}
                         </div>
                       </div>
-                      <button aria-pressed={starredOnly} className={`inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition ${starredOnly ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50" : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"}`} type="button" onClick={() => setStarredOnly((isStarredOnly) => !isStarredOnly)}>
+                      <button aria-pressed={starredOnly} className={`inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${starredOnly ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50" : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"}`} disabled={isUpdatingSubmissionView} type="button" onClick={() => void updateSubmissionView({ starredOnly: !starredOnly })}>
                         {starredOnly ? "Starred only" : "Show starred only"}
                       </button>
                     </div>
+                    {submissionViewStatus ? <p className="mt-3 text-xs font-medium text-slate-500" role="status">{submissionViewStatus}</p> : null}
                     {selectedPromptHistory ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500"><InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText></p> : null}
                   </section>
 

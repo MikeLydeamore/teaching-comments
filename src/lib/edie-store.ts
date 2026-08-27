@@ -8,6 +8,7 @@ import {
   type EdieStore,
   type PollSelectionMode,
   type SessionPatch,
+  type SubmissionViewSettingsPatch,
   type Submission,
   type SubmissionDto,
   type CreateSubmissionInput,
@@ -43,6 +44,9 @@ export type {
   CreateSubmissionInput,
   SubmissionPatch,
   SubmissionStatus,
+  SubmissionViewMinutes,
+  SubmissionViewSettings,
+  SubmissionViewSettingsPatch,
   TeacherSpace,
   TeacherSpaceSummary,
 } from "./edie-store-model";
@@ -124,6 +128,17 @@ export async function listSessions(spaceCode?: string) {
 
 export async function updateSession(code: string, patch: SessionPatch) {
   return getStore().updateSession(code, patch);
+}
+
+export async function getSubmissionViewSettings(code: string) {
+  return getStore().getSubmissionViewSettings(code);
+}
+
+export async function updateSubmissionViewSettings(
+  code: string,
+  patch: SubmissionViewSettingsPatch,
+) {
+  return getStore().updateSubmissionViewSettings(code, patch);
 }
 
 export async function listPromptHistory(code: string) {

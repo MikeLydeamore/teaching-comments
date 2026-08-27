@@ -141,6 +141,103 @@ export type PromptHistoryItem = {
   endedAt: string | null;
 };
 
+export const SUBMISSION_VIEW_MINUTES = [0, 1, 3, 5, 10] as const;
+
+export type SubmissionViewMinutes = (typeof SUBMISSION_VIEW_MINUTES)[number];
+
+export type SubmissionViewSettings = {
+  sessionCode: string;
+  promptHistoryId: string | null;
+  minutes: SubmissionViewMinutes;
+  sortOrder: "newest" | "oldest";
+  starredOnly: boolean;
+  revision: number;
+  updatedAt: string;
+};
+
+export type SubmissionViewSettingsPatch = Partial<
+  Pick<
+    SubmissionViewSettings,
+    "promptHistoryId" | "minutes" | "sortOrder" | "starredOnly"
+  >
+>;
+
+export function defaultSubmissionViewSettings(
+  sessionCode: string,
+  updatedAt = now(),
+): SubmissionViewSettings {
+  return {
+    sessionCode,
+    promptHistoryId: null,
+    minutes: 3,
+    sortOrder: "newest",
+    starredOnly: false,
+    revision: 0,
+    updatedAt,
+  };
+}
+
+export function normalizeSubmissionViewSettingsPatch(
+  value: unknown,
+): SubmissionViewSettingsPatch {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Display settings must be an object.");
+  }
+
+  const data = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    "promptHistoryId",
+    "minutes",
+    "sortOrder",
+    "starredOnly",
+  ]);
+  const keys = Object.keys(data);
+
+  if (!keys.length || keys.some((key) => !allowedKeys.has(key))) {
+    throw new Error("Display settings contain unsupported fields.");
+  }
+
+  const patch: SubmissionViewSettingsPatch = {};
+
+  if ("promptHistoryId" in data) {
+    if (
+      data.promptHistoryId !== null &&
+      (typeof data.promptHistoryId !== "string" ||
+        data.promptHistoryId.length < 1 ||
+        data.promptHistoryId.length > 200)
+    ) {
+      throw new Error("Prompt filter is invalid.");
+    }
+    patch.promptHistoryId = data.promptHistoryId as string | null;
+  }
+
+  if ("minutes" in data) {
+    if (
+      typeof data.minutes !== "number" ||
+      !SUBMISSION_VIEW_MINUTES.includes(data.minutes as SubmissionViewMinutes)
+    ) {
+      throw new Error("Time range is invalid.");
+    }
+    patch.minutes = data.minutes as SubmissionViewMinutes;
+  }
+
+  if ("sortOrder" in data) {
+    if (data.sortOrder !== "newest" && data.sortOrder !== "oldest") {
+      throw new Error("Card order is invalid.");
+    }
+    patch.sortOrder = data.sortOrder;
+  }
+
+  if ("starredOnly" in data) {
+    if (typeof data.starredOnly !== "boolean") {
+      throw new Error("Starred filter is invalid.");
+    }
+    patch.starredOnly = data.starredOnly;
+  }
+
+  return patch;
+}
+
 export type GroupQuestion = {
   id: string;
   sessionCode: string;
@@ -255,6 +352,13 @@ export type EdieStore = {
   ): Promise<Session | null>;
   listSessions(spaceCode?: string): Promise<Session[]>;
   updateSession(code: string, patch: SessionPatch): Promise<Session | null>;
+  getSubmissionViewSettings(
+    code: string,
+  ): Promise<SubmissionViewSettings | null>;
+  updateSubmissionViewSettings(
+    code: string,
+    patch: SubmissionViewSettingsPatch,
+  ): Promise<SubmissionViewSettings | null>;
   listPromptHistory(code: string): Promise<PromptHistoryItem[]>;
   listSubmissions(
     code: string,

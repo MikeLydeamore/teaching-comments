@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   useCallback,
   useEffect,
-  useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -12,21 +12,24 @@ import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
-import type { SubmissionDto } from "@/lib/edie-store";
+import type {
+  SubmissionDto,
+  SubmissionViewSettings,
+} from "@/lib/edie-store";
 import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
 
 type SubmissionsPopoutProps = {
   dashboardUrl: string;
-  includeHidden: boolean;
-  initialSubmissions: SubmissionDto[];
-  minutes: number;
-  promptHistoryId?: string;
-  promptOptions: Array<{ id: string; prompt: string }>;
-  promptText?: string;
+  initialView: SubmissionView;
   sessionCode: string;
   sessionTitle: string;
-  sortOrder: "newest" | "oldest";
-  starredOnly: boolean;
+};
+
+type SubmissionView = {
+  promptOptions: Array<{ id: string; prompt: string }>;
+  promptText: string;
+  submissions: SubmissionDto[];
+  viewSettings: SubmissionViewSettings;
 };
 
 function subscribeToHydration() {
@@ -38,34 +41,6 @@ function useHasHydrated() {
     subscribeToHydration,
     () => true,
     () => false,
-  );
-}
-
-function sortSubmissions(
-  submissions: SubmissionDto[],
-  sortOrder: "newest" | "oldest",
-) {
-  return [...submissions].sort((left, right) => {
-    const leftTime = new Date(left.createdAt).getTime();
-    const rightTime = new Date(right.createdAt).getTime();
-
-    return sortOrder === "oldest" ? leftTime - rightTime : rightTime - leftTime;
-  });
-}
-
-function submissionsAreUnchanged(
-  currentSubmissions: SubmissionDto[],
-  nextSubmissions: SubmissionDto[],
-) {
-  return (
-    currentSubmissions.length === nextSubmissions.length &&
-    currentSubmissions.every((submission, index) => {
-      const nextSubmission = nextSubmissions[index];
-      return (
-        submission.id === nextSubmission?.id &&
-        submission.version === nextSubmission.version
-      );
-    })
   );
 }
 
@@ -82,39 +57,21 @@ function responseTime(value: string, hasHydrated: boolean) {
 
 export function SubmissionsPopout({
   dashboardUrl,
-  includeHidden,
-  initialSubmissions,
-  minutes,
-  promptHistoryId,
-  promptOptions,
-  promptText,
+  initialView,
   sessionCode,
   sessionTitle,
-  sortOrder,
-  starredOnly,
 }: SubmissionsPopoutProps) {
-  const [submissions, setSubmissions] = useState(() =>
-    sortSubmissions(initialSubmissions, sortOrder),
-  );
+  const [view, setView] = useState(initialView);
   const hasHydrated = useHasHydrated();
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-
-  const queryString = useMemo(() => {
-    const query = new URLSearchParams({
-      includeHidden: String(includeHidden),
-      minutes: String(minutes),
-    });
-
-    if (promptHistoryId) {
-      query.set("promptHistoryId", promptHistoryId);
-    }
-
-    return query.toString();
-  }, [includeHidden, minutes, promptHistoryId]);
+  const [settingsError, setSettingsError] = useState("");
+  const savingSettingsRef = useRef(false);
+  const { promptOptions, promptText, submissions, viewSettings } = view;
+  const { minutes, promptHistoryId, starredOnly } = viewSettings;
 
   const refresh = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(
-      `/api/sessions/${sessionCode}/submissions?${queryString}`,
+      `/api/sessions/${sessionCode}/submission-view`,
       { cache: "no-store", signal },
     );
 
@@ -122,25 +79,22 @@ export function SubmissionsPopout({
       return;
     }
 
-    const payload = (await response.json().catch(() => ({}))) as {
-      submissions?: SubmissionDto[];
-    };
-    const nextSubmissions = payload.submissions ?? [];
-    const nextVisibleSubmissions = starredOnly
-      ? nextSubmissions.filter((submission) => submission.starred)
-      : nextSubmissions;
-    const sortedSubmissions = sortSubmissions(
-      nextVisibleSubmissions,
-      sortOrder,
-    );
+    const payload = (await response.json().catch(() => null)) as
+      | SubmissionView
+      | null;
 
-    setSubmissions((currentSubmissions) =>
-      submissionsAreUnchanged(currentSubmissions, sortedSubmissions)
-        ? currentSubmissions
-        : sortedSubmissions,
+    if (!payload || savingSettingsRef.current) {
+      return;
+    }
+
+    setView((currentView) =>
+      payload.viewSettings.revision < currentView.viewSettings.revision
+        ? currentView
+        : payload,
     );
+    setSettingsError("");
     setLastRefresh(new Date());
-  }, [queryString, sessionCode, sortOrder, starredOnly]);
+  }, [sessionCode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -161,9 +115,14 @@ export function SubmissionsPopout({
       }
     };
 
-    timer = window.setTimeout(() => {
-      void poll();
-    }, 3000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refresh(controller.signal).catch(() => {});
+      }
+    };
+
+    timer = window.setTimeout(() => void poll(), 3000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       disposed = true;
@@ -171,19 +130,45 @@ export function SubmissionsPopout({
       if (timer !== null) {
         window.clearTimeout(timer);
       }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refresh]);
 
-  function selectPrompt(nextPromptHistoryId: string) {
-    const url = new URL(window.location.href);
+  async function selectPrompt(nextPromptHistoryId: string) {
+    if (savingSettingsRef.current) return;
+    savingSettingsRef.current = true;
+    setSettingsError("");
 
-    if (nextPromptHistoryId) {
-      url.searchParams.set("promptHistoryId", nextPromptHistoryId);
-    } else {
-      url.searchParams.delete("promptHistoryId");
+    try {
+      const response = await fetch(
+        `/api/sessions/${sessionCode}/submission-view`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            promptHistoryId: nextPromptHistoryId || null,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setSettingsError(payload.error ?? "Could not change the prompt filter.");
+        return;
+      }
+
+      setView((currentView) => ({
+        ...currentView,
+        viewSettings: payload.viewSettings,
+      }));
+    } catch {
+      setSettingsError("Could not change the prompt filter.");
+    } finally {
+      savingSettingsRef.current = false;
     }
 
-    window.location.assign(url.toString());
+    const controller = new AbortController();
+    await refresh(controller.signal).catch(() => {});
   }
 
   return (
@@ -229,7 +214,7 @@ export function SubmissionsPopout({
                   className={`w-full rounded px-3 py-2 text-left text-sm font-medium transition hover:bg-teal-50 ${
                     !promptHistoryId ? "bg-teal-50 text-teal-900" : "text-slate-700"
                   }`}
-                  onClick={() => selectPrompt("")}
+                  onClick={() => void selectPrompt("")}
                   type="button"
                 >
                   All prompts
@@ -242,7 +227,7 @@ export function SubmissionsPopout({
                         : "text-slate-700"
                     }`}
                     key={prompt.id}
-                    onClick={() => selectPrompt(prompt.id)}
+                    onClick={() => void selectPrompt(prompt.id)}
                     type="button"
                   >
                     {prompt.prompt}
@@ -258,7 +243,6 @@ export function SubmissionsPopout({
         <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">
           <span>
             {submissionTimeRangeLabel(minutes)}
-            {includeHidden ? ", including hidden responses" : ""}
             {starredOnly ? ", starred responses only" : ""}
           </span>
           <span aria-hidden="true">•</span>
@@ -268,6 +252,11 @@ export function SubmissionsPopout({
               : "Loaded with page"}
           </span>
         </div>
+        {settingsError ? (
+          <p className="mt-3 text-sm font-medium text-red-700" role="status">
+            {settingsError}
+          </p>
+        ) : null}
       </header>
 
       {submissions.length ? (
