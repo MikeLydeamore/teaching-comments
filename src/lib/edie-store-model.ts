@@ -945,7 +945,7 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
     typeof patch.title === "string" ? patch.title.trim() : current.title;
   const promptChanged = nextPrompt !== current.prompt;
 
-  if (nextPrompt.length < 5) {
+  if (typeof patch.prompt === "string" && nextPrompt.length < 5) {
     throw new Error("Prompt must be at least 5 characters.");
   }
 
