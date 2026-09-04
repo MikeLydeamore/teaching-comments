@@ -345,7 +345,6 @@ function TeacherDashboardContent({
   const [minutes, setMinutes] = useState<SubmissionViewMinutes>(
     initialSubmissionViewSettings.minutes,
   );
-  const [includeHidden, setIncludeHidden] = useState(false);
   const [promptHistory, setPromptHistory] = useState(initialPromptHistory);
   const [selectedPromptHistoryId, setSelectedPromptHistoryId] = useState(
     initialSubmissionViewSettings.promptHistoryId ?? "",
@@ -474,13 +473,11 @@ function TeacherDashboardContent({
   }, []);
 
   const refresh = useCallback(async (overrides?: {
-    includeHidden?: boolean;
     scope?: DashboardRefreshScope;
   }) => {
-    const effectiveIncludeHidden = overrides?.includeHidden ?? includeHidden;
     const scope = overrides?.scope ?? "all";
     const query = new URLSearchParams({
-      includeHidden: String(effectiveIncludeHidden),
+      includeHidden: "true",
     });
 
     let submissionsResponse: Response | null;
@@ -577,7 +574,6 @@ function TeacherDashboardContent({
     setIsLoading(false);
   }, [
     applyRefreshedSession,
-    includeHidden,
     initialStats,
     session.id,
     submissionSortOrder,
@@ -1273,18 +1269,25 @@ function TeacherDashboardContent({
         : orderedSubmissions,
     [orderedSubmissions, starredOnly],
   );
-  const wordCounts = useMemo(
-    () => responseWordCounts(displayedSubmissions, 8),
+  const chartSubmissions = useMemo(
+    () =>
+      displayedSubmissions.filter(
+        (submission) => submission.status !== "hidden",
+      ),
     [displayedSubmissions],
+  );
+  const wordCounts = useMemo(
+    () => responseWordCounts(chartSubmissions, 8),
+    [chartSubmissions],
   );
   const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
   const pollResults = useMemo(
-    () => responseCounts(displayedSubmissions),
-    [displayedSubmissions],
+    () => responseCounts(chartSubmissions),
+    [chartSubmissions],
   );
   const wordCloudResults = useMemo(
-    () => responseWordCounts(displayedSubmissions),
-    [displayedSubmissions],
+    () => responseWordCounts(chartSubmissions),
+    [chartSubmissions],
   );
   const chartResults = chartType === "wordCloud" ? wordCloudResults : pollResults;
   const maxPollCount = Math.max(1, ...chartResults.map(([, count]) => count));
@@ -1317,9 +1320,9 @@ function TeacherDashboardContent({
     : `/host/${session.code}`;
   const qrPopoutUrl = `${dashboardUrl}/qr`;
 
-  function buildViewSearch(showHiddenSubmissions = includeHidden) {
+  function buildViewSearch() {
     const search = new URLSearchParams({
-      includeHidden: String(showHiddenSubmissions),
+      includeHidden: "false",
       minutes: String(minutes),
       starredOnly: String(starredOnly),
     });
@@ -1341,24 +1344,6 @@ function TeacherDashboardContent({
       submissionsPopoutUrl,
       "edie-submissions-popout",
     )?.focus();
-  }
-
-  async function toggleHiddenSubmissions() {
-    const opKey = "toggle-hidden-submissions";
-
-    if (isPending(opKey)) {
-      return;
-    }
-
-    beginOp(opKey);
-    const nextIncludeHidden = !includeHidden;
-    setIncludeHidden(nextIncludeHidden);
-
-    try {
-      await refresh({ includeHidden: nextIncludeHidden });
-    } finally {
-      endOp(opKey);
-    }
   }
 
   return (
@@ -1826,30 +1811,6 @@ function TeacherDashboardContent({
                       />
                     </span>
                   </button>
-                  <button
-                    aria-checked={includeHidden}
-                    className="grid min-h-12 w-full grid-cols-[1fr_auto] items-center gap-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
-                    disabled={isPending("toggle-hidden-submissions")}
-                    role="switch"
-                    type="button"
-                    onClick={() => {
-                      void toggleHiddenSubmissions();
-                    }}
-                  >
-                    <span className="leading-5">Show hidden submissions</span>
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
-                        includeHidden ? "bg-teal-600" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`block size-5 rounded-full bg-white shadow-sm transition ${
-                          includeHidden ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </span>
-                  </button>
                     </div>
                   </section>
 
@@ -1983,7 +1944,7 @@ function TeacherDashboardContent({
                 promptUpdatedAt={
                   selectedPromptHistory?.startedAt ?? sessionDetails.promptUpdatedAt
                 }
-                submissions={displayedSubmissions}
+                submissions={chartSubmissions}
               />
             </section>
           ) : null}
