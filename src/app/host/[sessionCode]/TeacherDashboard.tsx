@@ -11,7 +11,6 @@ import { PendingActionButton } from "@/components/PendingActionButton";
 import { PendingLink } from "@/components/PendingLink";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { ToastProvider, useToast } from "@/components/Toast";
-import { QrCode } from "@/components/QrCode";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
@@ -364,7 +363,6 @@ function TeacherDashboardContent({
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showLiveControls, setShowLiveControls] = useState(false);
   const [showResultsChart, setShowResultsChart] = useState(false);
-  const [showStudentQr, setShowStudentQr] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
   const [timerDraftValue, setTimerDraftValue] = useState(formatTimerSeconds(30));
@@ -382,8 +380,6 @@ function TeacherDashboardContent({
     useState(false);
   const [submissionViewStatus, setSubmissionViewStatus] = useState("");
   const [copiedSubmissionId, setCopiedSubmissionId] = useState<string | null>(null);
-  const [studentLinkCopyStatus, setStudentLinkCopyStatus] = useState("");
-  const [studentLinkOrigin, setStudentLinkOrigin] = useState("");
   const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editError, setEditError] = useState("");
@@ -1039,31 +1035,6 @@ function TeacherDashboardContent({
     }, 1400);
   }
 
-  async function copyStudentLink(studentShareUrl: string) {
-    if (!studentShareUrl) {
-      return;
-    }
-
-    try {
-      await writeTextToClipboard(studentShareUrl);
-    } catch {
-      setStudentLinkCopyStatus("Could not copy link.");
-      return;
-    }
-
-    setStudentLinkCopyStatus("Copied.");
-    window.setTimeout(() => {
-      setStudentLinkCopyStatus("");
-    }, 1400);
-  }
-
-  function toggleStudentQr() {
-    setStudentLinkOrigin((currentOrigin) =>
-      currentOrigin || window.location.origin,
-    );
-    setShowStudentQr((isShown) => !isShown);
-  }
-
   async function updateSubmissionView(
     patch: SubmissionViewSettingsPatch,
   ) {
@@ -1343,9 +1314,6 @@ function TeacherDashboardContent({
   const studentUrl = spaceCode
     ? `/spaces/${spaceCode}/${session.code}`
     : `/spaces/${session.code}`;
-  const studentShareUrl = studentLinkOrigin
-    ? `${studentLinkOrigin}${studentUrl}`
-    : "";
   const teacherHomeUrl = spaceCode ? `/host/${spaceCode}` : "/host";
   const dashboardUrl = spaceCode
     ? `/host/${spaceCode}/${session.code}`
@@ -1432,13 +1400,6 @@ function TeacherDashboardContent({
           >
             Open student page
           </Link>
-          <button
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-            type="button"
-            onClick={toggleStudentQr}
-          >
-            {showStudentQr ? "Hide QR code" : "Show QR code"}
-          </button>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
             href={qrPopoutUrl}
@@ -1465,62 +1426,6 @@ function TeacherDashboardContent({
           </form>
         </div>
       </header>
-
-      {showStudentQr ? (
-        <section className="border-b border-slate-200 bg-white">
-          <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 md:grid-cols-[240px_minmax(0,1fr)]">
-            <div className="aspect-square rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-              {studentShareUrl ? (
-                <QrCode className="size-full" value={studentShareUrl} />
-              ) : (
-                <div className="flex aspect-square items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-500">
-                  Preparing QR code...
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col justify-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
-                Student QR code
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
-                Scan to join {sessionDetails.title}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Put this on screen at the start of class. It opens the student
-                response page for this space and session.
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <code className="max-w-full overflow-x-auto rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {studentShareUrl || studentUrl}
-                </code>
-                <button
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={!studentShareUrl}
-                  type="button"
-                  onClick={() => {
-                    void copyStudentLink(studentShareUrl);
-                  }}
-                >
-                  Copy link
-                </button>
-                <Link
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
-                  href={qrPopoutUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open popout
-                </Link>
-                {studentLinkCopyStatus ? (
-                  <span className="text-sm font-medium text-slate-600">
-                    {studentLinkCopyStatus}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : null}
 
       <div className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-5">
