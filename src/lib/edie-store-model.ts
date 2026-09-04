@@ -465,8 +465,7 @@ export type EdieStore = {
 
 export const DEFAULT_SPACE_CODE = "default";
 
-export const DEFAULT_PROMPT =
-  "In one or two sentences, explain what the p-value tells us in this setting.";
+export const DEFAULT_PROMPT = "";
 
 export function now() {
   return new Date().toISOString();
@@ -946,7 +945,7 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
     typeof patch.title === "string" ? patch.title.trim() : current.title;
   const promptChanged = nextPrompt !== current.prompt;
 
-  if (nextPrompt.length < 5) {
+  if (typeof patch.prompt === "string" && nextPrompt.length < 5) {
     throw new Error("Prompt must be at least 5 characters.");
   }
 

@@ -11,7 +11,7 @@ create table if not exists edie_sessions (
   id text primary key default gen_random_uuid()::text,
   code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   space_code text not null default 'default' references edie_teacher_spaces(code) on delete restrict,
-  title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) between 5 and 1200),
+  title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200),
   is_open boolean not null default true, group_questions_screening_enabled boolean not null default false, submissions_screening_enabled boolean not null default false,
   text_input_enabled boolean not null default true, gif_input_enabled boolean not null default true, drawing_input_enabled boolean not null default true, image_input_enabled boolean not null default true,
   created_at timestamptz not null default now(), prompt_updated_at timestamptz not null default now(),
@@ -50,7 +50,7 @@ create table if not exists edie_poll_question_bank (
 );
 create table if not exists edie_prompt_history (
   id uuid primary key default gen_random_uuid(), session_code text not null references edie_sessions(id) on delete cascade,
-  prompt text not null check (char_length(prompt) between 5 and 1200), started_at timestamptz not null, ended_at timestamptz,
+  prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200), started_at timestamptz not null, ended_at timestamptz,
   check (ended_at is null or ended_at > started_at)
 );
 create table if not exists edie_submission_view_settings (
@@ -121,7 +121,7 @@ alter table edie_polls enable row level security;
 alter table edie_poll_responses enable row level security;
 
 insert into edie_teacher_spaces (code,name,pin_hash) values ('default','Default Space','plain:teach123') on conflict (code) do nothing;
-insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','In one or two sentences, explain what the p-value tells us in this setting.',true) on conflict (space_code,code) do nothing;
+insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','',true) on conflict (space_code,code) do nothing;
 insert into edie_prompt_history (id,session_code,prompt,started_at,ended_at)
 select '44444444-4444-4444-8444-444444444444',id,prompt,prompt_updated_at,null from edie_sessions where id='demo-lecture' on conflict (id) do nothing;
 insert into edie_question_bank (id,session_code,title,text) values ('33333333-3333-4333-8333-333333333333','demo-lecture','Explain p-values','In one or two sentences, explain what the p-value tells us in this setting.') on conflict (id) do nothing;
