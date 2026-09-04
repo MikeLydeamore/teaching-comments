@@ -35,6 +35,7 @@ export default async function TeacherSubmissionsPage({
       initialView={initialView}
       sessionCode={session.id}
       sessionTitle={session.title}
+      studentUrl={`/spaces/${session.code}`}
     />
   );
 }

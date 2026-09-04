@@ -11,6 +11,7 @@ import {
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
+import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import type {
   SubmissionDto,
@@ -23,6 +24,7 @@ type SubmissionsPopoutProps = {
   initialView: SubmissionView;
   sessionCode: string;
   sessionTitle: string;
+  studentUrl: string;
 };
 
 type SubmissionView = {
@@ -60,11 +62,14 @@ export function SubmissionsPopout({
   initialView,
   sessionCode,
   sessionTitle,
+  studentUrl,
 }: SubmissionsPopoutProps) {
   const [view, setView] = useState(initialView);
   const hasHydrated = useHasHydrated();
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [settingsError, setSettingsError] = useState("");
+  const [showStudentQr, setShowStudentQr] = useState(false);
+  const [studentShareUrl, setStudentShareUrl] = useState("");
   const savingSettingsRef = useRef(false);
   const { promptOptions, promptText, submissions, viewSettings } = view;
   const { minutes, promptHistoryId, starredOnly } = viewSettings;
@@ -171,6 +176,13 @@ export function SubmissionsPopout({
     await refresh(controller.signal).catch(() => {});
   }
 
+  function toggleStudentQr() {
+    setStudentShareUrl((currentUrl) =>
+      currentUrl || new URL(studentUrl, window.location.origin).toString(),
+    );
+    setShowStudentQr((isShown) => !isShown);
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-6 text-slate-950">
       <header className="rounded-md border border-slate-200 bg-white px-6 py-5 shadow-sm">
@@ -193,6 +205,25 @@ export function SubmissionsPopout({
             >
               Dashboard
             </Link>
+            <div className="relative">
+              <button
+                aria-controls="student-qr-code"
+                aria-expanded={showStudentQr}
+                className="rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                type="button"
+                onClick={toggleStudentQr}
+              >
+                {showStudentQr ? "Hide QR code" : "Show QR code"}
+              </button>
+              {showStudentQr ? (
+                <section
+                  className="absolute right-0 top-full z-20 mt-3 aspect-square w-[22.5rem] max-w-[calc(100vw-3rem)] rounded-md border border-slate-200 bg-white p-3 shadow-xl"
+                  id="student-qr-code"
+                >
+                  <QrCode className="size-full" value={studentShareUrl} />
+                </section>
+              ) : null}
+            </div>
           </div>
         </div>
         {promptText ? (
