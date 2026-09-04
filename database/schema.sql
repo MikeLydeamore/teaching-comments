@@ -121,7 +121,7 @@ alter table edie_polls enable row level security;
 alter table edie_poll_responses enable row level security;
 
 insert into edie_teacher_spaces (code,name,pin_hash) values ('default','Default Space','plain:teach123') on conflict (code) do nothing;
-insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','In one or two sentences, explain what the p-value tells us in this setting.',true) on conflict (space_code,code) do nothing;
+insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','',true) on conflict (space_code,code) do nothing;
 insert into edie_prompt_history (id,session_code,prompt,started_at,ended_at)
 select '44444444-4444-4444-8444-444444444444',id,prompt,prompt_updated_at,null from edie_sessions where id='demo-lecture' on conflict (id) do nothing;
 insert into edie_question_bank (id,session_code,title,text) values ('33333333-3333-4333-8333-333333333333','demo-lecture','Explain p-values','In one or two sentences, explain what the p-value tells us in this setting.') on conflict (id) do nothing;

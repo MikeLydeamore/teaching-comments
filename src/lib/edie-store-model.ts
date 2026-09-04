@@ -465,8 +465,7 @@ export type EdieStore = {
 
 export const DEFAULT_SPACE_CODE = "default";
 
-export const DEFAULT_PROMPT =
-  "In one or two sentences, explain what the p-value tells us in this setting.";
+export const DEFAULT_PROMPT = "";
 
 export function now() {
   return new Date().toISOString();
