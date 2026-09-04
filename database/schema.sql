@@ -11,7 +11,7 @@ create table if not exists edie_sessions (
   id text primary key default gen_random_uuid()::text,
   code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   space_code text not null default 'default' references edie_teacher_spaces(code) on delete restrict,
-  title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) between 5 and 1200),
+  title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200),
   is_open boolean not null default true, group_questions_screening_enabled boolean not null default false, submissions_screening_enabled boolean not null default false,
   text_input_enabled boolean not null default true, gif_input_enabled boolean not null default true, drawing_input_enabled boolean not null default true, image_input_enabled boolean not null default true,
   created_at timestamptz not null default now(), prompt_updated_at timestamptz not null default now(),
@@ -50,7 +50,7 @@ create table if not exists edie_poll_question_bank (
 );
 create table if not exists edie_prompt_history (
   id uuid primary key default gen_random_uuid(), session_code text not null references edie_sessions(id) on delete cascade,
-  prompt text not null check (char_length(prompt) between 5 and 1200), started_at timestamptz not null, ended_at timestamptz,
+  prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200), started_at timestamptz not null, ended_at timestamptz,
   check (ended_at is null or ended_at > started_at)
 );
 create table if not exists edie_submission_view_settings (
