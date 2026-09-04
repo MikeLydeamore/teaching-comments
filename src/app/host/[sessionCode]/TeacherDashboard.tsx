@@ -1298,11 +1298,6 @@ function TeacherDashboardContent({
         : orderedSubmissions,
     [orderedSubmissions, starredOnly],
   );
-  const wordCounts = useMemo(
-    () => responseWordCounts(displayedSubmissions, 8),
-    [displayedSubmissions],
-  );
-  const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
   const chartSubmissions = useMemo(
     () =>
       displayedSubmissions.filter(
@@ -1310,6 +1305,11 @@ function TeacherDashboardContent({
       ),
     [displayedSubmissions],
   );
+  const wordCounts = useMemo(
+    () => responseWordCounts(chartSubmissions, 8),
+    [chartSubmissions],
+  );
+  const maxWordCount = Math.max(1, ...wordCounts.map(([, count]) => count));
   const pollResults = useMemo(
     () => responseCounts(chartSubmissions),
     [chartSubmissions],
