@@ -14,6 +14,7 @@ const blankSession: Session = {
   gifInputEnabled: true,
   drawingInputEnabled: true,
   imageInputEnabled: true,
+  imageEmbedsEnabled: true,
   createdAt: "2026-01-01T00:00:00.000Z",
   promptUpdatedAt: "2026-01-01T00:00:00.000Z",
   timerDurationSeconds: 0,
@@ -32,5 +33,14 @@ describe("applySessionPatch", () => {
     expect(() => applySessionPatch(blankSession, { prompt: "No" })).toThrow(
       "Prompt must be at least 5 characters.",
     );
+  });
+
+  it("updates Markdown image embeds independently from image uploads", () => {
+    const updated = applySessionPatch(blankSession, {
+      imageEmbedsEnabled: false,
+    });
+
+    expect(updated.imageEmbedsEnabled).toBe(false);
+    expect(updated.imageInputEnabled).toBe(true);
   });
 });

@@ -76,6 +76,7 @@ export type Session = {
   gifInputEnabled: boolean;
   drawingInputEnabled: boolean;
   imageInputEnabled: boolean;
+  imageEmbedsEnabled: boolean;
   createdAt: string;
   promptUpdatedAt: string;
   timerDurationSeconds: number;
@@ -311,6 +312,7 @@ export type SessionPatch = Partial<
     | "gifInputEnabled"
     | "drawingInputEnabled"
     | "imageInputEnabled"
+    | "imageEmbedsEnabled"
     | "timerDurationSeconds"
     | "timerEndsAt"
   >
@@ -1016,6 +1018,10 @@ export function applySessionPatch(current: Session, patch: SessionPatch) {
       typeof patch.imageInputEnabled === "boolean"
         ? patch.imageInputEnabled
         : current.imageInputEnabled,
+    imageEmbedsEnabled:
+      typeof patch.imageEmbedsEnabled === "boolean"
+        ? patch.imageEmbedsEnabled
+        : current.imageEmbedsEnabled,
     timerDurationSeconds: nextTimerDurationSeconds,
     timerEndsAt: nextTimerEndsAt,
   };

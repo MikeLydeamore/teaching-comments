@@ -59,6 +59,7 @@ export default async function StudentPage({
       gifInputEnabled={session.gifInputEnabled}
       drawingInputEnabled={session.drawingInputEnabled}
       imageInputEnabled={session.imageInputEnabled}
+      imageEmbedsEnabled={session.imageEmbedsEnabled}
       timerDurationSeconds={session.timerDurationSeconds}
       timerEndsAt={session.timerEndsAt}
       imageUploadsEnabled={imageUploadsEnabled()}

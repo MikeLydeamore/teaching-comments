@@ -12,13 +12,20 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@radix-ui/react-popover": "^1.1.23",
+    "@uiw/react-md-editor": "^4.1.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "emoji-picker-react": "^4.20.2",
     "heic-to": "^1.5.2",
     "next": "16.2.10",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

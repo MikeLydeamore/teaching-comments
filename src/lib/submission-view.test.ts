@@ -33,6 +33,7 @@ const session = {
   gifInputEnabled: true,
   drawingInputEnabled: true,
   imageInputEnabled: true,
+  imageEmbedsEnabled: false,
   createdAt: "2026-01-02T03:00:00.000Z",
   promptUpdatedAt: "2026-01-02T03:00:00.000Z",
   timerDurationSeconds: 0,
@@ -98,6 +99,7 @@ describe("getSubmissionViewPayload", () => {
       promptHistoryId: "prompt-1",
     });
     expect(result.promptText).toBe("Earlier prompt");
+    expect(result.imageEmbedsEnabled).toBe(false);
     expect(result.submissions.map(({ id }) => id)).toEqual(["old", "new"]);
   });
 });

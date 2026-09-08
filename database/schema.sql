@@ -13,7 +13,7 @@ create table if not exists edie_sessions (
   space_code text not null default 'default' references edie_teacher_spaces(code) on delete restrict,
   title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200),
   is_open boolean not null default true, group_questions_screening_enabled boolean not null default false, submissions_screening_enabled boolean not null default false,
-  text_input_enabled boolean not null default true, gif_input_enabled boolean not null default true, drawing_input_enabled boolean not null default true, image_input_enabled boolean not null default true,
+  text_input_enabled boolean not null default true, gif_input_enabled boolean not null default true, drawing_input_enabled boolean not null default true, image_input_enabled boolean not null default true, image_embeds_enabled boolean not null default true,
   created_at timestamptz not null default now(), prompt_updated_at timestamptz not null default now(),
   timer_duration_seconds integer not null default 0 check (timer_duration_seconds between 0 and 3600), timer_ends_at timestamptz
 );

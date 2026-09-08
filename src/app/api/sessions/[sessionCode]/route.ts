@@ -42,6 +42,7 @@ export async function PATCH(
     gifInputEnabled?: boolean;
     drawingInputEnabled?: boolean;
     imageInputEnabled?: boolean;
+    imageEmbedsEnabled?: boolean;
     timerDurationSeconds?: number;
     title?: string;
   };
@@ -55,6 +56,7 @@ export async function PATCH(
       gifInputEnabled: body.gifInputEnabled,
       drawingInputEnabled: body.drawingInputEnabled,
       imageInputEnabled: body.imageInputEnabled,
+      imageEmbedsEnabled: body.imageEmbedsEnabled,
       prompt: body.prompt,
       title: body.title,
     };

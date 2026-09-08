@@ -12,6 +12,7 @@ import {
 } from "@/lib/edie-store";
 
 export type SubmissionViewPayload = {
+  imageEmbedsEnabled: boolean;
   promptHistory: PromptHistoryItem[];
   promptOptions: Array<{ id: string; prompt: string }>;
   promptText: string;
@@ -52,6 +53,7 @@ export async function getSubmissionViewPayload(
   });
 
   return {
+    imageEmbedsEnabled: session.imageEmbedsEnabled,
     promptHistory,
     promptOptions: promptHistory.map(({ id, prompt }) => ({ id, prompt })),
     promptText: selectedPrompt?.prompt ?? session.prompt,

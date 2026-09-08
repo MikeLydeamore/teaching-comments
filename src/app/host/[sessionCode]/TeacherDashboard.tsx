@@ -15,6 +15,7 @@ import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
@@ -50,6 +51,7 @@ type Session = {
   gifInputEnabled: boolean;
   drawingInputEnabled: boolean;
   imageInputEnabled: boolean;
+  imageEmbedsEnabled: boolean;
   timerDurationSeconds: number;
   timerEndsAt: string | null;
 };
@@ -859,7 +861,7 @@ function TeacherDashboardContent({
   }
 
   async function setSubmissionInputEnabled(
-    input: "textInputEnabled" | "gifInputEnabled" | "drawingInputEnabled" | "imageInputEnabled",
+    input: "textInputEnabled" | "gifInputEnabled" | "drawingInputEnabled" | "imageInputEnabled" | "imageEmbedsEnabled",
     isEnabled: boolean,
   ) {
     const opKey = `input-${input}`;
@@ -1822,6 +1824,7 @@ function TeacherDashboardContent({
                     ["gifInputEnabled", "GIF responses"],
                     ["drawingInputEnabled", "Drawings"],
                     ["imageInputEnabled", "Image uploads"],
+                    ["imageEmbedsEnabled", "Image embeds"],
                   ] as const).map(([input, label]) => {
                     const isEnabled = sessionDetails[input];
                     return (
@@ -2117,9 +2120,9 @@ function TeacherDashboardContent({
                       >
                         <CopyStatusIcon isCopied={copiedSubmissionId === submission.id} />
                       </button>
-                      <p className="whitespace-pre-wrap">
-                        <InlineCodeText>{submission.text}</InlineCodeText>
-                      </p>
+                      <SubmissionMarkdown imageEmbedsEnabled={sessionDetails.imageEmbedsEnabled}>
+                        {submission.text}
+                      </SubmissionMarkdown>
                     </div>
                   ) : !submission.drawingData && !submission.gifData && !submission.image ? (
                     <p

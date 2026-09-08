@@ -15,7 +15,9 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { ImageUploadPanel, type PreparedImage } from "@/components/ImageUploadPanel";
+import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
+import { isMarkdownSubmitShortcut } from "@/lib/submission-markdown-editor";
 import type { DrawingData, GifData, ParticipantPoll } from "@/lib/edie-store";
 
 type StudentSubmitProps = {
@@ -32,6 +34,7 @@ type StudentSubmitProps = {
   gifInputEnabled: boolean;
   drawingInputEnabled: boolean;
   imageInputEnabled: boolean;
+  imageEmbedsEnabled: boolean;
 };
 
 type SavedSubmission = {
@@ -79,6 +82,7 @@ export function StudentSubmit({
   gifInputEnabled: initialGifInputEnabled,
   drawingInputEnabled: initialDrawingInputEnabled,
   imageInputEnabled: initialImageInputEnabled,
+  imageEmbedsEnabled: initialImageEmbedsEnabled,
 }: StudentSubmitProps) {
   const [currentPrompt, setCurrentPrompt] = useState(prompt);
   const [sessionIsOpen, setSessionIsOpen] = useState(true);
@@ -99,6 +103,7 @@ export function StudentSubmit({
   const [gifInputEnabled, setGifInputEnabled] = useState(initialGifInputEnabled);
   const [drawingInputEnabled, setDrawingInputEnabled] = useState(initialDrawingInputEnabled);
   const [imageInputEnabled, setImageInputEnabled] = useState(initialImageInputEnabled);
+  const [imageEmbedsEnabled, setImageEmbedsEnabled] = useState(initialImageEmbedsEnabled);
   const [imageStatus, setImageStatus] = useState("");
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [uploadReceipt, setUploadReceipt] = useState<UploadReceipt | null>(null);
@@ -135,6 +140,7 @@ export function StudentSubmit({
     const nextGifInputEnabled = payload.session?.gifInputEnabled;
     const nextDrawingInputEnabled = payload.session?.drawingInputEnabled;
     const nextImageInputEnabled = payload.session?.imageInputEnabled;
+    const nextImageEmbedsEnabled = payload.session?.imageEmbedsEnabled;
     setActivePoll(payload.activePoll ?? null);
 
     if (typeof nextPrompt === "string") {
@@ -160,6 +166,7 @@ export function StudentSubmit({
     if (typeof nextGifInputEnabled === "boolean") setGifInputEnabled(nextGifInputEnabled);
     if (typeof nextDrawingInputEnabled === "boolean") setDrawingInputEnabled(nextDrawingInputEnabled);
     if (typeof nextImageInputEnabled === "boolean") setImageInputEnabled(nextImageInputEnabled);
+    if (typeof nextImageEmbedsEnabled === "boolean") setImageEmbedsEnabled(nextImageEmbedsEnabled);
   }, [pollParticipantId, sessionId]);
 
   useEffect(() => {
@@ -260,10 +267,12 @@ export function StudentSubmit({
 
   function handleTextKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
-      event.key !== "Enter" ||
-      event.shiftKey ||
-      event.nativeEvent.isComposing ||
-      window.matchMedia("(pointer: coarse)").matches ||
+      !isMarkdownSubmitShortcut({
+        ctrlKey: event.ctrlKey,
+        isComposing: event.nativeEvent.isComposing,
+        key: event.key,
+        metaKey: event.metaKey,
+      }) ||
       isSaving ||
       !sessionIsOpen ||
       !hasSubmissionContent
@@ -371,15 +380,17 @@ export function StudentSubmit({
               value={website}
               onChange={(event) => setWebsite(event.target.value)}
             />
-            {textInputEnabled ? <textarea
-              id="quick-write"
-              className="mt-3 min-h-40 w-full resize-y rounded-md border border-slate-300 bg-white p-4 text-lg leading-7 text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-              maxLength={2000}
-              placeholder="Type your response here..."
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={handleTextKeyDown}
-            /> : null}
+            {textInputEnabled ? (
+              <SubmissionMarkdownEditor
+                disabled={!sessionIsOpen || isSaving}
+                id="quick-write"
+                imageEmbedsEnabled={imageEmbedsEnabled}
+                maxLength={2000}
+                value={text}
+                onChange={setText}
+                onKeyDown={handleTextKeyDown}
+              />
+            ) : null}
               {gifInputEnabled ? <GiphyPicker
               disabled={!sessionIsOpen || isSaving}
               gifData={gifData}
@@ -402,7 +413,7 @@ export function StudentSubmit({
                 disabled={isSaving || Boolean(activeImage && isImageProcessing) || !sessionIsOpen || !hasSubmissionContent}
                 type="submit"
               >
-                {activeImage && isImageProcessing ? "Preparing image..." : isSaving ? "Submitting..." : "Submit (Enter)"}
+                {activeImage && isImageProcessing ? "Preparing image..." : isSaving ? "Submitting..." : "Submit (Ctrl/Cmd+Enter)"}
               </button>
             </div>
             {error ? (

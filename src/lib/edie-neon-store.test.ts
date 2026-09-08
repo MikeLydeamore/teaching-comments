@@ -25,7 +25,8 @@ const sessionRow = {
   title: "Demo", prompt: "A valid prompt.", is_open: true,
   group_questions_screening_enabled: false, submissions_screening_enabled: false,
   text_input_enabled: true, gif_input_enabled: true, drawing_input_enabled: true,
-  image_input_enabled: true, created_at: new Date("2026-01-02T03:04:05.000Z"),
+  image_input_enabled: true, image_embeds_enabled: true,
+  created_at: new Date("2026-01-02T03:04:05.000Z"),
   prompt_updated_at: new Date("2026-01-02T03:04:05.000Z"),
   timer_duration_seconds: 0, timer_ends_at: null,
 };
@@ -74,6 +75,33 @@ beforeEach(() => {
     if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) return [sessionRow];
     if (statement.startsWith("INSERT INTO edie_submissions")) return [submissionRow(values)];
     return [];
+  });
+});
+
+describe("Neon session image embeds", () => {
+  it("persists the setting independently from image uploads", async () => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
+        return [sessionRow];
+      }
+      if (statement.startsWith("UPDATE edie_sessions")) {
+        return [{ ...sessionRow, image_embeds_enabled: false }];
+      }
+      return [];
+    });
+
+    await expect(
+      neonStore.updateSession("demo-lecture", { imageEmbedsEnabled: false }),
+    ).resolves.toMatchObject({
+      imageEmbedsEnabled: false,
+      imageInputEnabled: true,
+    });
+
+    const update = queryMock.mock.calls.find(([statement]) =>
+      String(statement).startsWith("UPDATE edie_sessions"),
+    );
+    expect(update?.[0]).toContain("image_embeds_enabled=$14");
+    expect(update?.[1]?.[13]).toBe(false);
   });
 });
 

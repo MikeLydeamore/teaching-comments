@@ -13,6 +13,7 @@ import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type {
   SubmissionDto,
   SubmissionViewSettings,
@@ -28,6 +29,7 @@ type SubmissionsPopoutProps = {
 };
 
 type SubmissionView = {
+  imageEmbedsEnabled: boolean;
   promptOptions: Array<{ id: string; prompt: string }>;
   promptText: string;
   submissions: SubmissionDto[];
@@ -71,7 +73,7 @@ export function SubmissionsPopout({
   const [showStudentQr, setShowStudentQr] = useState(false);
   const [studentShareUrl, setStudentShareUrl] = useState("");
   const savingSettingsRef = useRef(false);
-  const { promptOptions, promptText, submissions, viewSettings } = view;
+  const { imageEmbedsEnabled, promptOptions, promptText, submissions, viewSettings } = view;
   const { minutes, promptHistoryId, starredOnly } = viewSettings;
 
   const refresh = useCallback(async (signal: AbortSignal) => {
@@ -318,9 +320,12 @@ export function SubmissionsPopout({
               </div>
 
               {submission.text ? (
-                <p className="whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-xl leading-8 text-slate-950">
-                  <InlineCodeText>{submission.text}</InlineCodeText>
-                </p>
+                <SubmissionMarkdown
+                  className="rounded-md border border-slate-200 bg-slate-50 p-4 text-xl leading-8 text-slate-950"
+                  imageEmbedsEnabled={imageEmbedsEnabled}
+                >
+                  {submission.text}
+                </SubmissionMarkdown>
               ) : !submission.drawingData && !submission.gifData && !submission.image ? (
                 <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-600">
                   Media-only response

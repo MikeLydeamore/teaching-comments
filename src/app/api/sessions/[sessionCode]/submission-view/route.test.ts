@@ -47,7 +47,11 @@ describe("submission view route", () => {
   });
 
   it("returns the canonical view with the requested hidden policy", async () => {
-    payloadMock.mockResolvedValue({ submissions: [], viewSettings: {} });
+    payloadMock.mockResolvedValue({
+      imageEmbedsEnabled: false,
+      submissions: [],
+      viewSettings: {},
+    });
 
     const response = await GET(
       new Request(
@@ -58,6 +62,9 @@ describe("submission view route", () => {
 
     expect(response.status).toBe(200);
     expect(payloadMock).toHaveBeenCalledWith(session, true);
+    await expect(response.json()).resolves.toMatchObject({
+      imageEmbedsEnabled: false,
+    });
   });
 
   it("updates a validated partial setting", async () => {

@@ -140,6 +140,7 @@ function sessionFromRow(row: Row): Session {
     gifInputEnabled: bool(row, "gif_input_enabled", true),
     drawingInputEnabled: bool(row, "drawing_input_enabled", true),
     imageInputEnabled: bool(row, "image_input_enabled", true),
+    imageEmbedsEnabled: bool(row, "image_embeds_enabled", true),
     createdAt: text(row, "created_at"),
     promptUpdatedAt: text(row, "prompt_updated_at") || text(row, "created_at"),
     timerDurationSeconds: number(row, "timer_duration_seconds"),
@@ -197,7 +198,7 @@ function pollFromRow(row: Row): SessionPoll {
   };
 }
 
-const SESSION_COLUMNS = "id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at";
+const SESSION_COLUMNS = "id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, image_embeds_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at";
 const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, gif_data, image_data, status, starred, flagged, version, archived_at, created_at, updated_at";
 const GROUP_QUESTION_COLUMNS = "id, session_code, student_name, text, is_answered, is_visible, archived_at, created_at, updated_at";
 const POLL_QUESTION_COLUMNS = "id, session_code, title, question, selection_mode, options, correct_option_indexes, created_at, updated_at";
@@ -278,8 +279,8 @@ export const neonStore: EdieStore = {
     if (!space.length) return null;
     const timestamp = now(); const id = randomUUID();
     const rows = await query(
-      `INSERT INTO edie_sessions (id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at)
-       VALUES ($1,$2,$3,$4,$5,true,false,false,true,true,true,true,$6,$6,0,NULL)
+      `INSERT INTO edie_sessions (id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, image_embeds_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at)
+       VALUES ($1,$2,$3,$4,$5,true,false,false,true,true,true,true,true,$6,$6,0,NULL)
        ON CONFLICT (space_code, code) DO UPDATE SET code = EXCLUDED.code RETURNING ${SESSION_COLUMNS}`,
       [id, codeNormalized, spaceCodeNormalized, titleFromCode(codeNormalized) || "Ed.ie Session", DEFAULT_PROMPT, timestamp],
     );
@@ -295,8 +296,8 @@ export const neonStore: EdieStore = {
     const current = sessionFromRow(row); const next = applySessionPatch(current, patch); const changed = current.prompt !== next.prompt;
     if (changed) await ensurePromptHistory(current);
     const rows = await query(
-      `UPDATE edie_sessions SET title=$2,prompt=$3,prompt_updated_at=$4,timer_duration_seconds=$5,timer_ends_at=$6,is_open=$7,group_questions_screening_enabled=$8,submissions_screening_enabled=$9,text_input_enabled=$10,gif_input_enabled=$11,drawing_input_enabled=$12,image_input_enabled=$13 WHERE id=$1 RETURNING ${SESSION_COLUMNS}`,
-      [current.id,next.title,next.prompt,next.promptUpdatedAt,next.timerDurationSeconds,next.timerEndsAt,next.isOpen,next.groupQuestionsScreeningEnabled,next.submissionsScreeningEnabled,next.textInputEnabled,next.gifInputEnabled,next.drawingInputEnabled,next.imageInputEnabled],
+      `UPDATE edie_sessions SET title=$2,prompt=$3,prompt_updated_at=$4,timer_duration_seconds=$5,timer_ends_at=$6,is_open=$7,group_questions_screening_enabled=$8,submissions_screening_enabled=$9,text_input_enabled=$10,gif_input_enabled=$11,drawing_input_enabled=$12,image_input_enabled=$13,image_embeds_enabled=$14 WHERE id=$1 RETURNING ${SESSION_COLUMNS}`,
+      [current.id,next.title,next.prompt,next.promptUpdatedAt,next.timerDurationSeconds,next.timerEndsAt,next.isOpen,next.groupQuestionsScreeningEnabled,next.submissionsScreeningEnabled,next.textInputEnabled,next.gifInputEnabled,next.drawingInputEnabled,next.imageInputEnabled,next.imageEmbedsEnabled],
     );
     if (changed) {
       await query(

@@ -60,6 +60,7 @@ export async function GET(
       gifInputEnabled: session.gifInputEnabled,
       drawingInputEnabled: session.drawingInputEnabled,
       imageInputEnabled: session.imageInputEnabled,
+      imageEmbedsEnabled: session.imageEmbedsEnabled,
       timerDurationSeconds: session.timerDurationSeconds,
       timerEndsAt: session.timerEndsAt,
     },

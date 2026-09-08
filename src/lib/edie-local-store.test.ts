@@ -142,3 +142,25 @@ describe("local submission view settings", () => {
     ).rejects.toThrow("Prompt filter does not belong to this session.");
   });
 });
+
+describe("local session image embeds", () => {
+  it("defaults legacy sessions on and persists updates", async () => {
+    await localStore.getSession("demo-lecture");
+    const legacy = JSON.parse(memory.value ?? "{}") as {
+      sessions: Array<Record<string, unknown>>;
+    };
+    delete legacy.sessions[0].imageEmbedsEnabled;
+    memory.value = JSON.stringify(legacy);
+
+    await expect(localStore.getSession("demo-lecture")).resolves.toMatchObject({
+      imageEmbedsEnabled: true,
+    });
+    await localStore.updateSession("demo-lecture", {
+      imageEmbedsEnabled: false,
+    });
+    await expect(localStore.getSession("demo-lecture")).resolves.toMatchObject({
+      imageEmbedsEnabled: false,
+      imageInputEnabled: true,
+    });
+  });
+});

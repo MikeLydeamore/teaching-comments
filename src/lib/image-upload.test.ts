@@ -106,7 +106,7 @@ it("applies and enforces per-input session controls", () => {
   const session: Session = {
     id: sessionId, code: sessionId, spaceCode: "default", title: "Test", prompt: "A valid prompt.", isOpen: true,
     groupQuestionsScreeningEnabled: false, submissionsScreeningEnabled: false,
-    textInputEnabled: true, gifInputEnabled: true, drawingInputEnabled: true, imageInputEnabled: true,
+    textInputEnabled: true, gifInputEnabled: true, drawingInputEnabled: true, imageInputEnabled: true, imageEmbedsEnabled: true,
     createdAt: "2026-01-01T00:00:00.000Z", promptUpdatedAt: "2026-01-01T00:00:00.000Z", timerDurationSeconds: 0, timerEndsAt: null,
   };
   const disabledText = applySessionPatch(session, { textInputEnabled: false });
