@@ -321,7 +321,7 @@ function TeacherDashboardContent({
   const [isLoading, setIsLoading] = useState(true);
   const [refreshError, setRefreshError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [showLiveControls, setShowLiveControls] = useState(false);
+  const [isRoomControlsOpen, setIsRoomControlsOpen] = useState(false);
   const [showResultsChart, setShowResultsChart] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("column");
   const [timerDraftSeconds, setTimerDraftSeconds] = useState(30);
@@ -350,7 +350,63 @@ function TeacherDashboardContent({
   const [isUnarchiving, setIsUnarchiving] = useState(false);
   const [questionsPanelKey, setQuestionsPanelKey] = useState(0);
   const [pendingOps, setPendingOps] = useState<string[]>([]);
+  const roomControlsDrawerRef = useRef<HTMLElement>(null);
+  const roomControlsTriggerRef = useRef<HTMLButtonElement>(null);
+  const roomControlsCloseRef = useRef<HTMLButtonElement>(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (!isRoomControlsOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const triggerElement = roomControlsTriggerRef.current;
+    document.body.style.overflow = "hidden";
+    roomControlsCloseRef.current?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsRoomControlsOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        roomControlsDrawerRef.current?.querySelectorAll<HTMLElement>(
+          "a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ) ?? [],
+      ).filter((element) => !element.hasAttribute("hidden"));
+
+      if (!focusableElements.length) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      triggerElement?.focus();
+    };
+  }, [isRoomControlsOpen]);
 
   const beginOp = useCallback((key: string) => {
     setPendingOps((currentOps) =>
@@ -1362,96 +1418,6 @@ function TeacherDashboardContent({
         <aside className="space-y-5">
           <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-500">Prompt</p>
-              <p className="text-xs text-slate-500">Shown to students</p>
-            </div>
-            <label className="mt-3 block text-sm font-medium text-slate-700" htmlFor="question-bank">
-              Question bank
-            </label>
-            <div className="mt-2 flex items-center gap-2">
-              <select
-                className="h-10 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="question-bank"
-                value={selectedQuestionId}
-                onChange={(event) => selectQuestionFromBank(event.target.value)}
-              >
-                <option value="">
-                  {questionBank.length ? "Select a saved question" : "No saved questions"}
-                </option>
-                {questionBank.map((question) => (
-                  <option key={question.id} value={question.id}>
-                    {question.title}
-                  </option>
-                ))}
-              </select>
-              <PendingActionButton
-                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!selectedQuestion}
-                pending={isPending("delete-question")}
-                onClick={() => {
-                  void deleteSelectedQuestionFromBank();
-                }}
-              >
-                Delete
-              </PendingActionButton>
-            </div>
-            <label className="sr-only" htmlFor="prompt">
-              Session prompt
-            </label>
-            <textarea
-              id="prompt"
-              className="mt-3 min-h-32 w-full resize-y rounded-md border border-slate-300 p-3 text-sm leading-6 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-              maxLength={1200}
-              value={promptDraft}
-              onChange={(event) => {
-                const nextPromptDraft = event.target.value;
-                setPromptDraft(nextPromptDraft);
-                if (
-                  selectedQuestion &&
-                  nextPromptDraft.trim() !== selectedQuestion.text
-                ) {
-                  setSelectedQuestionId("");
-                }
-                setQuestionBankStatus("");
-                setPromptStatus("");
-              }}
-            />
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">
-                {promptDraft.length}/1200
-              </p>
-              <div className="flex gap-2">
-                <button
-                  className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!canAddPromptToBank}
-                  type="button"
-                  onClick={openQuestionTitleDialog}
-                >
-                  Add to bank
-                </button>
-                <PendingActionButton
-                  className="h-9 rounded-md bg-slate-900 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={promptDraft.trim() === sessionDetails.prompt}
-                  pending={isPending("save-prompt")}
-                  pendingChildren="Saving..."
-                  onClick={savePrompt}
-                >
-                  Show
-                </PendingActionButton>
-              </div>
-            </div>
-            {questionBankStatus ? (
-              <p className="mt-3 text-sm font-medium text-slate-600">
-                {questionBankStatus}
-              </p>
-            ) : null}
-            {promptStatus ? (
-              <p className="mt-3 text-sm font-medium text-slate-600">{promptStatus}</p>
-            ) : null}
-          </section>
-
-          <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-slate-500">Timer</p>
               <p className="text-xs text-slate-500">Shown to students</p>
             </div>
@@ -1605,43 +1571,195 @@ function TeacherDashboardContent({
             </div>
           </div>
 
-          <section className="mb-4 rounded-md border border-slate-200 bg-white shadow-sm">
-            <button
-              aria-controls="teacher-room-controls"
-              aria-expanded={showLiveControls}
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50"
-              type="button"
-              onClick={() => setShowLiveControls((isShown) => !isShown)}
-            >
+          <section className="mb-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-950">
+                <h3 className="text-xl font-semibold text-slate-950">Prompt</h3>
+                <p className="mt-1 text-sm text-slate-500">Shown to students</p>
+              </div>
+              <p className="text-xs font-medium text-slate-500">
+                {promptDraft.length}/1200
+              </p>
+            </div>
+            <label
+              className="mt-5 block text-sm font-medium text-slate-700"
+              htmlFor="question-bank"
+            >
+              Question bank
+            </label>
+            <div className="mt-2 flex flex-wrap items-center gap-2 sm:flex-nowrap">
+              <select
+                className="h-10 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                id="question-bank"
+                value={selectedQuestionId}
+                onChange={(event) => selectQuestionFromBank(event.target.value)}
+              >
+                <option value="">
+                  {questionBank.length
+                    ? "Select a saved question"
+                    : "No saved questions"}
+                </option>
+                {questionBank.map((question) => (
+                  <option key={question.id} value={question.id}>
+                    {question.title}
+                  </option>
+                ))}
+              </select>
+              <PendingActionButton
+                className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!selectedQuestion}
+                pending={isPending("delete-question")}
+                onClick={() => {
+                  void deleteSelectedQuestionFromBank();
+                }}
+              >
+                Delete
+              </PendingActionButton>
+            </div>
+            <label className="sr-only" htmlFor="prompt">
+              Session prompt
+            </label>
+            <textarea
+              id="prompt"
+              className="mt-4 min-h-44 w-full resize-y rounded-md border border-slate-300 p-4 text-base leading-7 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              maxLength={1200}
+              value={promptDraft}
+              onChange={(event) => {
+                const nextPromptDraft = event.target.value;
+                setPromptDraft(nextPromptDraft);
+                if (
+                  selectedQuestion &&
+                  nextPromptDraft.trim() !== selectedQuestion.text
+                ) {
+                  setSelectedQuestionId("");
+                }
+                setQuestionBankStatus("");
+                setPromptStatus("");
+              }}
+            />
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              <button
+                className="h-10 rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canAddPromptToBank}
+                type="button"
+                onClick={openQuestionTitleDialog}
+              >
+                Add to bank
+              </button>
+              <PendingActionButton
+                className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={promptDraft.trim() === sessionDetails.prompt}
+                pending={isPending("save-prompt")}
+                pendingChildren="Saving..."
+                onClick={savePrompt}
+              >
+                Show
+              </PendingActionButton>
+            </div>
+            {questionBankStatus ? (
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                {questionBankStatus}
+              </p>
+            ) : null}
+            {promptStatus ? (
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                {promptStatus}
+              </p>
+            ) : null}
+          </section>
+
+          <button
+            aria-controls="teacher-room-controls"
+            aria-expanded={isRoomControlsOpen}
+            aria-label={
+              isRoomControlsOpen ? "Close room controls" : "Open room controls"
+            }
+            className={`fixed top-1/2 z-[80] flex -translate-y-1/2 items-center gap-2 rounded-l-md border border-r-0 border-slate-300 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-lg transition-[right,opacity,background-color,color] duration-200 hover:bg-teal-50 hover:text-teal-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 motion-reduce:transition-none ${
+              isRoomControlsOpen
+                ? "pointer-events-none right-0 opacity-0 sm:pointer-events-auto sm:right-[28rem] sm:opacity-100"
+                : "right-0"
+            }`}
+            ref={roomControlsTriggerRef}
+            type="button"
+            onClick={() => setIsRoomControlsOpen((isOpen) => !isOpen)}
+          >
+            <svg
+              aria-hidden="true"
+              className={`size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${
+                isRoomControlsOpen ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span className="[writing-mode:vertical-rl]">Room controls</span>
+          </button>
+
+          <div
+            aria-hidden="true"
+            className={`fixed inset-0 z-[60] bg-slate-950/40 transition-opacity duration-200 motion-reduce:transition-none ${
+              isRoomControlsOpen
+                ? "opacity-100"
+                : "pointer-events-none opacity-0"
+            }`}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setIsRoomControlsOpen(false);
+              }
+            }}
+          />
+
+          <aside
+            aria-hidden={!isRoomControlsOpen}
+            aria-labelledby="teacher-room-controls-title"
+            aria-modal={isRoomControlsOpen ? "true" : undefined}
+            className={`fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-200 motion-reduce:transition-none ${
+              isRoomControlsOpen ? "translate-x-0" : "translate-x-full"
+            }`}
+            id="teacher-room-controls"
+            inert={!isRoomControlsOpen}
+            ref={roomControlsDrawerRef}
+            role="dialog"
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
+              <div>
+                <h2
+                  className="text-xl font-semibold text-slate-950"
+                  id="teacher-room-controls-title"
+                >
                   Room controls
-                </p>
+                </h2>
                 <p className="mt-1 text-xs text-slate-500">
                   {refreshStatus(lastRefresh)}
                 </p>
               </div>
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                {showLiveControls ? "Hide" : "Show"}
+              <button
+                aria-label="Close room controls"
+                className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-700 transition hover:border-teal-500 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+                ref={roomControlsCloseRef}
+                type="button"
+                onClick={() => setIsRoomControlsOpen(false)}
+              >
                 <svg
                   aria-hidden="true"
-                  className={`size-4 transition ${
-                    showLiveControls ? "rotate-180" : ""
-                  }`}
+                  className="size-5"
                   fill="none"
                   stroke="currentColor"
                   strokeLinecap="round"
-                  strokeLinejoin="round"
                   strokeWidth="2"
                   viewBox="0 0 24 24"
                 >
-                  <path d="m6 9 6 6 6-6" />
+                  <path d="M6 6l12 12M18 6 6 18" />
                 </svg>
-              </span>
-            </button>
-            {showLiveControls ? (
-              <div className="border-t border-slate-200" id="teacher-room-controls">
-                <div className="grid divide-y divide-slate-200 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-3">
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="divide-y divide-slate-200">
                   <section className="p-4">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Display &amp; filters</h3>
@@ -1782,9 +1900,7 @@ function TeacherDashboardContent({
                     </button>
                   </div>
                 </footer>
-              </div>
-            ) : null}
-            {showLiveControls && archiveStatus ? (
+            {archiveStatus ? (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
                 <p className="text-sm font-medium text-slate-600">
                   {archiveStatus}
@@ -1803,7 +1919,8 @@ function TeacherDashboardContent({
                 ) : null}
               </div>
             ) : null}
-          </section>
+            </div>
+          </aside>
 
           <div className="mb-4">
             <GroupQuestionsPanel
