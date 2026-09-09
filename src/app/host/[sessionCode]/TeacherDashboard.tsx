@@ -1588,23 +1588,37 @@ function TeacherDashboardContent({
               Question bank
             </label>
             <div className="mt-2 flex flex-wrap items-center gap-2 sm:flex-nowrap">
-              <select
-                className="h-10 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                id="question-bank"
-                value={selectedQuestionId}
-                onChange={(event) => selectQuestionFromBank(event.target.value)}
-              >
-                <option value="">
-                  {questionBank.length
-                    ? "Select a saved question"
-                    : "No saved questions"}
-                </option>
-                {questionBank.map((question) => (
-                  <option key={question.id} value={question.id}>
-                    {question.title}
+              <div className="relative min-w-0 flex-1">
+                <select
+                  className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white py-0 pl-3 pr-12 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                  id="question-bank"
+                  value={selectedQuestionId}
+                  onChange={(event) => selectQuestionFromBank(event.target.value)}
+                >
+                  <option value="">
+                    {questionBank.length
+                      ? "Select a saved question"
+                      : "No saved questions"}
                   </option>
-                ))}
-              </select>
+                  {questionBank.map((question) => (
+                    <option key={question.id} value={question.id}>
+                      {question.title}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
               <PendingActionButton
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!selectedQuestion}
