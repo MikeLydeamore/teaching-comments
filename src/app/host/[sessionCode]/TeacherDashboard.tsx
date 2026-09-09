@@ -1782,21 +1782,75 @@ function TeacherDashboardContent({
                     <div className="mt-4 space-y-3">
                       <label className="block text-sm font-medium text-slate-700" htmlFor="prompt-history-filter">
                         Prompt
-                        <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60" disabled={isUpdatingSubmissionView} id="prompt-history-filter" value={selectedPromptHistoryId} onChange={(event) => void updateSubmissionView({ promptHistoryId: event.target.value || null })}>
-                          <option value="">All prompts</option>
-                          {promptHistory.map((item) => <option key={item.id} value={item.id}>{promptHistoryOptionLabel(item)}</option>)}
-                        </select>
+                        <span className="relative mt-1.5 block">
+                          <select
+                            className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white py-0 pl-3 pr-12 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+                            disabled={isUpdatingSubmissionView}
+                            id="prompt-history-filter"
+                            value={selectedPromptHistoryId}
+                            onChange={(event) =>
+                              void updateSubmissionView({
+                                promptHistoryId: event.target.value || null,
+                              })
+                            }
+                          >
+                            <option value="">All prompts</option>
+                            {promptHistory.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {promptHistoryOptionLabel(item)}
+                              </option>
+                            ))}
+                          </select>
+                          <svg
+                            aria-hidden="true"
+                            className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-600"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </span>
                       </label>
                       <div className="flex items-end gap-2">
                         <label className="min-w-0 flex-1 text-sm font-medium text-slate-700" htmlFor="minutes">
                           Time range
-                          <select className="mt-1.5 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60" disabled={isUpdatingSubmissionView} id="minutes" value={minutes} onChange={(event) => void updateSubmissionView({ minutes: Number(event.target.value) as SubmissionViewMinutes })}>
-                            <option value={1}>Last minute</option>
-                            <option value={3}>Last 3 minutes</option>
-                            <option value={5}>Last 5 minutes</option>
-                            <option value={10}>Last 10 minutes</option>
-                            <option value={0}>All time</option>
-                          </select>
+                          <span className="relative mt-1.5 block">
+                            <select
+                              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white py-0 pl-3 pr-12 text-sm text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+                              disabled={isUpdatingSubmissionView}
+                              id="minutes"
+                              value={minutes}
+                              onChange={(event) =>
+                                void updateSubmissionView({
+                                  minutes: Number(
+                                    event.target.value,
+                                  ) as SubmissionViewMinutes,
+                                })
+                              }
+                            >
+                              <option value={1}>Last minute</option>
+                              <option value={3}>Last 3 minutes</option>
+                              <option value={5}>Last 5 minutes</option>
+                              <option value={10}>Last 10 minutes</option>
+                              <option value={0}>All time</option>
+                            </select>
+                            <svg
+                              aria-hidden="true"
+                              className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-slate-600"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="m6 9 6 6 6-6" />
+                            </svg>
+                          </span>
                         </label>
                         <button aria-label="Refresh responses" className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-800" type="button" onClick={() => void refresh()}>
                           <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4" /></svg>
