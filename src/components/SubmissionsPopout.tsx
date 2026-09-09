@@ -10,7 +10,6 @@ import {
 } from "react";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
-import { InlineCodeText } from "@/components/InlineCodeText";
 import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
@@ -268,9 +267,12 @@ export function SubmissionsPopout({
                 ))}
               </div>
             </details>
-            <p className="mt-3 max-h-40 overflow-y-auto break-words pr-2 text-xl font-medium leading-8 text-slate-900">
-              <InlineCodeText>{promptText}</InlineCodeText>
-            </p>
+            <SubmissionMarkdown
+              className="mt-3 max-h-40 overflow-y-auto break-words pr-2 text-xl font-medium leading-8 text-slate-900"
+              imageEmbedsEnabled={imageEmbedsEnabled}
+            >
+              {promptText}
+            </SubmissionMarkdown>
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">

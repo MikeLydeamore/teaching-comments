@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { InlineCodeText } from "@/components/InlineCodeText";
 import { ResponseTimePlot } from "@/components/ResponseTimePlot";
 import { ResultsChart, type ChartType } from "@/components/ResultsChart";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import {
   getOrCreateSession,
@@ -104,9 +104,12 @@ export default async function TeacherResultsPage({
             {selectedPromptHistory ? ", filtered by prompt" : ""}
           </p>
           {selectedPromptHistory ? (
-            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600">
-              <InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText>
-            </p>
+            <SubmissionMarkdown
+              className="mt-3 max-w-3xl text-base leading-7 text-slate-600"
+              imageEmbedsEnabled={session.imageEmbedsEnabled}
+            >
+              {selectedPromptHistory.prompt}
+            </SubmissionMarkdown>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
