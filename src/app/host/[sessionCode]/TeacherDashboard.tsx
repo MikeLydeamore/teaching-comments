@@ -36,6 +36,7 @@ import type {
   SubmissionViewSettings,
   SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
+import { runViewTransition } from "@/lib/view-transition";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -314,6 +315,12 @@ function TeacherDashboardContent({
   );
   const [submissionSortOrder, setSubmissionSortOrder] =
     useState<SubmissionSortOrder>(initialSubmissionViewSettings.sortOrder);
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(
+    initialSubmissionViewSettings.expandedSubmissionId,
+  );
+  const expandedSubmissionIdRef = useRef(
+    initialSubmissionViewSettings.expandedSubmissionId,
+  );
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [orderedSubmissionIds, setOrderedSubmissionIds] = useState<string[]>([]);
   const [draggedSubmissionId, setDraggedSubmissionId] = useState<string | null>(null);
@@ -351,6 +358,15 @@ function TeacherDashboardContent({
   const [questionsPanelKey, setQuestionsPanelKey] = useState(0);
   const [pendingOps, setPendingOps] = useState<string[]>([]);
   const toast = useToast();
+
+  const applyExpandedSubmissionId = useCallback((nextId: string | null) => {
+    if (expandedSubmissionIdRef.current === nextId) {
+      return;
+    }
+
+    expandedSubmissionIdRef.current = nextId;
+    runViewTransition(() => setExpandedSubmissionId(nextId));
+  }, []);
 
   const beginOp = useCallback((key: string) => {
     setPendingOps((currentOps) =>
@@ -506,6 +522,7 @@ function TeacherDashboardContent({
           setPromptHistory(submissionsPayload.promptHistory);
         }
         setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
+        applyExpandedSubmissionId(nextViewSettings.expandedSubmissionId);
         setSubmissionSortOrder(nextViewSettings.sortOrder);
         setSubmissions(nextSubmissions);
         setOrderedSubmissionIds((currentOrder) =>
@@ -532,6 +549,7 @@ function TeacherDashboardContent({
     setLastRefresh(new Date());
     setIsLoading(false);
   }, [
+    applyExpandedSubmissionId,
     applyRefreshedSession,
     initialStats,
     session.id,
@@ -1000,6 +1018,9 @@ function TeacherDashboardContent({
         submissionIdsForOrder(submissions, patch.sortOrder),
       );
     }
+    if ("expandedSubmissionId" in patch) {
+      applyExpandedSubmissionId(patch.expandedSubmissionId ?? null);
+    }
     try {
       const response = await fetch(
         `/api/sessions/${session.id}/submission-view`,
@@ -1021,6 +1042,7 @@ function TeacherDashboardContent({
         submissionViewRevisionRef.current = nextViewSettings.revision;
         setMinutes(nextViewSettings.minutes);
         setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
+        applyExpandedSubmissionId(nextViewSettings.expandedSubmissionId);
         setSubmissionSortOrder(nextViewSettings.sortOrder);
         setSubmissionViewStatus("Display settings synced.");
       }
@@ -1038,6 +1060,13 @@ function TeacherDashboardContent({
 
   function changeSubmissionSortOrder(nextSortOrder: SubmissionSortOrder) {
     void updateSubmissionView({ sortOrder: nextSortOrder });
+  }
+
+  function toggleExpandedSubmission(submissionId: string) {
+    void updateSubmissionView({
+      expandedSubmissionId:
+        expandedSubmissionId === submissionId ? null : submissionId,
+    });
   }
 
   async function saveEditedSubmission(id: string) {
@@ -1882,9 +1911,14 @@ function TeacherDashboardContent({
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {displayedSubmissions.map((submission) => (
                 <div
-                  className="cursor-grab active:cursor-grabbing"
+                  className={`cursor-grab active:cursor-grabbing ${
+                    expandedSubmissionId === submission.id
+                      ? "md:col-span-2 xl:col-span-3"
+                      : ""
+                  }`}
                   draggable
                   key={submission.id}
+                  style={{ viewTransitionName: `submission-${submission.id}` }}
                   title="Drag the card edge to reorder"
                   onDragEnd={() => setDraggedSubmissionId(null)}
                   onDragOver={(event) => {
@@ -1939,10 +1973,23 @@ function TeacherDashboardContent({
                           : "border-slate-300"
                     }`}
                   >
-                    <div className="mb-3">
+                    <div className="mb-3 flex items-start justify-between gap-3">
                       <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
                         {minutesAgo(submission.createdAt)}
                       </p>
+                      <button
+                        aria-label={`${expandedSubmissionId === submission.id ? "Collapse" : "Expand"} response from ${submission.studentName || "Anonymous"}`}
+                        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold leading-none text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+                        data-no-card-drag="true"
+                        disabled={isUpdatingSubmissionView}
+                        title={expandedSubmissionId === submission.id ? "Collapse response" : "Expand response"}
+                        type="button"
+                        onClick={() => toggleExpandedSubmission(submission.id)}
+                      >
+                        <span aria-hidden="true">
+                          {expandedSubmissionId === submission.id ? "−" : "+"}
+                        </span>
+                      </button>
                     </div>
                   {editingSubmissionId === submission.id ? (
                     <div data-no-card-drag="true">
@@ -2026,7 +2073,14 @@ function TeacherDashboardContent({
                   ) : null}
                   {submission.gifData ? (
                     <div className="cursor-auto" data-no-card-drag="true">
-                      <GifPreview gifData={submission.gifData} />
+                      <GifPreview
+                        gifData={submission.gifData}
+                        imageClassName={
+                          expandedSubmissionId === submission.id
+                            ? "max-h-[40rem]"
+                            : undefined
+                        }
+                      />
                     </div>
                   ) : null}
                   {submission.drawingData ? (
@@ -2036,6 +2090,11 @@ function TeacherDashboardContent({
                   ) : null}
                   {submission.image ? (
                     <SubmissionImagePreview
+                      className={
+                        expandedSubmissionId === submission.id
+                          ? "max-h-[40rem] w-full rounded-md border border-slate-200 object-contain"
+                          : undefined
+                      }
                       key={submission.image.url}
                       url={submission.image.url}
                     />

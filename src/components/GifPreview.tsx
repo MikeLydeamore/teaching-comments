@@ -4,12 +4,14 @@ import type { GifData } from "@/lib/edie-store";
 
 type GifPreviewProps = {
   gifData: GifData;
+  imageClassName?: string;
   onRemove?: () => void;
   variant?: "student" | "teacher";
 };
 
 export function GifPreview({
   gifData,
+  imageClassName = "max-h-64",
   onRemove,
   variant = "teacher",
 }: GifPreviewProps) {
@@ -26,7 +28,7 @@ export function GifPreview({
       >
         <img
           alt={altText}
-          className="mx-auto block max-h-64 w-full object-contain"
+          className={`mx-auto block w-full object-contain ${imageClassName}`}
           decoding="async"
           height={gifData.height}
           loading="lazy"

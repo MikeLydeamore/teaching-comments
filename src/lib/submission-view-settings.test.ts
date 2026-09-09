@@ -14,6 +14,7 @@ describe("submission view settings", () => {
     ).toEqual({
       sessionCode: "session-1",
       promptHistoryId: null,
+      expandedSubmissionId: null,
       minutes: 3,
       sortOrder: "newest",
       revision: 0,

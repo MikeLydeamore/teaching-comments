@@ -2,6 +2,7 @@ import {
   archiveSessionActivity,
   getSessionStats,
   unarchiveSessionActivity,
+  updateSubmissionViewSettings,
 } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
@@ -23,6 +24,9 @@ export async function POST(
   }
 
   const stats = await getSessionStats(sessionCode);
+  await updateSubmissionViewSettings(sessionCode, {
+    expandedSubmissionId: null,
+  });
   return Response.json({ archive: result, stats });
 }
 

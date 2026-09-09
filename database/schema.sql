@@ -56,6 +56,7 @@ create table if not exists edie_prompt_history (
 create table if not exists edie_submission_view_settings (
   session_code text primary key references edie_sessions(id) on delete cascade,
   prompt_history_id uuid references edie_prompt_history(id) on delete set null,
+  expanded_submission_id uuid references edie_submissions(id) on delete set null,
   minutes integer not null default 3 check (minutes in (0,1,3,5,10)),
   sort_order text not null default 'newest' check (sort_order in ('newest','oldest')),
   revision integer not null default 0 check (revision >= 0),

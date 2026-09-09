@@ -46,6 +46,7 @@ const pollRow = {
 const submissionViewSettingsRow = {
   session_code: "demo-lecture",
   prompt_history_id: null,
+  expanded_submission_id: null,
   minutes: 3,
   sort_order: "newest",
   revision: 2,
@@ -153,6 +154,7 @@ describe("Neon submission view settings", () => {
     ).resolves.toEqual({
       sessionCode: "demo-lecture",
       promptHistoryId: null,
+      expandedSubmissionId: null,
       minutes: 3,
       sortOrder: "newest",
       revision: 2,
@@ -165,10 +167,13 @@ describe("Neon submission view settings", () => {
       if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) {
         return [sessionRow];
       }
+      if (statement.startsWith("SELECT 1 FROM edie_submissions")) {
+        return [{ exists: 1 }];
+      }
       if (statement.startsWith("INSERT INTO edie_submission_view_settings")) {
         return [{
           ...submissionViewSettingsRow,
-          minutes: 10,
+          expanded_submission_id: "123e4567-e89b-42d3-a456-426614174000",
           revision: 3,
         }];
       }
@@ -176,14 +181,19 @@ describe("Neon submission view settings", () => {
     });
 
     await expect(
-      neonStore.updateSubmissionViewSettings("demo-lecture", { minutes: 10 }),
-    ).resolves.toMatchObject({ minutes: 10, revision: 3 });
+      neonStore.updateSubmissionViewSettings("demo-lecture", {
+        expandedSubmissionId: "123e4567-e89b-42d3-a456-426614174000",
+      }),
+    ).resolves.toMatchObject({
+      expandedSubmissionId: "123e4567-e89b-42d3-a456-426614174000",
+      revision: 3,
+    });
 
     const upsert = queryMock.mock.calls.find(([statement]) =>
       String(statement).startsWith("INSERT INTO edie_submission_view_settings"),
     );
     expect(upsert?.[0]).toContain("current_settings.revision + 1");
-    expect(upsert?.[1]?.slice(5)).toEqual([false, true, false]);
+    expect(upsert?.[1]?.slice(6)).toEqual([false, true, false, false]);
   });
 
   it("rejects a prompt filter from another session", async () => {

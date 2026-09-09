@@ -115,16 +115,26 @@ describe("local submission view settings", () => {
   });
 
   it("serializes partial updates without losing independent fields", async () => {
+    const [submission] = await localStore.listSubmissions("demo-lecture");
+
     await Promise.all([
       localStore.updateSubmissionViewSettings("demo-lecture", { minutes: 10 }),
       localStore.updateSubmissionViewSettings("demo-lecture", {
         sortOrder: "oldest",
       }),
+      localStore.updateSubmissionViewSettings("demo-lecture", {
+        expandedSubmissionId: submission.id,
+      }),
     ]);
 
     await expect(
       localStore.getSubmissionViewSettings("demo-lecture"),
-    ).resolves.toMatchObject({ minutes: 10, sortOrder: "oldest", revision: 2 });
+    ).resolves.toMatchObject({
+      expandedSubmissionId: submission.id,
+      minutes: 10,
+      sortOrder: "oldest",
+      revision: 3,
+    });
   });
 
   it("rejects a prompt filter from another session", async () => {
@@ -139,6 +149,20 @@ describe("local submission view settings", () => {
         promptHistoryId: prompt.id,
       }),
     ).rejects.toThrow("Prompt filter does not belong to this session.");
+  });
+
+  it("rejects an expanded submission from another session", async () => {
+    const [submission] = await localStore.listSubmissions("demo-lecture");
+    const otherSession = await localStore.getOrCreateSessionInSpace(
+      "default",
+      "other-room",
+    );
+
+    await expect(
+      localStore.updateSubmissionViewSettings(otherSession!.id, {
+        expandedSubmissionId: submission.id,
+      }),
+    ).rejects.toThrow("Expanded submission does not belong to this session.");
   });
 });
 

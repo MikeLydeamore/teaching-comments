@@ -268,6 +268,7 @@ async function readStore(): Promise<StoreData> {
       ({
         sessionCode,
         promptHistoryId,
+        expandedSubmissionId,
         minutes,
         sortOrder,
         revision,
@@ -275,6 +276,7 @@ async function readStore(): Promise<StoreData> {
       }) => ({
         sessionCode,
         promptHistoryId,
+        expandedSubmissionId: expandedSubmissionId ?? null,
         minutes,
         sortOrder,
         revision,
@@ -590,6 +592,17 @@ export const localStore: EdieStore = {
         )
       ) {
         throw new Error("Prompt filter does not belong to this session.");
+      }
+
+      if (
+        normalizedPatch.expandedSubmissionId &&
+        !data.submissions.some(
+          (item) =>
+            item.sessionCode === session.id &&
+            item.id === normalizedPatch.expandedSubmissionId,
+        )
+      ) {
+        throw new Error("Expanded submission does not belong to this session.");
       }
 
       const index = data.submissionViewSettings.findIndex(

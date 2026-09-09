@@ -68,6 +68,7 @@ describe("getSubmissionViewPayload", () => {
     getSubmissionViewSettingsMock.mockResolvedValue({
       sessionCode: session.id,
       promptHistoryId: "prompt-1",
+      expandedSubmissionId: null,
       minutes: 10,
       sortOrder: "oldest",
       revision: 4,

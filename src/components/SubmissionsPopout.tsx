@@ -17,8 +17,10 @@ import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type {
   SubmissionDto,
   SubmissionViewSettings,
+  SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
+import { runViewTransition } from "@/lib/view-transition";
 
 type SubmissionsPopoutProps = {
   dashboardUrl: string;
@@ -67,6 +69,7 @@ export function SubmissionsPopout({
   studentUrl,
 }: SubmissionsPopoutProps) {
   const [view, setView] = useState(initialView);
+  const viewRef = useRef(initialView);
   const hasHydrated = useHasHydrated();
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [settingsError, setSettingsError] = useState("");
@@ -75,6 +78,19 @@ export function SubmissionsPopout({
   const savingSettingsRef = useRef(false);
   const { imageEmbedsEnabled, promptOptions, promptText, submissions, viewSettings } = view;
   const { minutes, promptHistoryId } = viewSettings;
+
+  const applyView = useCallback((nextView: SubmissionView) => {
+    const expansionChanged =
+      viewRef.current.viewSettings.expandedSubmissionId !==
+      nextView.viewSettings.expandedSubmissionId;
+    viewRef.current = nextView;
+
+    if (expansionChanged) {
+      runViewTransition(() => setView(nextView));
+    } else {
+      setView(nextView);
+    }
+  }, []);
 
   const refresh = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(
@@ -94,14 +110,14 @@ export function SubmissionsPopout({
       return;
     }
 
-    setView((currentView) =>
-      payload.viewSettings.revision < currentView.viewSettings.revision
-        ? currentView
-        : payload,
-    );
+    if (payload.viewSettings.revision < viewRef.current.viewSettings.revision) {
+      return;
+    }
+
+    applyView(payload);
     setSettingsError("");
     setLastRefresh(new Date());
-  }, [sessionCode]);
+  }, [applyView, sessionCode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -141,10 +157,18 @@ export function SubmissionsPopout({
     };
   }, [refresh]);
 
-  async function selectPrompt(nextPromptHistoryId: string) {
+  async function updateViewSettings(
+    patch: SubmissionViewSettingsPatch,
+    errorMessage: string,
+  ) {
     if (savingSettingsRef.current) return;
     savingSettingsRef.current = true;
     setSettingsError("");
+
+    applyView({
+      ...viewRef.current,
+      viewSettings: { ...viewRef.current.viewSettings, ...patch },
+    });
 
     try {
       const response = await fetch(
@@ -152,30 +176,47 @@ export function SubmissionsPopout({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            promptHistoryId: nextPromptHistoryId || null,
-          }),
+          body: JSON.stringify(patch),
         },
       );
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setSettingsError(payload.error ?? "Could not change the prompt filter.");
+        setSettingsError(payload.error ?? errorMessage);
         return;
       }
 
-      setView((currentView) => ({
-        ...currentView,
+      applyView({
+        ...viewRef.current,
         viewSettings: payload.viewSettings,
-      }));
+      });
     } catch {
-      setSettingsError("Could not change the prompt filter.");
+      setSettingsError(errorMessage);
     } finally {
       savingSettingsRef.current = false;
     }
 
     const controller = new AbortController();
     await refresh(controller.signal).catch(() => {});
+  }
+
+  function selectPrompt(nextPromptHistoryId: string) {
+    void updateViewSettings(
+      { promptHistoryId: nextPromptHistoryId || null },
+      "Could not change the prompt filter.",
+    );
+  }
+
+  function toggleExpandedSubmission(submissionId: string) {
+    void updateViewSettings(
+      {
+        expandedSubmissionId:
+          viewSettings.expandedSubmissionId === submissionId
+            ? null
+            : submissionId,
+      },
+      "Could not change the expanded response.",
+    );
   }
 
   function toggleStudentQr() {
@@ -247,7 +288,7 @@ export function SubmissionsPopout({
                   className={`w-full rounded px-3 py-2 text-left text-sm font-medium transition hover:bg-teal-50 ${
                     !promptHistoryId ? "bg-teal-50 text-teal-900" : "text-slate-700"
                   }`}
-                  onClick={() => void selectPrompt("")}
+                  onClick={() => selectPrompt("")}
                   type="button"
                 >
                   All prompts
@@ -260,7 +301,7 @@ export function SubmissionsPopout({
                         : "text-slate-700"
                     }`}
                     key={prompt.id}
-                    onClick={() => void selectPrompt(prompt.id)}
+                    onClick={() => selectPrompt(prompt.id)}
                     type="button"
                   >
                     {prompt.prompt}
@@ -296,11 +337,16 @@ export function SubmissionsPopout({
           {submissions.map((submission) => (
             <article
               className={`rounded-md border bg-white p-5 shadow-sm ${
+                viewSettings.expandedSubmissionId === submission.id
+                  ? "md:col-span-2 xl:col-span-3"
+                  : ""
+              } ${
                 submission.status === "hidden"
                   ? "border-slate-200 opacity-60"
                   : "border-slate-300"
               }`}
               key={submission.id}
+              style={{ viewTransitionName: `submission-${submission.id}` }}
             >
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
@@ -311,11 +357,24 @@ export function SubmissionsPopout({
                     {responseTime(submission.createdAt, hasHydrated)}
                   </p>
                 </div>
-                {submission.status === "hidden" ? (
-                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Hidden
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {submission.status === "hidden" ? (
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Hidden
+                    </span>
+                  ) : null}
+                  <button
+                    aria-label={`${viewSettings.expandedSubmissionId === submission.id ? "Collapse" : "Expand"} response from ${submission.studentName || "Anonymous"}`}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold leading-none text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                    title={viewSettings.expandedSubmissionId === submission.id ? "Collapse response" : "Expand response"}
+                    type="button"
+                    onClick={() => toggleExpandedSubmission(submission.id)}
+                  >
+                    <span aria-hidden="true">
+                      {viewSettings.expandedSubmissionId === submission.id ? "−" : "+"}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {submission.text ? (
@@ -332,13 +391,25 @@ export function SubmissionsPopout({
               ) : null}
 
               {submission.gifData ? (
-                <GifPreview gifData={submission.gifData} />
+                <GifPreview
+                  gifData={submission.gifData}
+                  imageClassName={
+                    viewSettings.expandedSubmissionId === submission.id
+                      ? "max-h-[40rem]"
+                      : undefined
+                  }
+                />
               ) : null}
               {submission.drawingData ? (
                 <DrawingPreview drawingData={submission.drawingData} />
               ) : null}
               {submission.image ? (
                 <SubmissionImagePreview
+                  className={
+                    viewSettings.expandedSubmissionId === submission.id
+                      ? "max-h-[40rem] w-full rounded-md border border-slate-200 object-contain"
+                      : undefined
+                  }
                   key={submission.image.url}
                   url={submission.image.url}
                 />

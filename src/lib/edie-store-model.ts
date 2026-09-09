@@ -147,6 +147,7 @@ export type SubmissionViewMinutes = (typeof SUBMISSION_VIEW_MINUTES)[number];
 export type SubmissionViewSettings = {
   sessionCode: string;
   promptHistoryId: string | null;
+  expandedSubmissionId: string | null;
   minutes: SubmissionViewMinutes;
   sortOrder: "newest" | "oldest";
   revision: number;
@@ -156,7 +157,7 @@ export type SubmissionViewSettings = {
 export type SubmissionViewSettingsPatch = Partial<
   Pick<
     SubmissionViewSettings,
-    "promptHistoryId" | "minutes" | "sortOrder"
+    "promptHistoryId" | "expandedSubmissionId" | "minutes" | "sortOrder"
   >
 >;
 
@@ -167,6 +168,7 @@ export function defaultSubmissionViewSettings(
   return {
     sessionCode,
     promptHistoryId: null,
+    expandedSubmissionId: null,
     minutes: 3,
     sortOrder: "newest",
     revision: 0,
@@ -184,6 +186,7 @@ export function normalizeSubmissionViewSettingsPatch(
   const data = value as Record<string, unknown>;
   const allowedKeys = new Set([
     "promptHistoryId",
+    "expandedSubmissionId",
     "minutes",
     "sortOrder",
   ]);
@@ -205,6 +208,18 @@ export function normalizeSubmissionViewSettingsPatch(
       throw new Error("Prompt filter is invalid.");
     }
     patch.promptHistoryId = data.promptHistoryId as string | null;
+  }
+
+  if ("expandedSubmissionId" in data) {
+    if (
+      data.expandedSubmissionId !== null &&
+      (typeof data.expandedSubmissionId !== "string" ||
+        data.expandedSubmissionId.length < 1 ||
+        data.expandedSubmissionId.length > 200)
+    ) {
+      throw new Error("Expanded submission is invalid.");
+    }
+    patch.expandedSubmissionId = data.expandedSubmissionId as string | null;
   }
 
   if ("minutes" in data) {

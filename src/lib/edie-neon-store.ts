@@ -172,6 +172,7 @@ function submissionViewSettingsFromRow(row: Row): SubmissionViewSettings {
   return {
     sessionCode: text(row, "session_code"),
     promptHistoryId: nullableText(row, "prompt_history_id"),
+    expandedSubmissionId: nullableText(row, "expanded_submission_id"),
     minutes: number(row, "minutes", 3) as SubmissionViewSettings["minutes"],
     sortOrder: text(row, "sort_order") as SubmissionViewSettings["sortOrder"],
     revision: number(row, "revision"),
@@ -201,7 +202,7 @@ const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, 
 const GROUP_QUESTION_COLUMNS = "id, session_code, student_name, text, is_answered, is_visible, archived_at, created_at, updated_at";
 const POLL_QUESTION_COLUMNS = "id, session_code, title, question, selection_mode, options, correct_option_indexes, created_at, updated_at";
 const POLL_COLUMNS = "id, session_code, question, selection_mode, options, correct_option_ids, solution_revealed, status, duration_seconds, started_at, ends_at, ended_at, created_at, updated_at";
-const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, minutes, sort_order, revision, updated_at";
+const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, expanded_submission_id, minutes, sort_order, revision, updated_at";
 
 async function getSessionRow(code: string) {
   const normalized = normalizeSessionCode(code);
@@ -337,25 +338,38 @@ export const neonStore: EdieStore = {
       }
     }
 
+    if (normalizedPatch.expandedSubmissionId) {
+      const submissionRows = await query(
+        "SELECT 1 FROM edie_submissions WHERE session_code = $1 AND id = $2::uuid LIMIT 1",
+        [session.id, normalizedPatch.expandedSubmissionId],
+      );
+      if (!submissionRows.length) {
+        throw new Error("Expanded submission does not belong to this session.");
+      }
+    }
+
     const timestamp = now();
     const rows = await query(
       `INSERT INTO edie_submission_view_settings AS current_settings
-         (session_code, prompt_history_id, minutes, sort_order, revision, updated_at)
-       VALUES ($1, $2, $3, $4, 1, $5)
+         (session_code, prompt_history_id, expanded_submission_id, minutes, sort_order, revision, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 1, $6)
        ON CONFLICT (session_code) DO UPDATE SET
-         prompt_history_id = CASE WHEN $6 THEN EXCLUDED.prompt_history_id ELSE current_settings.prompt_history_id END,
-         minutes = CASE WHEN $7 THEN EXCLUDED.minutes ELSE current_settings.minutes END,
-         sort_order = CASE WHEN $8 THEN EXCLUDED.sort_order ELSE current_settings.sort_order END,
+         prompt_history_id = CASE WHEN $7 THEN EXCLUDED.prompt_history_id ELSE current_settings.prompt_history_id END,
+         expanded_submission_id = CASE WHEN $8 THEN EXCLUDED.expanded_submission_id ELSE current_settings.expanded_submission_id END,
+         minutes = CASE WHEN $9 THEN EXCLUDED.minutes ELSE current_settings.minutes END,
+         sort_order = CASE WHEN $10 THEN EXCLUDED.sort_order ELSE current_settings.sort_order END,
          revision = current_settings.revision + 1,
          updated_at = EXCLUDED.updated_at
        RETURNING ${SUBMISSION_VIEW_SETTINGS_COLUMNS}`,
       [
         session.id,
         normalizedPatch.promptHistoryId ?? null,
+        normalizedPatch.expandedSubmissionId ?? null,
         normalizedPatch.minutes ?? 3,
         normalizedPatch.sortOrder ?? "newest",
         timestamp,
         "promptHistoryId" in normalizedPatch,
+        "expandedSubmissionId" in normalizedPatch,
         "minutes" in normalizedPatch,
         "sortOrder" in normalizedPatch,
       ],
