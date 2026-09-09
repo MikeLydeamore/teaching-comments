@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { formatTimerSeconds } from "@/components/SessionTimer";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type { ParticipantPoll } from "@/lib/edie-store";
 
 type ParticipantPollOverlayProps = {
@@ -165,12 +166,14 @@ export function ParticipantPollOverlay({
           </div>
         </div>
 
-        <h2
+        <div
+          aria-level={2}
           className="mt-5 text-2xl font-semibold leading-8 text-slate-950"
           id="participant-poll-question"
+          role="heading"
         >
-          <InlineCodeText>{poll.question}</InlineCodeText>
-        </h2>
+          <SubmissionMarkdown>{poll.question}</SubmissionMarkdown>
+        </div>
 
         <div className="mt-5 space-y-3">
           {poll.options.map((option) => {

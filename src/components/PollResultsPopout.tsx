@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type { PollResults, SessionPoll } from "@/lib/edie-store";
 
 type PollResultsPopoutProps = {
@@ -121,9 +122,13 @@ export function PollResultsPopout({
       {poll && results ? (
         <section className="mx-auto mt-8 w-full max-w-6xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <h2 className="max-w-5xl text-3xl font-semibold leading-tight sm:text-5xl">
-              <InlineCodeText>{poll.question}</InlineCodeText>
-            </h2>
+            <div
+              aria-level={2}
+              className="max-w-5xl text-3xl font-semibold leading-tight sm:text-5xl"
+              role="heading"
+            >
+              <SubmissionMarkdown>{poll.question}</SubmissionMarkdown>
+            </div>
             <p className="shrink-0 rounded-md border border-slate-300 bg-white px-4 py-3 text-lg font-semibold tabular-nums text-slate-700">
               {results.responseCount} response
               {results.responseCount === 1 ? "" : "s"}

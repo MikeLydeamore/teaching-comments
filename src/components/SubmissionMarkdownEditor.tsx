@@ -34,12 +34,14 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), {
 type EditorMode = "write" | "preview";
 
 type SubmissionMarkdownEditorProps = {
+  ariaLabel?: string;
   disabled?: boolean;
   id: string;
-  imageEmbedsEnabled: boolean;
+  imageEmbedsEnabled?: boolean;
   maxLength: number;
   onChange: (value: string) => void;
-  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
   value: string;
 };
 
@@ -66,12 +68,14 @@ function createEditorCommands(
 }
 
 export function SubmissionMarkdownEditor({
+  ariaLabel = "Your writing",
   disabled = false,
   id,
-  imageEmbedsEnabled,
+  imageEmbedsEnabled = true,
   maxLength,
   onChange,
   onKeyDown,
+  placeholder = "Type your response here...",
   value,
 }: SubmissionMarkdownEditorProps) {
   const [mode, setMode] = useState<EditorMode>("write");
@@ -140,12 +144,12 @@ export function SubmissionMarkdownEditor({
             preview={mode === "write" ? "edit" : "preview"}
             ref={editorRef}
             textareaProps={{
-              "aria-label": "Your writing",
+              "aria-label": ariaLabel,
               disabled,
               id,
               maxLength,
               onKeyDown,
-              placeholder: "Type your response here...",
+              placeholder,
             }}
             value={value}
             visibleDragbar={false}

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { SessionTimer } from "@/components/SessionTimer";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
+import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import type {
   PollQuestionBankItem,
@@ -796,9 +798,13 @@ export function HostPollManager({
                               : "Multiple choice"}
                           </span>
                         </div>
-                        <h3 className="mt-3 text-xl font-semibold leading-7 text-slate-950">
-                          <InlineCodeText>{poll.question}</InlineCodeText>
-                        </h3>
+                        <div
+                          aria-level={3}
+                          className="mt-3 text-xl font-semibold leading-7 text-slate-950"
+                          role="heading"
+                        >
+                          <SubmissionMarkdown>{poll.question}</SubmissionMarkdown>
+                        </div>
                       </div>
                       {poll.status === "active" ? (
                         <SessionTimer timerEndsAt={poll.endsAt} />
@@ -1003,11 +1009,15 @@ export function HostPollManager({
                               ).toLocaleString()}
                             </time>
                           </div>
-                          <h3 className="mt-2 text-xl font-semibold leading-7 text-slate-950">
-                            <InlineCodeText>
+                          <div
+                            aria-level={3}
+                            className="mt-2 text-xl font-semibold leading-7 text-slate-950"
+                            role="heading"
+                          >
+                            <SubmissionMarkdown>
                               {selectedHistoryResults.poll.question}
-                            </InlineCodeText>
-                          </h3>
+                            </SubmissionMarkdown>
+                          </div>
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-2">
                           <button
@@ -1167,14 +1177,14 @@ export function HostPollManager({
                   <label className="block text-sm font-semibold text-slate-700" htmlFor="poll-question">
                     Question
                   </label>
-                  <textarea
-                    className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-300 p-3 text-base leading-6 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                  <SubmissionMarkdownEditor
+                    ariaLabel="Poll question"
                     id="poll-question"
                     maxLength={500}
                     placeholder="Ask the group..."
                     value={question}
-                    onChange={(event) => {
-                      setQuestion(event.target.value);
+                    onChange={(value) => {
+                      setQuestion(value);
                       setBankStatus("");
                       setStatus("");
                     }}
