@@ -40,7 +40,6 @@ export default async function TeacherResultsPage({
     includeHidden?: string;
     minutes?: string;
     promptHistoryId?: string;
-    starredOnly?: string;
   }>;
 }) {
   const { sessionCode } = await params;
@@ -49,12 +48,10 @@ export default async function TeacherResultsPage({
   const chartType = parseChartType(query.chartType);
   const includeHidden = query.includeHidden === "true";
   const promptHistoryId = query.promptHistoryId ?? "";
-  const starredOnly = query.starredOnly === "true";
   const search = new URLSearchParams({
     chartType,
     includeHidden: String(includeHidden),
     minutes: String(minutes),
-    starredOnly: String(starredOnly),
   });
 
   if (promptHistoryId) {
@@ -84,13 +81,10 @@ export default async function TeacherResultsPage({
     minutes,
     promptHistoryId: selectedPromptHistory?.id,
   });
-  const displayedSubmissions = starredOnly
-    ? submissions.filter((submission) => submission.starred)
-    : submissions;
   const results =
     chartType === "wordCloud"
-      ? responseWordCounts(displayedSubmissions)
-      : responseCounts(displayedSubmissions);
+      ? responseWordCounts(submissions)
+      : responseCounts(submissions);
   const total = results.reduce((sum, [, count]) => sum + count, 0);
   const maxCount = Math.max(1, ...results.map(([, count]) => count));
 
@@ -107,7 +101,6 @@ export default async function TeacherResultsPage({
           <p className="mt-2 text-base text-slate-600">
             {submissionTimeRangeLabel(minutes)}
             {includeHidden ? ", including hidden responses" : ""}
-            {starredOnly ? ", starred responses only" : ""}
             {selectedPromptHistory ? ", filtered by prompt" : ""}
           </p>
           {selectedPromptHistory ? (
@@ -158,7 +151,7 @@ export default async function TeacherResultsPage({
       />
       <ResponseTimePlot
         promptUpdatedAt={selectedPromptHistory?.startedAt ?? session.promptUpdatedAt}
-        submissions={displayedSubmissions}
+        submissions={submissions}
         variant="screen"
       />
     </main>

@@ -64,8 +64,6 @@ type Submission = {
   gifData: GifData | null;
   image: SubmissionImageDto | null;
   status: "visible" | "hidden";
-  starred: boolean;
-  flagged: boolean;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -75,8 +73,6 @@ type Stats = {
   total: number;
   visible: number;
   hidden: number;
-  starred: number;
-  flagged: number;
   latestAt?: string;
 };
 
@@ -159,41 +155,6 @@ function CopyStatusIcon({ isCopied }: { isCopied: boolean }) {
     >
       <rect height="14" rx="2" width="14" x="8" y="8" />
       <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-    </svg>
-  );
-}
-
-function StarIcon({ isActive }: { isActive: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className="size-4"
-      fill={isActive ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M11.5 2.8a.6.6 0 0 1 1 0l2.7 5.5 6.1.9a.6.6 0 0 1 .3 1l-4.4 4.3 1 6.1a.6.6 0 0 1-.9.6L12 18.3l-5.4 2.9a.6.6 0 0 1-.9-.6l1-6.1-4.4-4.3a.6.6 0 0 1 .3-1l6.1-.9 2.8-5.5Z" />
-    </svg>
-  );
-}
-
-function FlagIcon({ isActive }: { isActive: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className="size-4"
-      fill={isActive ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M5 21V4" />
-      <path d="M5 4h12l-1.5 4L17 12H5" />
     </svg>
   );
 }
@@ -350,9 +311,6 @@ function TeacherDashboardContent({
   const [promptHistory, setPromptHistory] = useState(initialPromptHistory);
   const [selectedPromptHistoryId, setSelectedPromptHistoryId] = useState(
     initialSubmissionViewSettings.promptHistoryId ?? "",
-  );
-  const [starredOnly, setStarredOnly] = useState(
-    initialSubmissionViewSettings.starredOnly,
   );
   const [submissionSortOrder, setSubmissionSortOrder] =
     useState<SubmissionSortOrder>(initialSubmissionViewSettings.sortOrder);
@@ -548,7 +506,6 @@ function TeacherDashboardContent({
           setPromptHistory(submissionsPayload.promptHistory);
         }
         setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
-        setStarredOnly(nextViewSettings.starredOnly);
         setSubmissionSortOrder(nextViewSettings.sortOrder);
         setSubmissions(nextSubmissions);
         setOrderedSubmissionIds((currentOrder) =>
@@ -982,22 +939,6 @@ function TeacherDashboardContent({
     }
   }
 
-  function toggleSubmissionStar(submission: Submission) {
-    return patchSubmission(
-      submission.id,
-      { starred: !submission.starred },
-      `submission:${submission.id}:star`,
-    );
-  }
-
-  function toggleSubmissionFlag(submission: Submission) {
-    return patchSubmission(
-      submission.id,
-      { flagged: !submission.flagged },
-      `submission:${submission.id}:flag`,
-    );
-  }
-
   function toggleSubmissionVisibility(submission: Submission) {
     return patchSubmission(
       submission.id,
@@ -1059,10 +1000,6 @@ function TeacherDashboardContent({
         submissionIdsForOrder(submissions, patch.sortOrder),
       );
     }
-    if (typeof patch.starredOnly === "boolean") {
-      setStarredOnly(patch.starredOnly);
-    }
-
     try {
       const response = await fetch(
         `/api/sessions/${session.id}/submission-view`,
@@ -1085,7 +1022,6 @@ function TeacherDashboardContent({
         setMinutes(nextViewSettings.minutes);
         setSelectedPromptHistoryId(nextViewSettings.promptHistoryId ?? "");
         setSubmissionSortOrder(nextViewSettings.sortOrder);
-        setStarredOnly(nextViewSettings.starredOnly);
         setSubmissionViewStatus("Display settings synced.");
       }
     } catch {
@@ -1264,13 +1200,7 @@ function TeacherDashboardContent({
       ),
     ];
   }, [orderedSubmissionIds, submissions, submissionSortOrder]);
-  const displayedSubmissions = useMemo(
-    () =>
-      starredOnly
-        ? orderedSubmissions.filter((submission) => submission.starred)
-        : orderedSubmissions,
-    [orderedSubmissions, starredOnly],
-  );
+  const displayedSubmissions = orderedSubmissions;
   const chartSubmissions = useMemo(
     () =>
       displayedSubmissions.filter(
@@ -1326,7 +1256,6 @@ function TeacherDashboardContent({
     const search = new URLSearchParams({
       includeHidden: "false",
       minutes: String(minutes),
-      starredOnly: String(starredOnly),
     });
 
     if (selectedPromptHistoryId) {
@@ -1601,12 +1530,11 @@ function TeacherDashboardContent({
 
           <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-slate-500">Session totals</p>
-            <dl className="mt-3 grid grid-cols-2 gap-3">
+            <dl className="mt-3 grid grid-cols-3 gap-3">
               {[
                 ["Total", stats.total],
                 ["Visible", stats.visible],
-                ["Starred", stats.starred],
-                ["Flagged", stats.flagged],
+                ["Hidden", stats.hidden],
               ].map(([label, value]) => (
                 <div className="rounded-md border border-slate-200 p-3" key={label}>
                   <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -1750,9 +1678,6 @@ function TeacherDashboardContent({
                           {submissionSortOptions.map((option) => <button className={`h-8 rounded px-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${submissionSortOrder === option.value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-teal-800"}`} disabled={isUpdatingSubmissionView} key={option.value} type="button" onClick={() => changeSubmissionSortOrder(option.value)}>{option.label}</button>)}
                         </div>
                       </div>
-                      <button aria-pressed={starredOnly} className={`inline-flex h-9 items-center rounded-full border px-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${starredOnly ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-50" : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-900"}`} disabled={isUpdatingSubmissionView} type="button" onClick={() => void updateSubmissionView({ starredOnly: !starredOnly })}>
-                        {starredOnly ? "Starred only" : "Show starred only"}
-                      </button>
                     </div>
                     {submissionViewStatus ? <p className="mt-3 text-xs font-medium text-slate-500" role="status">{submissionViewStatus}</p> : null}
                     {selectedPromptHistory ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500"><InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText></p> : null}
@@ -2013,45 +1938,11 @@ function TeacherDashboardContent({
                           : "border-slate-300"
                     }`}
                   >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
-                      {minutesAgo(submission.createdAt)}
-                    </p>
-                    <div className="flex gap-1" data-no-card-drag="true">
-                      <PendingActionButton
-                        aria-label={
-                          submission.starred ? "Remove star from response" : "Star response"
-                        }
-                        className={`flex size-8 items-center justify-center rounded-md border transition ${
-                          submission.starred
-                            ? "border-amber-300 bg-amber-100 text-amber-900"
-                            : "border-slate-200 text-slate-600 hover:border-amber-300"
-                        }`}
-                        pending={isPending(`submission:${submission.id}:star`)}
-                        pendingChildren={null}
-                        title={submission.starred ? "Remove star" : "Star"}
-                        onClick={() => void toggleSubmissionStar(submission)}
-                      >
-                        <StarIcon isActive={submission.starred} />
-                      </PendingActionButton>
-                      <PendingActionButton
-                        aria-label={
-                          submission.flagged ? "Remove flag from response" : "Flag response"
-                        }
-                        className={`flex size-8 items-center justify-center rounded-md border transition ${
-                          submission.flagged
-                            ? "border-red-300 bg-red-100 text-red-900"
-                            : "border-slate-200 text-slate-600 hover:border-red-300"
-                        }`}
-                        pending={isPending(`submission:${submission.id}:flag`)}
-                        pendingChildren={null}
-                        title={submission.flagged ? "Remove flag" : "Flag"}
-                        onClick={() => void toggleSubmissionFlag(submission)}
-                      >
-                        <FlagIcon isActive={submission.flagged} />
-                      </PendingActionButton>
+                    <div className="mb-3">
+                      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+                        {minutesAgo(submission.createdAt)}
+                      </p>
                     </div>
-                  </div>
                   {editingSubmissionId === submission.id ? (
                     <div data-no-card-drag="true">
                       <label className="sr-only" htmlFor={`edit-${submission.id}`}>
@@ -2171,9 +2062,7 @@ function TeacherDashboardContent({
             </div>
           ) : (
             <div className="rounded-md border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-              {starredOnly
-                ? "No starred submissions in this time window yet."
-                : "No submissions in this time window yet."}
+              No submissions in this time window yet.
             </div>
           )}
         </section>

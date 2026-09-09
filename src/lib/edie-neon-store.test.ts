@@ -48,7 +48,6 @@ const submissionViewSettingsRow = {
   prompt_history_id: null,
   minutes: 3,
   sort_order: "newest",
-  starred_only: false,
   revision: 2,
   updated_at: new Date("2026-01-02T03:04:07.000Z"),
 };
@@ -60,7 +59,7 @@ function submissionRow(values: unknown[]) {
     drawing_data: values[4] ? JSON.parse(String(values[4])) : null,
     gif_data: values[5] ? JSON.parse(String(values[5])) : null,
     image_data: values[6] ? JSON.parse(String(values[6])) : null,
-    status: values[7], starred: false, flagged: false, version: 1, archived_at: null,
+    status: values[7], version: 1, archived_at: null,
     created_at: new Date("2026-01-02T03:04:06.000Z"),
     updated_at: new Date("2026-01-02T03:04:06.000Z"),
   };
@@ -156,7 +155,6 @@ describe("Neon submission view settings", () => {
       promptHistoryId: null,
       minutes: 3,
       sortOrder: "newest",
-      starredOnly: false,
       revision: 2,
       updatedAt: "2026-01-02T03:04:07.000Z",
     });
@@ -185,7 +183,7 @@ describe("Neon submission view settings", () => {
       String(statement).startsWith("INSERT INTO edie_submission_view_settings"),
     );
     expect(upsert?.[0]).toContain("current_settings.revision + 1");
-    expect(upsert?.[1]?.slice(6)).toEqual([false, true, false, false]);
+    expect(upsert?.[1]?.slice(5)).toEqual([false, true, false]);
   });
 
   it("rejects a prompt filter from another session", async () => {

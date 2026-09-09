@@ -21,7 +21,7 @@ create table if not exists edie_submissions (
   id uuid primary key default gen_random_uuid(), session_code text not null references edie_sessions(id) on delete cascade,
   student_name text not null default 'Anonymous' check (char_length(student_name) between 1 and 80), text text not null default '' check (char_length(text) <= 2000),
   drawing_data jsonb, gif_data jsonb, image_data jsonb, status text not null default 'visible' check (status in ('visible', 'hidden')),
-  starred boolean not null default false, flagged boolean not null default false, version integer not null default 1 check (version >= 1), archived_at timestamptz,
+  version integer not null default 1 check (version >= 1), archived_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   constraint edie_submissions_text_or_media_check check (char_length(text) >= 1 or drawing_data is not null or gif_data is not null or image_data is not null),
   constraint edie_submissions_drawing_data_check check (drawing_data is null or jsonb_typeof(drawing_data) = 'object'),
@@ -58,7 +58,6 @@ create table if not exists edie_submission_view_settings (
   prompt_history_id uuid references edie_prompt_history(id) on delete set null,
   minutes integer not null default 3 check (minutes in (0,1,3,5,10)),
   sort_order text not null default 'newest' check (sort_order in ('newest','oldest')),
-  starred_only boolean not null default false,
   revision integer not null default 0 check (revision >= 0),
   updated_at timestamptz not null default now()
 );
@@ -125,7 +124,7 @@ insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('dem
 insert into edie_prompt_history (id,session_code,prompt,started_at,ended_at)
 select '44444444-4444-4444-8444-444444444444',id,prompt,prompt_updated_at,null from edie_sessions where id='demo-lecture' on conflict (id) do nothing;
 insert into edie_question_bank (id,session_code,title,text) values ('33333333-3333-4333-8333-333333333333','demo-lecture','Explain p-values','In one or two sentences, explain what the p-value tells us in this setting.') on conflict (id) do nothing;
-insert into edie_submissions (id,session_code,student_name,text,status,starred,flagged,version) values
-('11111111-1111-4111-8111-111111111111','demo-lecture','Anonymous','There is no evidence against the null model, so the observed difference could be due to random variation.','visible',false,false,1),
-('22222222-2222-4222-8222-822222222222','demo-lecture','Anonymous','The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.','visible',true,false,1)
+insert into edie_submissions (id,session_code,student_name,text,status,version) values
+('11111111-1111-4111-8111-111111111111','demo-lecture','Anonymous','There is no evidence against the null model, so the observed difference could be due to random variation.','visible',1),
+('22222222-2222-4222-8222-822222222222','demo-lecture','Anonymous','The p-value is 0.28, which is not small enough to suggest the bird type proportions are different.','visible',1)
 on conflict (id) do nothing;

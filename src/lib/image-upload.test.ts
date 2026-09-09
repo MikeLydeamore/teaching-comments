@@ -147,7 +147,7 @@ describe("submission image invariants", () => {
   it("allows image-only responses and removes internal storage data from DTOs", () => {
     const imageData = { version: 1 as const, objectKey: "final/a", contentType: "image/webp" as const, byteSize: 42, etag: "quoted-etag" };
     expect(() => assertSubmissionHasContent("", null, null, imageData)).not.toThrow();
-    const dto = toSubmissionDto({ id: submissionId, sessionCode: sessionId, studentName: "Anonymous", text: "", drawingData: null, gifData: null, imageData, status: "visible", starred: false, flagged: false, version: 1, archivedAt: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" });
+    const dto = toSubmissionDto({ id: submissionId, sessionCode: sessionId, studentName: "Anonymous", text: "", drawingData: null, gifData: null, imageData, status: "visible", version: 1, archivedAt: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" });
     expect(dto.image).toEqual({ contentType: "image/webp", byteSize: 42, url: `/api/submissions/${submissionId}/image` });
     expect(JSON.stringify(dto)).not.toContain("objectKey");
     expect(JSON.stringify(dto)).not.toContain("quoted-etag");

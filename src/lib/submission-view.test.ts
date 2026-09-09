@@ -40,7 +40,7 @@ const session = {
   timerEndsAt: null,
 };
 
-function submission(id: string, createdAt: string, starred: boolean) {
+function submission(id: string, createdAt: string) {
   return {
     id,
     sessionCode: session.id,
@@ -50,8 +50,6 @@ function submission(id: string, createdAt: string, starred: boolean) {
     gifData: null,
     imageData: null,
     status: "visible",
-    starred,
-    flagged: false,
     version: 1,
     archivedAt: null,
     createdAt,
@@ -66,13 +64,12 @@ beforeEach(() => {
 });
 
 describe("getSubmissionViewPayload", () => {
-  it("uses canonical filters and returns sorted starred submissions", async () => {
+  it("uses canonical filters and returns sorted submissions", async () => {
     getSubmissionViewSettingsMock.mockResolvedValue({
       sessionCode: session.id,
       promptHistoryId: "prompt-1",
       minutes: 10,
       sortOrder: "oldest",
-      starredOnly: true,
       revision: 4,
       updatedAt: "2026-01-02T03:04:00.000Z",
     });
@@ -86,9 +83,9 @@ describe("getSubmissionViewPayload", () => {
       },
     ]);
     listSubmissionsMock.mockResolvedValue([
-      submission("new", "2026-01-02T03:03:00.000Z", true),
-      submission("not-starred", "2026-01-02T03:02:00.000Z", false),
-      submission("old", "2026-01-02T03:01:00.000Z", true),
+      submission("new", "2026-01-02T03:03:00.000Z"),
+      submission("middle", "2026-01-02T03:02:00.000Z"),
+      submission("old", "2026-01-02T03:01:00.000Z"),
     ]);
 
     const result = await getSubmissionViewPayload(session, false);
@@ -100,6 +97,10 @@ describe("getSubmissionViewPayload", () => {
     });
     expect(result.promptText).toBe("Earlier prompt");
     expect(result.imageEmbedsEnabled).toBe(false);
-    expect(result.submissions.map(({ id }) => id)).toEqual(["old", "new"]);
+    expect(result.submissions.map(({ id }) => id)).toEqual([
+      "old",
+      "middle",
+      "new",
+    ]);
   });
 });

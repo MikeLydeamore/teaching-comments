@@ -41,10 +41,7 @@ export async function getSubmissionViewPayload(
   const selectedPrompt = promptHistory.find(
     (item) => item.id === viewSettings.promptHistoryId,
   );
-  const visibleSubmissions = viewSettings.starredOnly
-    ? submissions.filter((submission) => submission.starred)
-    : submissions;
-  const sortedSubmissions = [...visibleSubmissions].sort((left, right) => {
+  const sortedSubmissions = [...submissions].sort((left, right) => {
     const leftTime = new Date(left.createdAt).getTime();
     const rightTime = new Date(right.createdAt).getTime();
     return viewSettings.sortOrder === "oldest"

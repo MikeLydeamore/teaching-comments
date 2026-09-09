@@ -26,7 +26,7 @@ export default function PrivacyPage() {
               session code, an optional selected GIF, an optional private image, an optional display name,
               timestamps, anonymous browser vote markers for group-question
               upvotes, answered markers for group questions, and host
-              moderation markers such as starred, flagged, or hidden. The
+              moderation markers such as whether a response is hidden. The
               service may also create ordinary technical logs through its
               hosting provider.
             </p>

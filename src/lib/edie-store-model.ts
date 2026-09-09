@@ -92,8 +92,6 @@ export type Submission = {
   gifData: GifData | null;
   imageData: SubmissionImageData | null;
   status: SubmissionStatus;
-  starred: boolean;
-  flagged: boolean;
   version: number;
   archivedAt: string | null;
   createdAt: string;
@@ -151,7 +149,6 @@ export type SubmissionViewSettings = {
   promptHistoryId: string | null;
   minutes: SubmissionViewMinutes;
   sortOrder: "newest" | "oldest";
-  starredOnly: boolean;
   revision: number;
   updatedAt: string;
 };
@@ -159,7 +156,7 @@ export type SubmissionViewSettings = {
 export type SubmissionViewSettingsPatch = Partial<
   Pick<
     SubmissionViewSettings,
-    "promptHistoryId" | "minutes" | "sortOrder" | "starredOnly"
+    "promptHistoryId" | "minutes" | "sortOrder"
   >
 >;
 
@@ -172,7 +169,6 @@ export function defaultSubmissionViewSettings(
     promptHistoryId: null,
     minutes: 3,
     sortOrder: "newest",
-    starredOnly: false,
     revision: 0,
     updatedAt,
   };
@@ -190,7 +186,6 @@ export function normalizeSubmissionViewSettingsPatch(
     "promptHistoryId",
     "minutes",
     "sortOrder",
-    "starredOnly",
   ]);
   const keys = Object.keys(data);
 
@@ -227,13 +222,6 @@ export function normalizeSubmissionViewSettingsPatch(
       throw new Error("Card order is invalid.");
     }
     patch.sortOrder = data.sortOrder;
-  }
-
-  if ("starredOnly" in data) {
-    if (typeof data.starredOnly !== "boolean") {
-      throw new Error("Starred filter is invalid.");
-    }
-    patch.starredOnly = data.starredOnly;
   }
 
   return patch;
@@ -297,7 +285,7 @@ export type ParticipantPoll = Omit<SessionPoll, "correctOptionIds"> & {
 };
 
 export type SubmissionPatch = Partial<
-  Pick<Submission, "text" | "status" | "starred" | "flagged">
+  Pick<Submission, "text" | "status">
 >;
 
 export type SessionPatch = Partial<
@@ -322,8 +310,6 @@ export type SessionStats = {
   total: number;
   visible: number;
   hidden: number;
-  starred: number;
-  flagged: number;
   latestAt?: string;
 };
 
@@ -1038,22 +1024,11 @@ export function normalizeSubmissionPatch(patch: SubmissionPatch) {
     next.status = patch.status;
   }
 
-  if (typeof patch.starred === "boolean") {
-    next.starred = patch.starred;
-  }
-
-  if (typeof patch.flagged === "boolean") {
-    next.flagged = patch.flagged;
-  }
-
   return next;
 }
 
 export function calculateStats(
-  submissions: Pick<
-    Submission,
-    "status" | "starred" | "flagged" | "createdAt" | "archivedAt"
-  >[],
+  submissions: Pick<Submission, "status" | "createdAt" | "archivedAt">[],
 ) {
   const activeSubmissions = submissions.filter(
     (submission) => !submission.archivedAt,
@@ -1067,8 +1042,6 @@ export function calculateStats(
     hidden: activeSubmissions.filter(
       (submission) => submission.status === "hidden",
     ).length,
-    starred: activeSubmissions.filter((submission) => submission.starred).length,
-    flagged: activeSubmissions.filter((submission) => submission.flagged).length,
     latestAt: activeSubmissions
       .map((submission) => submission.createdAt)
       .sort()

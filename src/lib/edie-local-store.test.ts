@@ -110,7 +110,6 @@ describe("local submission view settings", () => {
       promptHistoryId: null,
       minutes: 3,
       sortOrder: "newest",
-      starredOnly: false,
       revision: 0,
     });
   });
@@ -119,13 +118,13 @@ describe("local submission view settings", () => {
     await Promise.all([
       localStore.updateSubmissionViewSettings("demo-lecture", { minutes: 10 }),
       localStore.updateSubmissionViewSettings("demo-lecture", {
-        starredOnly: true,
+        sortOrder: "oldest",
       }),
     ]);
 
     await expect(
       localStore.getSubmissionViewSettings("demo-lecture"),
-    ).resolves.toMatchObject({ minutes: 10, starredOnly: true, revision: 2 });
+    ).resolves.toMatchObject({ minutes: 10, sortOrder: "oldest", revision: 2 });
   });
 
   it("rejects a prompt filter from another session", async () => {

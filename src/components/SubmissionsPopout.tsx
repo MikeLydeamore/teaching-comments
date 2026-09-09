@@ -74,7 +74,7 @@ export function SubmissionsPopout({
   const [studentShareUrl, setStudentShareUrl] = useState("");
   const savingSettingsRef = useRef(false);
   const { imageEmbedsEnabled, promptOptions, promptText, submissions, viewSettings } = view;
-  const { minutes, promptHistoryId, starredOnly } = viewSettings;
+  const { minutes, promptHistoryId } = viewSettings;
 
   const refresh = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(
@@ -276,7 +276,6 @@ export function SubmissionsPopout({
         <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">
           <span>
             {submissionTimeRangeLabel(minutes)}
-            {starredOnly ? ", starred responses only" : ""}
           </span>
           <span aria-hidden="true">•</span>
           <span>

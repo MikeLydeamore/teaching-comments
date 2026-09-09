@@ -16,7 +16,6 @@ describe("submission view settings", () => {
       promptHistoryId: null,
       minutes: 3,
       sortOrder: "newest",
-      starredOnly: false,
       revision: 0,
       updatedAt: "2026-01-02T03:04:05.000Z",
     });
@@ -33,12 +32,10 @@ describe("submission view settings", () => {
       normalizeSubmissionViewSettingsPatch({
         promptHistoryId: null,
         sortOrder: "oldest",
-        starredOnly: true,
       }),
     ).toEqual({
       promptHistoryId: null,
       sortOrder: "oldest",
-      starredOnly: true,
     });
   });
 
@@ -47,7 +44,7 @@ describe("submission view settings", () => {
     {},
     { minutes: 2 },
     { sortOrder: "manual" },
-    { starredOnly: "yes" },
+    { legacyFilter: true },
     { promptHistoryId: "" },
     { revision: 4 },
   ])("rejects invalid settings: %j", (value) => {

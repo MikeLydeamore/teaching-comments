@@ -159,8 +159,7 @@ function submissionFromRow(row: Row): Submission {
     drawingData: json(row, "drawing_data") as Submission["drawingData"],
     gifData: json(row, "gif_data") as Submission["gifData"],
     imageData: normalizeSubmissionImageData(json(row, "image_data")),
-    status: text(row, "status") as Submission["status"], starred: bool(row, "starred"),
-    flagged: bool(row, "flagged"), version: number(row, "version", 1),
+    status: text(row, "status") as Submission["status"], version: number(row, "version", 1),
     archivedAt: nullableText(row, "archived_at"), createdAt: text(row, "created_at"), updatedAt: text(row, "updated_at"),
   };
 }
@@ -175,7 +174,6 @@ function submissionViewSettingsFromRow(row: Row): SubmissionViewSettings {
     promptHistoryId: nullableText(row, "prompt_history_id"),
     minutes: number(row, "minutes", 3) as SubmissionViewSettings["minutes"],
     sortOrder: text(row, "sort_order") as SubmissionViewSettings["sortOrder"],
-    starredOnly: bool(row, "starred_only"),
     revision: number(row, "revision"),
     updatedAt: text(row, "updated_at"),
   };
@@ -199,11 +197,11 @@ function pollFromRow(row: Row): SessionPoll {
 }
 
 const SESSION_COLUMNS = "id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, image_embeds_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at";
-const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, gif_data, image_data, status, starred, flagged, version, archived_at, created_at, updated_at";
+const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, gif_data, image_data, status, version, archived_at, created_at, updated_at";
 const GROUP_QUESTION_COLUMNS = "id, session_code, student_name, text, is_answered, is_visible, archived_at, created_at, updated_at";
 const POLL_QUESTION_COLUMNS = "id, session_code, title, question, selection_mode, options, correct_option_indexes, created_at, updated_at";
 const POLL_COLUMNS = "id, session_code, question, selection_mode, options, correct_option_ids, solution_revealed, status, duration_seconds, started_at, ends_at, ended_at, created_at, updated_at";
-const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, minutes, sort_order, starred_only, revision, updated_at";
+const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, minutes, sort_order, revision, updated_at";
 
 async function getSessionRow(code: string) {
   const normalized = normalizeSessionCode(code);
@@ -342,13 +340,12 @@ export const neonStore: EdieStore = {
     const timestamp = now();
     const rows = await query(
       `INSERT INTO edie_submission_view_settings AS current_settings
-         (session_code, prompt_history_id, minutes, sort_order, starred_only, revision, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 1, $6)
+         (session_code, prompt_history_id, minutes, sort_order, revision, updated_at)
+       VALUES ($1, $2, $3, $4, 1, $5)
        ON CONFLICT (session_code) DO UPDATE SET
-         prompt_history_id = CASE WHEN $7 THEN EXCLUDED.prompt_history_id ELSE current_settings.prompt_history_id END,
-         minutes = CASE WHEN $8 THEN EXCLUDED.minutes ELSE current_settings.minutes END,
-         sort_order = CASE WHEN $9 THEN EXCLUDED.sort_order ELSE current_settings.sort_order END,
-         starred_only = CASE WHEN $10 THEN EXCLUDED.starred_only ELSE current_settings.starred_only END,
+         prompt_history_id = CASE WHEN $6 THEN EXCLUDED.prompt_history_id ELSE current_settings.prompt_history_id END,
+         minutes = CASE WHEN $7 THEN EXCLUDED.minutes ELSE current_settings.minutes END,
+         sort_order = CASE WHEN $8 THEN EXCLUDED.sort_order ELSE current_settings.sort_order END,
          revision = current_settings.revision + 1,
          updated_at = EXCLUDED.updated_at
        RETURNING ${SUBMISSION_VIEW_SETTINGS_COLUMNS}`,
@@ -357,12 +354,10 @@ export const neonStore: EdieStore = {
         normalizedPatch.promptHistoryId ?? null,
         normalizedPatch.minutes ?? 3,
         normalizedPatch.sortOrder ?? "newest",
-        normalizedPatch.starredOnly ?? false,
         timestamp,
         "promptHistoryId" in normalizedPatch,
         "minutes" in normalizedPatch,
         "sortOrder" in normalizedPatch,
-        "starredOnly" in normalizedPatch,
       ],
     );
     return rows[0] ? submissionViewSettingsFromRow(rows[0]) : null;
@@ -394,8 +389,8 @@ export const neonStore: EdieStore = {
     const session = sessionFromRow(row); if (!session.isOpen) throw new Error("This Ed.ie session is closed.");
     assertSubmissionUsesEnabledInputs(session, content.text, content.drawingData, content.gifData, imageData);
     const timestamp = now(); const rows = await query(
-      `INSERT INTO edie_submissions (id,session_code,student_name,text,drawing_data,gif_data,image_data,status,starred,flagged,version,archived_at,created_at,updated_at)
-       VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,false,false,1,NULL,$9,$9) RETURNING ${SUBMISSION_COLUMNS}`,
+      `INSERT INTO edie_submissions (id,session_code,student_name,text,drawing_data,gif_data,image_data,status,version,archived_at,created_at,updated_at)
+       VALUES (COALESCE($1::uuid,gen_random_uuid()),$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,1,NULL,$9,$9) RETURNING ${SUBMISSION_COLUMNS}`,
       [input.id ?? null,session.id,normalizeStudentName(input.studentName ?? ""),content.text,jsonParameter(content.drawingData),jsonParameter(content.gifData),jsonParameter(imageData),session.submissionsScreeningEnabled ? "hidden" : "visible",timestamp]);
     return submissionFromRow(rows[0]);
   },
@@ -404,7 +399,7 @@ export const neonStore: EdieStore = {
     const currentRows = await query(`SELECT ${SUBMISSION_COLUMNS} FROM edie_submissions WHERE id=$1::uuid AND session_code=$2`, [id,sessionCode]); if (!currentRows[0]) return null;
     const current = submissionFromRow(currentRows[0]); const normalized = normalizeSubmissionPatch(patch); const hasText = "text" in normalized; const nextText = hasText ? normalized.text ?? "" : current.text;
     assertSubmissionHasContent(nextText,current.drawingData,current.gifData,current.imageData);
-    const rows = await query(`UPDATE edie_submissions SET text=CASE WHEN $3 THEN $4 ELSE text END,status=COALESCE($5,status),starred=COALESCE($6,starred),flagged=COALESCE($7,flagged),version=version+1,updated_at=$8 WHERE id=$1::uuid AND session_code=$2 RETURNING ${SUBMISSION_COLUMNS}`,[id,sessionCode,hasText,nextText,normalized.status ?? null,typeof normalized.starred === "boolean" ? normalized.starred : null,typeof normalized.flagged === "boolean" ? normalized.flagged : null,now()]);
+    const rows = await query(`UPDATE edie_submissions SET text=CASE WHEN $3 THEN $4 ELSE text END,status=COALESCE($5,status),version=version+1,updated_at=$6 WHERE id=$1::uuid AND session_code=$2 RETURNING ${SUBMISSION_COLUMNS}`,[id,sessionCode,hasText,nextText,normalized.status ?? null,now()]);
     return rows[0] ? submissionFromRow(rows[0]) : null;
   },
   async getSessionStats(code) { const sessionCode=normalizeSessionCode(code)||"demo-lecture"; return calculateStats((await query(`SELECT ${SUBMISSION_COLUMNS} FROM edie_submissions WHERE session_code=$1 AND archived_at IS NULL`,[sessionCode])).map(submissionFromRow)); },
