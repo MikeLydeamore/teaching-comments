@@ -16,6 +16,7 @@ import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
+import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
@@ -1575,7 +1576,6 @@ function TeacherDashboardContent({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-semibold text-slate-950">Prompt</h3>
-                <p className="mt-1 text-sm text-slate-500">Shown to students</p>
               </div>
               <p className="text-xs font-medium text-slate-500">
                 {promptDraft.length}/1200
@@ -1616,16 +1616,14 @@ function TeacherDashboardContent({
                 Delete
               </PendingActionButton>
             </div>
-            <label className="sr-only" htmlFor="prompt">
-              Session prompt
-            </label>
-            <textarea
+            <SubmissionMarkdownEditor
+              ariaLabel="Session prompt"
               id="prompt"
-              className="mt-4 min-h-44 w-full resize-y rounded-md border border-slate-300 p-4 text-base leading-7 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              imageEmbedsEnabled={sessionDetails.imageEmbedsEnabled}
               maxLength={1200}
+              placeholder="Write the prompt shown to students..."
               value={promptDraft}
-              onChange={(event) => {
-                const nextPromptDraft = event.target.value;
+              onChange={(nextPromptDraft) => {
                 setPromptDraft(nextPromptDraft);
                 if (
                   selectedQuestion &&
