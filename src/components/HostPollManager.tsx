@@ -946,7 +946,7 @@ export function HostPollManager({
                 )
               ) : tab === "history" ? (
                 <div>
-                  <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
                     <div className="min-w-0 flex-1">
                       <label
                         className="block text-sm font-semibold text-slate-700"
@@ -973,14 +973,6 @@ export function HostPollManager({
                         ))}
                       </select>
                     </div>
-                    <button
-                      className="h-11 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={isHistoryLoading}
-                      type="button"
-                      onClick={() => void refreshHistory()}
-                    >
-                      {isHistoryLoading ? "Refreshing..." : "Refresh"}
-                    </button>
                   </div>
 
                   {historyStatus ? (
