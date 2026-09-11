@@ -77,7 +77,7 @@ EDIE_STORAGE_BACKEND=<your-hosting>
 DATABASE_URL=https://your-project-ref.
 BETTER_AUTH_SECRET=replace-with-a-random-secret-at-least-32-characters-long
 BETTER_AUTH_URL=https://your-deployed-origin
-AUTH_DATABASE_URL=<postgres-url-holding-auth-tables>
+AUTH_DATABASE_URL=<optional-separate-auth-postgres-url>
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
@@ -157,3 +157,10 @@ AUTH_DATABASE_URL=postgres://edie:edie@localhost:5432/edie_auth \
 docker exec -i edie-auth-postgres psql -U edie -d edie_auth \
   < database/auth-schema.sql
 ```
+
+In Neon, `AUTH_DATABASE_URL` is optional when the Better Auth tables share the
+application database. Apply `database/auth-schema.sql`, then run
+`database/add-auth-app-role-grants.sql` as the project owner. The restricted
+`edie_app` role can then use the deployment's `DATABASE_URL` for both the Ed.ie
+and Better Auth tables. An explicit `AUTH_DATABASE_URL` still takes precedence
+when auth uses a separate database.

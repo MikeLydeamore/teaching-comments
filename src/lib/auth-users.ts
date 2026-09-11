@@ -1,13 +1,14 @@
 import "server-only";
 
 import { Pool } from "pg";
+import { resolveAuthDatabaseUrl } from "./auth-database-url";
 
 let pool: Pool | null = null;
 
-function userPool() {
+function userPool(connectionString: string) {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.AUTH_DATABASE_URL,
+      connectionString,
     });
   }
 
@@ -29,13 +30,14 @@ export async function findUserProfilesByEmail(
   emails: string[],
 ): Promise<Map<string, MemberProfile>> {
   const profiles = new Map<string, MemberProfile>();
+  const databaseUrl = resolveAuthDatabaseUrl();
 
-  if (!emails.length || !process.env.AUTH_DATABASE_URL?.trim()) {
+  if (!emails.length || !databaseUrl) {
     return profiles;
   }
 
   try {
-    const result = await userPool().query<{
+    const result = await userPool(databaseUrl).query<{
       email: string;
       name: string | null;
       image: string | null;

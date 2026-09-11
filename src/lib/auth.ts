@@ -4,15 +4,16 @@ import { PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { resolveAuthDatabaseUrl } from "./auth-database-url";
 
 const DEV_FALLBACK_SECRET = "edie-local-development-secret-not-for-production";
 
 export function authDatabaseUrl() {
-  const value = process.env.AUTH_DATABASE_URL?.trim();
+  const value = resolveAuthDatabaseUrl();
 
   if (!value) {
     throw new Error(
-      "AUTH_DATABASE_URL must point at the Postgres database holding auth tables.",
+      "AUTH_DATABASE_URL or DATABASE_URL must point at the Postgres database holding auth tables.",
     );
   }
 
