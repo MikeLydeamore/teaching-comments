@@ -16,6 +16,7 @@ import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
+import { SubmissionViewConnectionBadge } from "@/components/SubmissionViewConnectionBadge";
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
@@ -37,6 +38,7 @@ import type {
   SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { runViewTransition } from "@/lib/view-transition";
+import { useSubmissionViewRealtime } from "@/lib/use-submission-view-realtime";
 import { logoutTeacher } from "../actions";
 
 type Session = {
@@ -273,7 +275,6 @@ function promptHistoryOptionLabel(item: PromptHistoryItem) {
   return `${startedAt} - ${prompt}`;
 }
 
-const submissionsRefreshIntervalMs = 3_000;
 const sessionStateRefreshIntervalMs = 20_000;
 const questionBankRefreshIntervalMs = 10_000;
 
@@ -555,6 +556,15 @@ function TeacherDashboardContent({
     session.id,
     submissionSortOrder,
   ]);
+
+  const refreshSubmissions = useCallback(
+    () => refresh({ scope: "submissions" }),
+    [refresh],
+  );
+  const submissionRealtimeStatus = useSubmissionViewRealtime({
+    refresh: refreshSubmissions,
+    sessionCode: session.id,
+  });
 
   async function savePrompt() {
     if (isPending("save-prompt")) {
@@ -1162,11 +1172,6 @@ function TeacherDashboardContent({
     const firstRefresh = window.setTimeout(() => {
       void refresh();
     }, 0);
-    const submissionsTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refresh({ scope: "submissions" });
-      }
-    }, submissionsRefreshIntervalMs);
     const sessionStateTimer = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void refresh({ scope: "session" });
@@ -1182,7 +1187,6 @@ function TeacherDashboardContent({
 
     return () => {
       window.clearTimeout(firstRefresh);
-      window.clearInterval(submissionsTimer);
       window.clearInterval(sessionStateTimer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -1605,6 +1609,7 @@ function TeacherDashboardContent({
               Live writing stream
             </h2>
             <div className="flex flex-wrap items-center justify-end gap-3">
+              <SubmissionViewConnectionBadge status={submissionRealtimeStatus} />
               <p className="text-sm text-slate-500">
                 {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>

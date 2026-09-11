@@ -5,6 +5,7 @@ import {
   updateSubmissionViewSettings,
 } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
+import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
 
 export async function POST(
   _request: Request,
@@ -27,6 +28,7 @@ export async function POST(
   await updateSubmissionViewSettings(sessionCode, {
     expandedSubmissionId: null,
   });
+  await publishSubmissionViewInvalidation(authorization.session.id);
   return Response.json({ archive: result, stats });
 }
 
@@ -61,5 +63,6 @@ export async function DELETE(
   }
 
   const stats = await getSessionStats(sessionCode);
+  await publishSubmissionViewInvalidation(authorization.session.id);
   return Response.json({ archive: result, stats });
 }

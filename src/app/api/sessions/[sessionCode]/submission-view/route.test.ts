@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorizationMock, payloadMock, updateSettingsMock } = vi.hoisted(() => ({
+const {
+  authorizationMock,
+  payloadMock,
+  publishInvalidationMock,
+  updateSettingsMock,
+} = vi.hoisted(() => ({
   authorizationMock: vi.fn(),
   payloadMock: vi.fn(),
+  publishInvalidationMock: vi.fn(),
   updateSettingsMock: vi.fn(),
 }));
 
@@ -16,6 +22,9 @@ vi.mock("@/lib/submission-view", () => ({
 vi.mock("@/lib/edie-store", () => ({
   updateSubmissionViewSettings: updateSettingsMock,
 }));
+vi.mock("@/lib/submission-view-realtime", () => ({
+  publishSubmissionViewInvalidation: publishInvalidationMock,
+}));
 
 import { GET, PATCH } from "./route";
 
@@ -27,8 +36,10 @@ const context = {
 beforeEach(() => {
   authorizationMock.mockReset();
   payloadMock.mockReset();
+  publishInvalidationMock.mockReset();
   updateSettingsMock.mockReset();
   authorizationMock.mockResolvedValue({ session });
+  publishInvalidationMock.mockResolvedValue(true);
 });
 
 describe("submission view route", () => {
@@ -84,6 +95,7 @@ describe("submission view route", () => {
 
     expect(response.status).toBe(200);
     expect(updateSettingsMock).toHaveBeenCalledWith(session.id, { minutes: 10 });
+    expect(publishInvalidationMock).toHaveBeenCalledWith(session.id);
   });
 
   it("returns validation failures as bad requests", async () => {
@@ -98,8 +110,27 @@ describe("submission view route", () => {
     );
 
     expect(response.status).toBe(400);
+    expect(publishInvalidationMock).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toEqual({
       error: "Time range is invalid.",
     });
+  });
+
+  it("keeps a committed setting successful when realtime is unavailable", async () => {
+    updateSettingsMock.mockResolvedValue({ revision: 1, minutes: 10 });
+    publishInvalidationMock.mockResolvedValue(false);
+
+    const response = await PATCH(
+      new Request(
+        `https://example.test/api/sessions/${session.id}/submission-view`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ minutes: 10 }),
+        },
+      ),
+      context as never,
+    );
+
+    expect(response.status).toBe(200);
   });
 });

@@ -6,6 +6,7 @@ import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationError, imageUploadsEnabled, postInsertRecovery, sessionHash, uploadClientCookieName, verifyImageTicket, type ImageContentType } from "@/lib/image-upload";
 import type { SubmissionImageData } from "@/lib/edie-store";
 import { assertSubmissionUsesEnabledInputs, validateSubmissionContent, normalizeStudentName } from "@/lib/edie-store-model";
+import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
 
 class ImageReceiptError extends Error {
   constructor(message: string, readonly invalidReceipt: boolean) { super(message); }
@@ -135,12 +136,16 @@ export async function POST(
     }
     try {
       const submission = await addSubmission(canonicalSession.id, { id: suppliedId, text: body.text ?? "", drawingData: body.drawingData, gifData: body.gifData, imageData, studentName: body.studentName });
+      await publishSubmissionViewInvalidation(canonicalSession.id);
       return Response.json({ submission: toSubmissionDto(submission) }, { status: 201 });
     } catch (storeError) {
       if (suppliedId) {
         const existing = await getSubmission(suppliedId).catch(() => null);
         const recovery = postInsertRecovery(existing, canonicalSession.id, imageData, storeError);
-        if (recovery === "success" && existing) return Response.json({ submission: toSubmissionDto(existing) }, { status: 201 });
+        if (recovery === "success" && existing) {
+          await publishSubmissionViewInvalidation(canonicalSession.id);
+          return Response.json({ submission: toSubmissionDto(existing) }, { status: 201 });
+        }
         if (recovery === "cleanup") {
           const deleted = await deleteFinalizedImage(await sessionHash(canonicalSession.id), suppliedId, imageData);
           if (deleted && invalidatesReceiptAfterCleanup(storeError)) throw new ImageReceiptError("The image receipt could not be used. Please submit again to create a new receipt.", true);

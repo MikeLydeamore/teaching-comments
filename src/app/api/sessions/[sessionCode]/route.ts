@@ -5,6 +5,7 @@ import {
   type SessionPatch,
 } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
+import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/sessions/[sessionCode]">) {
   const { sessionCode } = await ctx.params;
@@ -90,6 +91,12 @@ export async function PATCH(
 
     const stats = await getSessionStats(session.id);
     const promptHistory = await listPromptHistory(session.id);
+    if (
+      typeof body.prompt === "string" ||
+      typeof body.imageEmbedsEnabled === "boolean"
+    ) {
+      await publishSubmissionViewInvalidation(session.id);
+    }
     return Response.json({ promptHistory, session, stats });
   } catch (error) {
     return Response.json(

@@ -1,6 +1,7 @@
 import { updateSubmissionViewSettings } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 import { getSubmissionViewPayload } from "@/lib/submission-view";
+import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
 
 export async function GET(
   request: Request,
@@ -42,6 +43,7 @@ export async function PATCH(
       return Response.json({ error: "Session not found." }, { status: 404 });
     }
 
+    await publishSubmissionViewInvalidation(authorization.session.id);
     return Response.json({ viewSettings });
   } catch (error) {
     return Response.json(

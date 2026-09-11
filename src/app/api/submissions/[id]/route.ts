@@ -1,5 +1,6 @@
 import { getSubmission, toSubmissionDto, updateSubmission } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
+import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/submissions/[id]">) {
   const { id } = await ctx.params;
@@ -30,6 +31,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/submission
       return Response.json({ error: "Submission not found." }, { status: 404 });
     }
 
+    await publishSubmissionViewInvalidation(submission.sessionCode);
     return Response.json({ submission: toSubmissionDto(submission) });
   } catch (error) {
     return Response.json(

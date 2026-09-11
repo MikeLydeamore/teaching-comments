@@ -65,7 +65,7 @@ npm test
 For local development, submissions are stored in `.data/edie-store.json`.
 This keeps the first step free and fast to iterate on.
 
-For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/neon-app-role.sql`.
+For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/db-app-role.sql`.
 
 Set these environment variables locally and in Vercel:
 
@@ -76,6 +76,28 @@ TEACHER_PIN=replace-with-a-private-pin-before-deploying
 ADMIN_PIN=replace-with-a-private-admin-pin-before-deploying
 TEACHER_AUTH_SECRET=replace-with-a-random-cookie-secret-before-deploying
 ```
+
+## Realtime submission updates
+
+The host dashboard and submissions popout use an authenticated Server-Sent
+Events stream for fast cross-device updates. The postgres database remains the source of
+truth; Redis carries only versioned invalidation notices and never contains
+student response content.
+
+When `REDIS_URL` is absent or Redis cannot be reached, both screens display a
+`Polling` badge and automatically return to three-second submission polling.
+Other live features keep their existing refresh behavior.
+
+
+Monitor usage in Vercel under **Observability → Functions** (provisioned
+memory, active CPU, and invocations) and in the Upstash console under the
+database's usage metrics (commands, connections, and bandwidth). Configure
+Vercel spend management and an Upstash budget before moving to paid usage.
+
+To roll back realtime delivery without reverting code, remove `REDIS_URL` from
+the affected Vercel environment and redeploy. The application will continue to
+work through polling.
+
 GIF search is optional. To enable it, create a GIPHY API key and set:
 
 ```text

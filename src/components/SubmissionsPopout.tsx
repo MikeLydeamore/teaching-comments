@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   useCallback,
-  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -14,12 +13,14 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
+import { SubmissionViewConnectionBadge } from "@/components/SubmissionViewConnectionBadge";
 import type {
   SubmissionDto,
   SubmissionViewSettings,
   SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
+import { useSubmissionViewRealtime } from "@/lib/use-submission-view-realtime";
 import { runViewTransition } from "@/lib/view-transition";
 
 type SubmissionsPopoutProps = {
@@ -92,7 +93,7 @@ export function SubmissionsPopout({
     }
   }, []);
 
-  const refresh = useCallback(async (signal: AbortSignal) => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch(
       `/api/sessions/${sessionCode}/submission-view`,
       { cache: "no-store", signal },
@@ -119,43 +120,7 @@ export function SubmissionsPopout({
     setLastRefresh(new Date());
   }, [applyView, sessionCode]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let timer: number | null = null;
-    let disposed = false;
-
-    const poll = async () => {
-      try {
-        await refresh(controller.signal);
-      } catch {
-        // A later poll can recover from transient network failures.
-      } finally {
-        if (!disposed) {
-          timer = window.setTimeout(() => {
-            void poll();
-          }, 3000);
-        }
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void refresh(controller.signal).catch(() => {});
-      }
-    };
-
-    timer = window.setTimeout(() => void poll(), 3000);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      disposed = true;
-      controller.abort();
-      if (timer !== null) {
-        window.clearTimeout(timer);
-      }
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refresh]);
+  const realtimeStatus = useSubmissionViewRealtime({ refresh, sessionCode });
 
   async function updateViewSettings(
     patch: SubmissionViewSettingsPatch,
@@ -239,6 +204,7 @@ export function SubmissionsPopout({
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <SubmissionViewConnectionBadge status={realtimeStatus} />
             <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
               {submissions.length} shown
             </p>
