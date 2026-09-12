@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { InlineCodeText } from "@/components/InlineCodeText";
+import { PollResultOption } from "@/components/PollResultOption";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type { PollResults, SessionPoll } from "@/lib/edie-store";
@@ -137,30 +137,17 @@ export function PollResultsPopout({
 
           <div className="mt-10 space-y-7" aria-live="polite">
             {results.options.map((option) => (
-              <div key={option.id}>
-                <div className="flex items-end justify-between gap-5">
-                  <p className="min-w-0 break-words text-2xl font-semibold sm:text-3xl">
-                    <InlineCodeText>{option.label}</InlineCodeText>
-                  </p>
-                  <p className="shrink-0 text-3xl font-semibold tabular-nums text-slate-700 sm:text-4xl">
-                    {option.responseCount}
-                  </p>
-                </div>
-                <div
-                  className={`mt-3 h-8 overflow-hidden rounded bg-white shadow-inner sm:h-10 ${
-                    solutionIsVisible && poll.correctOptionIds.includes(option.id)
-                      ? "ring-4 ring-green-600 ring-offset-2"
-                      : ""
-                  }`}
-                >
-                  <div
-                    className="h-full rounded bg-teal-600 transition-[width] duration-300"
-                    style={{
-                      width: `${(option.responseCount / maxResultCount) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
+              <PollResultOption
+                animate
+                isCorrect={
+                  solutionIsVisible && poll.correctOptionIds.includes(option.id)
+                }
+                key={option.id}
+                label={option.label}
+                maxResponseCount={maxResultCount}
+                responseCount={option.responseCount}
+                size="popout"
+              />
             ))}
           </div>
         </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { InlineCodeText } from "@/components/InlineCodeText";
+import { PollResultOption } from "@/components/PollResultOption";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
@@ -820,30 +820,17 @@ export function HostPollManager({
 
                     <div className="mt-6 space-y-4">
                       {results.options.map((option) => (
-                        <div key={option.id}>
-                          <div className="flex items-end justify-between gap-4 text-sm">
-                            <span className="min-w-0 break-words font-medium text-slate-800">
-                              <InlineCodeText>{option.label}</InlineCodeText>
-                            </span>
-                            <span className="shrink-0 font-semibold tabular-nums text-slate-700">
-                              {option.responseCount}
-                            </span>
-                          </div>
-                          <div
-                            className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
-                              solutionIsVisible && poll.correctOptionIds.includes(option.id)
-                                ? "ring-2 ring-green-600 ring-offset-2"
-                                : ""
-                            }`}
-                          >
-                            <div
-                              className="h-full rounded bg-teal-600 transition-[width]"
-                              style={{
-                                width: `${(option.responseCount / maxResultCount) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
+                        <PollResultOption
+                          animate
+                          isCorrect={
+                            solutionIsVisible &&
+                            poll.correctOptionIds.includes(option.id)
+                          }
+                          key={option.id}
+                          label={option.label}
+                          maxResponseCount={maxResultCount}
+                          responseCount={option.responseCount}
+                        />
                       ))}
                     </div>
 
@@ -1035,30 +1022,15 @@ export function HostPollManager({
 
                       <div className="mt-6 space-y-4">
                         {selectedHistoryResults.options.map((option) => (
-                          <div key={option.id}>
-                            <div className="flex items-end justify-between gap-4 text-sm">
-                              <span className="min-w-0 break-words font-medium text-slate-800">
-                                <InlineCodeText>{option.label}</InlineCodeText>
-                              </span>
-                              <span className="shrink-0 font-semibold tabular-nums text-slate-700">
-                                {option.responseCount}
-                              </span>
-                            </div>
-                            <div
-                              className={`mt-1 h-4 overflow-hidden rounded bg-slate-100 ${
-                                selectedHistoryResults.poll.correctOptionIds.includes(option.id)
-                                  ? "ring-2 ring-green-600 ring-offset-2"
-                                  : ""
-                              }`}
-                            >
-                              <div
-                                className="h-full rounded bg-teal-600"
-                                style={{
-                                  width: `${(option.responseCount / maxHistoryResultCount) * 100}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
+                          <PollResultOption
+                            isCorrect={selectedHistoryResults.poll.correctOptionIds.includes(
+                              option.id,
+                            )}
+                            key={option.id}
+                            label={option.label}
+                            maxResponseCount={maxHistoryResultCount}
+                            responseCount={option.responseCount}
+                          />
                         ))}
                       </div>
 
