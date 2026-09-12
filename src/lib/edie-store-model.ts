@@ -276,6 +276,7 @@ export type SessionPoll = {
   durationSeconds: number;
   startedAt: string;
   endsAt: string;
+  votingEndedAt: string | null;
   endedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -446,6 +447,7 @@ export type EdieStore = {
     durationSeconds: number,
   ): Promise<SessionPoll | null>;
   extendPoll(id: string, seconds: number): Promise<SessionPoll | null>;
+  finishPoll(id: string): Promise<SessionPoll | null>;
   endPoll(id: string): Promise<SessionPoll | null>;
   restartPoll(id: string): Promise<SessionPoll | null>;
   revealPollSolution(id: string): Promise<SessionPoll | null>;

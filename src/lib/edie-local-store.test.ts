@@ -97,6 +97,33 @@ describe("local question bank uniqueness", () => {
   });
 });
 
+describe("local poll presentation lifecycle", () => {
+  it("ends voting before closing the poll", async () => {
+    const poll = await localStore.startPoll(
+      "demo-lecture",
+      "Which answer is correct?",
+      "single",
+      ["A", "B"],
+      [0],
+      60,
+    );
+
+    expect(poll).not.toBeNull();
+    const scheduledEndsAt = poll!.endsAt;
+    const finished = await localStore.finishPoll(poll!.id);
+    expect(finished).toMatchObject({
+      status: "active",
+      endedAt: null,
+      votingEndedAt: expect.any(String),
+    });
+    expect(finished?.endsAt).toBe(scheduledEndsAt);
+
+    const closed = await localStore.endPoll(poll!.id);
+    expect(closed).toMatchObject({ status: "ended" });
+    expect(closed?.endedAt).not.toBeNull();
+  });
+});
+
 describe("local submission view settings", () => {
   it("loads defaults when a legacy JSON store has no settings collection", async () => {
     await localStore.getSession("demo-lecture");

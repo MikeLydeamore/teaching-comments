@@ -338,6 +338,10 @@ export async function extendPoll(id: string, seconds: number) {
   return getStore().extendPoll(id, seconds);
 }
 
+export async function finishPoll(id: string) {
+  return getStore().finishPoll(id);
+}
+
 export async function endPoll(id: string) {
   return getStore().endPoll(id);
 }

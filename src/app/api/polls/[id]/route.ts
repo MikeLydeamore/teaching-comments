@@ -1,6 +1,7 @@
 import {
   endPoll,
   extendPoll,
+  finishPoll,
   getPoll,
   getPollResults,
   restartPoll,
@@ -26,7 +27,7 @@ export async function PATCH(
   }
 
   const body = (await request.json().catch(() => ({}))) as {
-    action?: "end" | "extend" | "reveal-solution" | "restart";
+    action?: "end" | "extend" | "finish" | "reveal-solution" | "restart";
     seconds?: number;
   };
 
@@ -34,13 +35,15 @@ export async function PATCH(
     const poll =
       body.action === "end"
         ? await endPoll(id)
-        : body.action === "extend"
-          ? await extendPoll(id, Number(body.seconds))
-          : body.action === "reveal-solution"
-            ? await revealPollSolution(id)
-            : body.action === "restart"
-              ? await restartPoll(id)
-              : null;
+        : body.action === "finish"
+          ? await finishPoll(id)
+          : body.action === "extend"
+            ? await extendPoll(id, Number(body.seconds))
+            : body.action === "reveal-solution"
+              ? await revealPollSolution(id)
+              : body.action === "restart"
+                ? await restartPoll(id)
+                : null;
 
     if (!poll) {
       return Response.json(

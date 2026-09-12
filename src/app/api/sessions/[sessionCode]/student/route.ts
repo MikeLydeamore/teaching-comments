@@ -32,9 +32,11 @@ export async function GET(
         ...availablePoll,
         solutionRevealed:
           availablePoll.solutionRevealed ||
+          availablePoll.votingEndedAt !== null ||
           new Date(availablePoll.endsAt).getTime() <= Date.now(),
         correctOptionIds:
           availablePoll.solutionRevealed ||
+          availablePoll.votingEndedAt !== null ||
           new Date(availablePoll.endsAt).getTime() <= Date.now()
             ? availablePoll.correctOptionIds
             : [],

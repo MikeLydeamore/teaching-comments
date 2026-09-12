@@ -14,7 +14,10 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
+import { SubmissionsPollOverlay } from "@/components/SubmissionsPollOverlay";
 import type {
+  PollResults,
+  SessionPoll,
   SubmissionDto,
   SubmissionViewSettings,
   SubmissionViewSettingsPatch,
@@ -25,6 +28,8 @@ import { runViewTransition } from "@/lib/view-transition";
 
 type SubmissionsPopoutProps = {
   dashboardUrl: string;
+  initialPoll: SessionPoll | null;
+  initialPollResults: PollResults | null;
   initialView: SubmissionView;
   sessionCode: string;
   sessionTitle: string;
@@ -64,6 +69,8 @@ function responseTime(value: string, hasHydrated: boolean) {
 
 export function SubmissionsPopout({
   dashboardUrl,
+  initialPoll,
+  initialPollResults,
   initialView,
   sessionCode,
   sessionTitle,
@@ -194,6 +201,11 @@ export function SubmissionsPopout({
 
   return (
     <main className="min-h-screen bg-slate-100 px-6 py-6 text-slate-950">
+      <SubmissionsPollOverlay
+        initialPoll={initialPoll}
+        initialResults={initialPollResults}
+        sessionCode={sessionCode}
+      />
       <header className="rounded-md border border-slate-200 bg-white px-6 py-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

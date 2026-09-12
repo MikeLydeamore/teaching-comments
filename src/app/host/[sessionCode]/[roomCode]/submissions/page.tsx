@@ -1,5 +1,10 @@
 import { SubmissionsPopout } from "@/components/SubmissionsPopout";
-import { getOrCreateSessionInSpace, getTeacherSpace } from "@/lib/edie-store";
+import {
+  getActivePoll,
+  getOrCreateSessionInSpace,
+  getPollResults,
+  getTeacherSpace,
+} from "@/lib/edie-store";
 import { isDefaultTeacherPin } from "@/lib/teacher-auth";
 import { isTeacherAuthenticatedForSpaceCode } from "@/lib/teacher-session-auth";
 import { getSubmissionViewPayload } from "@/lib/submission-view";
@@ -55,11 +60,19 @@ export default async function TeacherSpaceSubmissionsPage({
     );
   }
 
-  const initialView = await getSubmissionViewPayload(session, false);
+  const [initialView, initialPoll] = await Promise.all([
+    getSubmissionViewPayload(session, false),
+    getActivePoll(session.id),
+  ]);
+  const initialPollResults = initialPoll
+    ? await getPollResults(initialPoll.id)
+    : null;
 
   return (
     <SubmissionsPopout
       dashboardUrl={`/host/${space.code}/${session.code}`}
+      initialPoll={initialPoll}
+      initialPollResults={initialPollResults}
       initialView={initialView}
       sessionCode={session.id}
       sessionTitle={session.title}

@@ -78,7 +78,7 @@ create table if not exists edie_polls (
   options jsonb not null check (jsonb_typeof(options) = 'array' and jsonb_array_length(options) between 2 and 8),
   correct_option_ids jsonb not null default '[]'::jsonb check (jsonb_typeof(correct_option_ids) = 'array'), solution_revealed boolean not null default false,
   status text not null default 'active' check (status in ('active','ended')),
-  duration_seconds integer not null check (duration_seconds >= 5), started_at timestamptz not null default now(), ends_at timestamptz not null, ended_at timestamptz,
+  duration_seconds integer not null check (duration_seconds >= 5), started_at timestamptz not null default now(), ends_at timestamptz not null, voting_ended_at timestamptz, ended_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), check (ends_at > started_at)
 );
 create table if not exists edie_poll_responses (

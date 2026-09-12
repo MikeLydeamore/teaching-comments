@@ -6,6 +6,10 @@ import { PollResultOption } from "@/components/PollResultOption";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type { PollResults, SessionPoll } from "@/lib/edie-store";
+import {
+  pollIsCurrentlyLive,
+  pollVotingHasEnded,
+} from "@/lib/poll-state";
 
 type PollResultsPopoutProps = {
   dashboardUrl: string;
@@ -17,10 +21,6 @@ type PollResultsPopoutProps = {
 
 const activePollRefreshIntervalMs = 2_000;
 const idlePollRefreshIntervalMs = 15_000;
-
-function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
-  return poll.status === "active" && new Date(poll.endsAt).getTime() > nowMs;
-}
 
 export function PollResultsPopout({
   dashboardUrl,
@@ -92,7 +92,7 @@ export function PollResultsPopout({
     [results],
   );
   const solutionIsVisible = Boolean(
-    poll && (poll.solutionRevealed || (nowMs > 0 && new Date(poll.endsAt).getTime() <= nowMs)),
+    poll && (poll.solutionRevealed || pollVotingHasEnded(poll, nowMs)),
   );
 
   return (
@@ -108,7 +108,10 @@ export function PollResultsPopout({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {poll?.status === "active" ? (
-            <SessionTimer timerEndsAt={poll.endsAt} />
+            <SessionTimer
+              isEnded={pollVotingHasEnded(poll, nowMs)}
+              timerEndsAt={poll.endsAt}
+            />
           ) : null}
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"

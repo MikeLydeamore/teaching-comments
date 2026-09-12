@@ -39,7 +39,8 @@ const pollRow = {
   ],
   correct_option_ids: ["option-b"], solution_revealed: true, status: "active",
   duration_seconds: 60, started_at: new Date("2026-01-02T03:04:05.000Z"),
-  ends_at: new Date("2026-01-02T03:05:05.000Z"), ended_at: null,
+  ends_at: new Date("2026-01-02T03:05:05.000Z"), voting_ended_at: null,
+  ended_at: null,
   created_at: new Date("2026-01-02T03:04:05.000Z"),
   updated_at: new Date("2026-01-02T03:04:06.000Z"),
 };
@@ -256,6 +257,33 @@ describe("Neon poll solutions", () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("correct_option_ids,solution_revealed"),
       expect.any(Array),
+    );
+  });
+});
+
+describe("Neon poll presentation lifecycle", () => {
+  it("ends voting without closing the poll", async () => {
+    const futureEnd = new Date(Date.now() + 60_000);
+    queryMock
+      .mockResolvedValueOnce([{ ...pollRow, ends_at: futureEnd }])
+      .mockImplementationOnce(async (_statement, values: unknown[]) => [
+        {
+          ...pollRow,
+          ends_at: futureEnd,
+          voting_ended_at: new Date(String(values[1])),
+          updated_at: values[1],
+        },
+      ]);
+
+    await expect(neonStore.finishPoll(pollRow.id)).resolves.toMatchObject({
+      status: "active",
+      endedAt: null,
+      endsAt: futureEnd.toISOString(),
+      votingEndedAt: expect.any(String),
+    });
+    expect(queryMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("SET voting_ended_at=$2"),
+      [pollRow.id, expect.any(String)],
     );
   });
 });

@@ -239,6 +239,7 @@ async function readStore(): Promise<StoreData> {
       ...poll,
       correctOptionIds: poll.correctOptionIds ?? [],
       solutionRevealed: poll.solutionRevealed ?? false,
+      votingEndedAt: poll.votingEndedAt ?? null,
       endedAt: poll.endedAt ?? null,
     })),
     teacherSpaces,
@@ -1303,7 +1304,13 @@ export const localStore: EdieStore = {
 
     data.polls = data.polls.map((poll) =>
       poll.sessionCode === session.id && poll.status === "active"
-        ? { ...poll, status: "ended", endedAt: timestamp, updatedAt: timestamp }
+        ? {
+            ...poll,
+            status: "ended",
+            votingEndedAt: poll.votingEndedAt ?? timestamp,
+            endedAt: timestamp,
+            updatedAt: timestamp,
+          }
         : poll,
     );
 
@@ -1325,6 +1332,7 @@ export const localStore: EdieStore = {
       endsAt: new Date(
         new Date(timestamp).getTime() + definition.durationSeconds * 1000,
       ).toISOString(),
+      votingEndedAt: null,
       endedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -1349,7 +1357,7 @@ export const localStore: EdieStore = {
       throw new Error("This poll has been ended.");
     }
 
-    if (new Date(poll.endsAt).getTime() <= Date.now()) {
+    if (poll.votingEndedAt || new Date(poll.endsAt).getTime() <= Date.now()) {
       throw new Error("This poll timer has ended.");
     }
 
@@ -1359,6 +1367,29 @@ export const localStore: EdieStore = {
     poll.durationSeconds += extension;
     poll.updatedAt = timestamp;
     await writeStore(data);
+    return poll;
+  },
+
+  async finishPoll(id) {
+    const data = await readStore();
+    const poll = data.polls.find((item) => item.id === id);
+
+    if (!poll) {
+      return null;
+    }
+
+    if (poll.status !== "active") {
+      throw new Error("This poll has been closed.");
+    }
+
+    const timestamp = now();
+
+    if (!poll.votingEndedAt) {
+      poll.votingEndedAt = timestamp;
+      poll.updatedAt = timestamp;
+      await writeStore(data);
+    }
+
     return poll;
   },
 
@@ -1373,6 +1404,7 @@ export const localStore: EdieStore = {
     if (poll.status === "active") {
       const timestamp = now();
       poll.status = "ended";
+      poll.votingEndedAt ??= timestamp;
       poll.endedAt = timestamp;
       poll.updatedAt = timestamp;
       await writeStore(data);
@@ -1390,7 +1422,8 @@ export const localStore: EdieStore = {
     }
 
     const isExpired =
-      poll.status === "active" && Date.parse(poll.endsAt) <= Date.now();
+      poll.status === "active" &&
+      (poll.votingEndedAt !== null || Date.parse(poll.endsAt) <= Date.now());
     const restartable = poll.status === "ended" || isExpired;
 
     if (!restartable) {
@@ -1411,12 +1444,19 @@ export const localStore: EdieStore = {
       item.sessionCode === poll.sessionCode &&
       item.status === "active" &&
       item.id !== id
-        ? { ...item, status: "ended", endedAt: timestamp, updatedAt: timestamp }
+        ? {
+            ...item,
+            status: "ended",
+            votingEndedAt: item.votingEndedAt ?? timestamp,
+            endedAt: timestamp,
+            updatedAt: timestamp,
+          }
         : item,
     );
 
     poll.status = "active";
     poll.endedAt = null;
+    poll.votingEndedAt = null;
     poll.solutionRevealed = false;
     poll.endsAt = new Date(
       Date.now() + poll.durationSeconds * 1000,
@@ -1476,6 +1516,7 @@ export const localStore: EdieStore = {
     if (
       poll.status !== "active" ||
       poll.solutionRevealed ||
+      poll.votingEndedAt !== null ||
       new Date(poll.endsAt).getTime() <= Date.now()
     ) {
       throw new Error("This poll is no longer accepting answers.");

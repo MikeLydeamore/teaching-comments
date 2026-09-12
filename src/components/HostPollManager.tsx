@@ -13,6 +13,10 @@ import type {
   SessionPoll,
 } from "@/lib/edie-store";
 import {
+  pollIsCurrentlyLive,
+  pollVotingHasEnded,
+} from "@/lib/poll-state";
+import {
   clampTimerSeconds,
   formatTimerSeconds,
   parseTimerDurationInput,
@@ -32,12 +36,6 @@ const activePollRefreshIntervalMs = 3_000;
 const idlePollRefreshIntervalMs = 15_000;
 const pollQuestionBankRefreshIntervalMs = 10_000;
 
-function pollIsCurrentlyLive(poll: SessionPoll, nowMs: number) {
-  return (
-    poll.status === "active" && new Date(poll.endsAt).getTime() > nowMs
-  );
-}
-
 function csvCell(value: string | number) {
   let text = String(value);
 
@@ -54,7 +52,7 @@ function downloadPollResults(results: PollResults) {
     ["Poll question", poll.question],
     ["Selection mode", poll.selectionMode],
     ["Started at", poll.startedAt],
-    ["Ended at", poll.endedAt ?? poll.endsAt],
+    ["Ended at", poll.votingEndedAt ?? poll.endedAt ?? poll.endsAt],
     ["Respondents", results.responseCount],
     [],
     ["Answer", "Responses", "Percent of respondents"],
@@ -294,7 +292,7 @@ export function HostPollManager({
     };
   }, []);
 
-  const pollNeedsEnding = poll?.status === "active";
+  const pollCanBeClosed = poll?.status === "active";
   const pastPollResults = useMemo(
     () =>
       history.filter(
@@ -320,7 +318,7 @@ export function HostPollManager({
   const parsedDraftSeconds = parseTimerDurationInput(durationDraftValue);
   const canStart =
     sessionIsOpen &&
-    !pollNeedsEnding &&
+    !pollCanBeClosed &&
     question.trim().length > 0 &&
     options.length >= 2 &&
     options.every((option) => option.trim().length > 0) &&
@@ -350,8 +348,7 @@ export function HostPollManager({
     selectionMode !== "single" || correctOptionIndexes.length === 1;
   const solutionIsVisible = Boolean(
     poll &&
-      (poll.solutionRevealed ||
-        (nowMs > 0 && new Date(poll.endsAt).getTime() <= nowMs)),
+      (poll.solutionRevealed || pollVotingHasEnded(poll, nowMs)),
   );
 
   function openManager() {
@@ -415,7 +412,7 @@ export function HostPollManager({
   }
 
   async function updatePoll(
-    action: "end" | "extend" | "reveal-solution" | "restart",
+    action: "end" | "extend" | "finish" | "reveal-solution" | "restart",
     seconds?: number,
   ) {
     if (!poll || isSaving) {
@@ -425,12 +422,14 @@ export function HostPollManager({
     setIsSaving(true);
     setStatus(
       action === "end"
-        ? "Ending poll..."
-        : action === "reveal-solution"
-          ? "Revealing solutions..."
-          : action === "restart"
-            ? "Restarting poll..."
-            : "Extending poll...",
+        ? "Closing poll..."
+        : action === "finish"
+          ? "Ending voting..."
+          : action === "reveal-solution"
+            ? "Revealing solutions..."
+            : action === "restart"
+              ? "Restarting poll..."
+              : "Extending poll...",
     );
 
     try {
@@ -448,14 +447,19 @@ export function HostPollManager({
 
       setPoll(payload.poll);
       setResults(payload.results);
+      if (action === "finish") {
+        setNowMs(Date.now());
+      }
       setStatus(
         action === "end"
-          ? "Poll ended."
-          : action === "reveal-solution"
-            ? "Solutions revealed."
-            : action === "restart"
-              ? "Poll restarted."
-              : `Added ${seconds} seconds.`,
+          ? "Poll closed."
+          : action === "finish"
+            ? "Voting ended. Results remain displayed."
+            : action === "reveal-solution"
+              ? "Solutions revealed."
+              : action === "restart"
+                ? "Poll restarted."
+                : `Added ${seconds} seconds.`,
       );
       if (action === "end" || action === "restart") {
         void refreshHistory();
@@ -700,14 +704,14 @@ export function HostPollManager({
             ? "border-teal-400 bg-teal-50 text-teal-900 hover:bg-teal-100"
             : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
         }`}
-        disabled={!sessionIsOpen && !pollNeedsEnding}
+        disabled={!sessionIsOpen && !pollCanBeClosed}
         type="button"
         onClick={openManager}
       >
         {pollIsLive
           ? `Poll live (${results?.responseCount ?? 0})`
-          : pollNeedsEnding
-            ? "Poll ready to end"
+          : pollCanBeClosed
+            ? "Poll ready to close"
             : !sessionIsOpen
             ? "Session closed"
           : "Run poll"}
@@ -789,7 +793,7 @@ export function HostPollManager({
                             {pollIsLive
                               ? "Live"
                               : poll.status === "ended"
-                                ? "Ended"
+                                ? "Closed"
                                 : "Time ended"}
                           </span>
                           <span className="text-sm text-slate-500">
@@ -807,11 +811,14 @@ export function HostPollManager({
                         </div>
                       </div>
                       {poll.status === "active" ? (
-                        <SessionTimer timerEndsAt={poll.endsAt} />
+                        <SessionTimer
+                          isEnded={pollVotingHasEnded(poll, nowMs)}
+                          timerEndsAt={poll.endsAt}
+                        />
                       ) : (
                         <div className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
                           <p className="text-xs font-semibold uppercase tracking-[0.12em]">
-                            Poll ended
+                            Poll closed
                           </p>
                           <p className="text-xl font-semibold tabular-nums">0:00</p>
                         </div>
@@ -891,9 +898,11 @@ export function HostPollManager({
                             className="h-10 rounded-md border border-red-200 px-3 text-sm font-semibold text-red-700 transition hover:border-red-400 disabled:opacity-60"
                             disabled={isSaving}
                             type="button"
-                            onClick={() => void updatePoll("end")}
+                            onClick={() =>
+                              void updatePoll(pollIsLive ? "finish" : "end")
+                            }
                           >
-                            End poll
+                            {pollIsLive ? "End poll" : "Close poll"}
                           </button>
                           </>
                         ) : (

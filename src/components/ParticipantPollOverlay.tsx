@@ -44,7 +44,8 @@ export function ParticipantPollOverlay({
   }, [poll.endsAt]);
 
   const endTime = new Date(poll.endsAt).getTime();
-  const timerEnded = nowMs > 0 && endTime <= nowMs;
+  const timerEnded =
+    poll.votingEndedAt !== null || (nowMs > 0 && endTime <= nowMs);
   const solutionIsVisible = poll.solutionRevealed || timerEnded;
 
   useEffect(() => {
@@ -57,7 +58,11 @@ export function ParticipantPollOverlay({
   }, []);
 
   const remainingSeconds =
-    nowMs > 0 ? Math.max(0, (endTime - nowMs) / 1000) : poll.durationSeconds;
+    poll.votingEndedAt !== null
+      ? 0
+      : nowMs > 0
+        ? Math.max(0, (endTime - nowMs) / 1000)
+        : poll.durationSeconds;
 
   async function saveSelection(nextOptionIds: string[]) {
     selectedOptionIdsRef.current = nextOptionIds;

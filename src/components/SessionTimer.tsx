@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatTimerSeconds } from "@/lib/timer-duration";
+import { formatTimerSeconds } from "../lib/timer-duration";
 
 type SessionTimerProps = {
+  isEnded?: boolean;
   idleText?: string;
   timerEndsAt: string | null;
   variant?: "compact" | "student";
@@ -26,6 +27,7 @@ export function getTimerRemainingSeconds(timerEndsAt: string | null, nowMs: numb
 }
 
 export function SessionTimer({
+  isEnded = false,
   idleText = "No timer running",
   timerEndsAt,
   variant = "compact",
@@ -40,11 +42,14 @@ export function SessionTimer({
     return () => window.clearInterval(timer);
   }, [timerEndsAt]);
 
-  const remainingSeconds = getTimerRemainingSeconds(timerEndsAt, nowMs);
+  const remainingSeconds = isEnded
+    ? 0
+    : getTimerRemainingSeconds(timerEndsAt, nowMs);
   const hasTimer = remainingSeconds !== null;
-  const isRunning = hasTimer && remainingSeconds > 0;
+  const isRunning = remainingSeconds !== null && remainingSeconds > 0;
   const status = isRunning ? "Time remaining" : hasTimer ? "Timer ended" : idleText;
-  const time = hasTimer ? formatTimerSeconds(remainingSeconds) : "--:--";
+  const time =
+    remainingSeconds !== null ? formatTimerSeconds(remainingSeconds) : "--:--";
 
   return (
     <div
