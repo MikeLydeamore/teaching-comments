@@ -4,6 +4,7 @@ import {
   getSession,
   type ParticipantPoll,
 } from "@/lib/edie-store";
+import { recordSessionPresence } from "@/lib/submission-view-realtime";
 
 export async function GET(
   request: Request,
@@ -19,7 +20,12 @@ export async function GET(
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const participantId = new URL(request.url).searchParams.get("participantId") ?? "";
+  const searchParams = new URL(request.url).searchParams;
+  const participantId = searchParams.get("participantId") ?? "";
+  const presencePromise =
+    searchParams.get("presence") === "1" && participantId
+      ? recordSessionPresence(session.id, participantId)
+      : Promise.resolve(false);
   const availablePoll = session.isOpen ? poll : null;
   const participantPoll = availablePoll
     ? {
@@ -49,6 +55,8 @@ export async function GET(
       activePoll = { ...participantPoll, selectedOptionIds: [] };
     }
   }
+
+  await presencePromise;
 
   return Response.json({
     activePoll,

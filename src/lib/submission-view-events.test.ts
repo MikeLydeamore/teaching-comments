@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   encodeSubmissionViewEvent,
+  encodeSubmissionViewPresenceEvent,
   isSubmissionViewInvalidation,
+  parseSubmissionViewPresence,
   submissionViewInvalidationPayload,
 } from "./submission-view-events";
 
@@ -20,5 +22,34 @@ describe("submission view events", () => {
     expect(isSubmissionViewInvalidation('{"version":2}')).toBe(false);
     expect(isSubmissionViewInvalidation("not-json")).toBe(false);
   });
-});
 
+  it("serializes and parses participant presence", () => {
+    expect(encodeSubmissionViewPresenceEvent(12)).toBe(
+      'event: participant-presence\ndata: {"version":1,"connectedParticipants":12}\n\n',
+    );
+    expect(
+      parseSubmissionViewPresence(
+        '{"version":1,"connectedParticipants":12}',
+      ),
+    ).toBe(12);
+    expect(
+      parseSubmissionViewPresence(
+        '{"version":1,"connectedParticipants":null}',
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects malformed or incompatible participant presence", () => {
+    expect(
+      parseSubmissionViewPresence(
+        '{"version":2,"connectedParticipants":12}',
+      ),
+    ).toBeUndefined();
+    expect(
+      parseSubmissionViewPresence(
+        '{"version":1,"connectedParticipants":-1}',
+      ),
+    ).toBeUndefined();
+    expect(parseSubmissionViewPresence("not-json")).toBeUndefined();
+  });
+});

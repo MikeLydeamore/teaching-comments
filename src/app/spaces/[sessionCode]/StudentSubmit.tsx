@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { DrawingPad } from "@/components/DrawingPad";
@@ -18,6 +19,7 @@ import { ImageUploadPanel, type PreparedImage } from "@/components/ImageUploadPa
 import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
 import { isMarkdownSubmitShortcut } from "@/lib/submission-markdown-editor";
+import { studentPresenceHeartbeatIsDue } from "@/lib/student-presence";
 import type { DrawingData, GifData, ParticipantPoll } from "@/lib/edie-store";
 
 type StudentSubmitProps = {
@@ -94,6 +96,7 @@ export function StudentSubmit({
   const [pollParticipantId] = useState(() =>
     typeof window === "undefined" ? "" : getOrCreatePollParticipantId(),
   );
+  const lastPresenceHeartbeatAtRef = useRef<number | null>(null);
   const [activePoll, setActivePoll] = useState<ParticipantPoll | null>(null);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
@@ -122,10 +125,28 @@ export function StudentSubmit({
     activeText.trim().length >= 1 || activeDrawingData !== null || activeGifData !== null || activeImage !== null;
 
   const refreshSession = useCallback(async () => {
-    const query = pollParticipantId
-      ? `?participantId=${encodeURIComponent(pollParticipantId)}`
-      : "";
-    const response = await fetch(`/api/sessions/${sessionId}/student${query}`);
+    const query = new URLSearchParams();
+
+    if (pollParticipantId) {
+      query.set("participantId", pollParticipantId);
+
+      const currentTime = Date.now();
+      if (
+        document.visibilityState === "visible" &&
+        studentPresenceHeartbeatIsDue(
+          lastPresenceHeartbeatAtRef.current,
+          currentTime,
+        )
+      ) {
+        query.set("presence", "1");
+        lastPresenceHeartbeatAtRef.current = currentTime;
+      }
+    }
+
+    const queryString = query.toString();
+    const response = await fetch(
+      `/api/sessions/${sessionId}/student${queryString ? `?${queryString}` : ""}`,
+    );
 
     if (!response.ok) {
       return;

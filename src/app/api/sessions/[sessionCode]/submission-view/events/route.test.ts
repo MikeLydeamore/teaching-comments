@@ -1,8 +1,9 @@
 import { EventEmitter } from "node:events";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authorizationMock, createSubscriberMock } = vi.hoisted(() => ({
+const { authorizationMock, countPresenceMock, createSubscriberMock } = vi.hoisted(() => ({
   authorizationMock: vi.fn(),
+  countPresenceMock: vi.fn(),
   createSubscriberMock: vi.fn(),
 }));
 
@@ -13,10 +14,13 @@ vi.mock("@/lib/teacher-session-auth", () => ({
 vi.mock("@/lib/submission-view-events", () => ({
   encodeSubmissionViewEvent: (event: string) =>
     `event: ${event}\ndata: {"version":1}\n\n`,
+  encodeSubmissionViewPresenceEvent: (connectedParticipants: number | null) =>
+    `event: participant-presence\ndata: ${JSON.stringify({ version: 1, connectedParticipants })}\n\n`,
   isSubmissionViewInvalidation: (message: string) =>
     message === '{"version":1}',
 }));
 vi.mock("@/lib/submission-view-realtime", () => ({
+  countSessionPresence: countPresenceMock,
   createSubmissionViewSubscriber: createSubscriberMock,
   submissionViewRealtimeChannel: (sessionId: string) =>
     `edie:submission-view:${sessionId}`,
@@ -46,8 +50,14 @@ function fakeSubscriber() {
 
 beforeEach(() => {
   authorizationMock.mockReset();
+  countPresenceMock.mockReset();
   createSubscriberMock.mockReset();
   authorizationMock.mockResolvedValue({ session: { id: "internal-session-1" } });
+  countPresenceMock.mockResolvedValue(2);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("submission view event stream", () => {
@@ -95,11 +105,16 @@ describe("submission view event stream", () => {
     const decoder = new TextDecoder();
     const firstChunk = await reader.read();
     const secondChunk = await reader.read();
+    const presenceChunk = await reader.read();
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     expect(decoder.decode(firstChunk.value)).toContain("retry: 1000");
     expect(decoder.decode(secondChunk.value)).toContain("event: ready");
+    expect(decoder.decode(presenceChunk.value)).toContain(
+      'event: participant-presence\ndata: {"version":1,"connectedParticipants":2}',
+    );
+    expect(countPresenceMock).toHaveBeenCalledWith("internal-session-1");
     expect(subscriber.subscribe).toHaveBeenCalledWith(
       "edie:submission-view:internal-session-1",
     );
@@ -120,5 +135,62 @@ describe("submission view event stream", () => {
 
     await reader.cancel();
     expect(subscriber.disconnect).toHaveBeenCalled();
+  });
+
+  it("sends periodic presence updates and stops them when cancelled", async () => {
+    vi.useFakeTimers();
+    const subscriber = fakeSubscriber();
+    createSubscriberMock.mockReturnValue(subscriber);
+
+    const response = await GET(
+      new Request(
+        "https://example.test/api/sessions/session-1/submission-view/events",
+      ),
+      context as never,
+    );
+    const reader = response.body!.getReader();
+
+    await reader.read();
+    await reader.read();
+    await reader.read();
+    expect(countPresenceMock).toHaveBeenCalledTimes(1);
+
+    const periodicPresence = reader.read();
+    await vi.advanceTimersByTimeAsync(10_000);
+    const chunk = await periodicPresence;
+    expect(new TextDecoder().decode(chunk.value)).toContain(
+      "event: participant-presence",
+    );
+    expect(countPresenceMock).toHaveBeenCalledTimes(2);
+
+    await reader.cancel();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(countPresenceMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an unavailable presence count without degrading submissions", async () => {
+    const subscriber = fakeSubscriber();
+    createSubscriberMock.mockReturnValue(subscriber);
+    countPresenceMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request(
+        "https://example.test/api/sessions/session-1/submission-view/events",
+      ),
+      context as never,
+    );
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+
+    await reader.read();
+    const readyChunk = await reader.read();
+    const presenceChunk = await reader.read();
+
+    expect(decoder.decode(readyChunk.value)).toContain("event: ready");
+    expect(decoder.decode(presenceChunk.value)).toContain(
+      '"connectedParticipants":null',
+    );
+
+    await reader.cancel();
   });
 });

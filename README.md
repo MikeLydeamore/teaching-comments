@@ -88,6 +88,13 @@ When `REDIS_URL` is absent or Redis cannot be reached, both screens display a
 `Polling` badge and automatically return to three-second submission polling.
 Other live features keep their existing refresh behavior.
 
+The dashboard and submissions popout also show an approximate connected-student
+count. Visible student forms add an anonymous browser identifier to an ephemeral
+Redis presence set at most once every 10 seconds. Identifiers not seen for 25
+seconds are excluded and removed when the host count is read. The count continues
+while submissions are closed, contains no names or response content, and displays
+as unavailable when Redis is not configured or cannot be reached.
+
 
 Monitor usage in Vercel under **Observability → Functions** (provisioned
 memory, active CPU, and invocations) and in the Upstash console under the

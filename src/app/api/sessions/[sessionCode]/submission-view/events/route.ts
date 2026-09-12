@@ -1,8 +1,10 @@
 import {
   encodeSubmissionViewEvent,
+  encodeSubmissionViewPresenceEvent,
   isSubmissionViewInvalidation,
 } from "@/lib/submission-view-events";
 import {
+  countSessionPresence,
   createSubmissionViewSubscriber,
   submissionViewRealtimeChannel,
 } from "@/lib/submission-view-realtime";
@@ -12,6 +14,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
+const PRESENCE_INTERVAL_MS = 10_000;
 const STREAM_RECYCLE_MS = 270_000;
 const INITIAL_PADDING = `: ${" ".repeat(2_048)}\nretry: 1000\n\n`;
 
@@ -44,6 +47,7 @@ export async function GET(
       let closed = false;
       let connectionState: "connecting" | "degraded" | "ready" = "connecting";
       let subscribed = false;
+      let presenceReadInFlight = false;
 
       const enqueue = (value: string) => {
         if (!closed) {
@@ -55,6 +59,7 @@ export async function GET(
         if (connectionState !== "degraded" && !closed) {
           connectionState = "degraded";
           enqueue(encodeSubmissionViewEvent("degraded"));
+          enqueue(encodeSubmissionViewPresenceEvent(null));
         }
       };
 
@@ -81,14 +86,31 @@ export async function GET(
       const onConnectionLost = () => setDegraded();
       const onError = () => setDegraded();
 
+      const sendPresence = () => {
+        if (closed || presenceReadInFlight) return;
+        presenceReadInFlight = true;
+
+        void countSessionPresence(authorization.session.id)
+          .then((connectedParticipants) => {
+            enqueue(
+              encodeSubmissionViewPresenceEvent(connectedParticipants),
+            );
+          })
+          .finally(() => {
+            presenceReadInFlight = false;
+          });
+      };
+
       const heartbeat = setInterval(() => {
         enqueue(`: heartbeat ${Date.now()}\n\n`);
       }, HEARTBEAT_INTERVAL_MS);
+      const presenceTimer = setInterval(sendPresence, PRESENCE_INTERVAL_MS);
 
       const cleanup = (closeController: boolean) => {
         if (closed) return;
         closed = true;
         clearInterval(heartbeat);
+        clearInterval(presenceTimer);
         clearTimeout(recycle);
         request.signal.removeEventListener("abort", onAbort);
         subscriber.off("message", onMessage);
@@ -134,6 +156,7 @@ export async function GET(
           await subscriber.subscribe(channel);
           subscribed = true;
           setReady();
+          sendPresence();
         } catch {
           setDegraded();
         }

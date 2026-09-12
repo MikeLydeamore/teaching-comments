@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { ConnectedParticipantBadge } from "@/components/ConnectedParticipantBadge";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { InlineCodeText } from "@/components/InlineCodeText";
@@ -120,7 +121,8 @@ export function SubmissionsPopout({
     setLastRefresh(new Date());
   }, [applyView, sessionCode]);
 
-  const realtimeStatus = useSubmissionViewRealtime({ refresh, sessionCode });
+  const { connectedParticipants, status: realtimeStatus } =
+    useSubmissionViewRealtime({ refresh, sessionCode });
 
   async function updateViewSettings(
     patch: SubmissionViewSettingsPatch,
@@ -204,6 +206,9 @@ export function SubmissionsPopout({
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <ConnectedParticipantBadge
+              connectedParticipants={connectedParticipants}
+            />
             <SubmissionViewConnectionBadge status={realtimeStatus} />
             <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
               {submissions.length} shown

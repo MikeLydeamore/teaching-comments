@@ -7,12 +7,17 @@ export type SubmissionViewRealtimeStatus =
 
 export type SubmissionViewServerEvent =
   | "degraded"
+  | "participant-presence"
   | "ready"
   | "reconnect"
   | "submission-view-invalidated";
 
 type SubmissionViewEventPayload = {
   version: typeof SUBMISSION_VIEW_EVENT_VERSION;
+};
+
+type SubmissionViewPresencePayload = SubmissionViewEventPayload & {
+  connectedParticipants: number | null;
 };
 
 export function submissionViewInvalidationPayload(): string {
@@ -34,3 +39,35 @@ export function encodeSubmissionViewEvent(
   return `event: ${event}\ndata: ${submissionViewInvalidationPayload()}\n\n`;
 }
 
+export function encodeSubmissionViewPresenceEvent(
+  connectedParticipants: number | null,
+): string {
+  return `event: participant-presence\ndata: ${JSON.stringify({
+    version: SUBMISSION_VIEW_EVENT_VERSION,
+    connectedParticipants,
+  })}\n\n`;
+}
+
+export function parseSubmissionViewPresence(
+  value: string,
+): number | null | undefined {
+  try {
+    const parsed = JSON.parse(value) as Partial<SubmissionViewPresencePayload>;
+
+    if (parsed.version !== SUBMISSION_VIEW_EVENT_VERSION) {
+      return undefined;
+    }
+
+    if (parsed.connectedParticipants === null) {
+      return null;
+    }
+
+    return typeof parsed.connectedParticipants === "number" &&
+      Number.isSafeInteger(parsed.connectedParticipants) &&
+      parsed.connectedParticipants >= 0
+      ? parsed.connectedParticipants
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}

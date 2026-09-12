@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ConnectedParticipantBadge } from "@/components/ConnectedParticipantBadge";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
@@ -561,7 +562,10 @@ function TeacherDashboardContent({
     () => refresh({ scope: "submissions" }),
     [refresh],
   );
-  const submissionRealtimeStatus = useSubmissionViewRealtime({
+  const {
+    connectedParticipants,
+    status: submissionRealtimeStatus,
+  } = useSubmissionViewRealtime({
     refresh: refreshSubmissions,
     sessionCode: session.id,
   });
@@ -1324,40 +1328,45 @@ function TeacherDashboardContent({
               </h1>
             </div>
           </div>
-          <button
-            aria-checked={sessionDetails.isOpen}
-            className={`flex min-h-10 items-center gap-2.5 rounded-full border py-1 pl-1 pr-3 transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60 ${
-              sessionDetails.isOpen
-                ? "border-teal-200 bg-teal-50 hover:border-teal-400 focus-visible:ring-teal-100"
-                : "border-amber-300 bg-amber-50 hover:border-amber-400 focus-visible:ring-amber-100"
-            }`}
-            disabled={isUpdatingSessionAccess}
-            role="switch"
-            type="button"
-            onClick={() => {
-              void setSessionOpen(!sessionDetails.isOpen);
-            }}
-          >
-            <span
-              aria-hidden="true"
-              className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
-                sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
+          <div className="flex flex-wrap items-center gap-2">
+            <ConnectedParticipantBadge
+              connectedParticipants={connectedParticipants}
+            />
+            <button
+              aria-checked={sessionDetails.isOpen}
+              className={`flex min-h-10 items-center gap-2.5 rounded-full border py-1 pl-1 pr-3 transition focus-visible:outline-none focus-visible:ring-4 disabled:cursor-wait disabled:opacity-60 ${
+                sessionDetails.isOpen
+                  ? "border-teal-200 bg-teal-50 hover:border-teal-400 focus-visible:ring-teal-100"
+                  : "border-amber-300 bg-amber-50 hover:border-amber-400 focus-visible:ring-amber-100"
               }`}
+              disabled={isUpdatingSessionAccess}
+              role="switch"
+              type="button"
+              onClick={() => {
+                void setSessionOpen(!sessionDetails.isOpen);
+              }}
             >
               <span
-                className={`block size-5 rounded-full bg-white shadow-sm transition ${
-                  sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
+                aria-hidden="true"
+                className={`flex h-7 w-12 items-center rounded-full p-1 transition ${
+                  sessionDetails.isOpen ? "bg-teal-600" : "bg-slate-300"
                 }`}
-              />
-            </span>
-            <span
-              className={`text-xs font-semibold uppercase tracking-[0.1em] ${
-                sessionDetails.isOpen ? "text-teal-800" : "text-amber-800"
-              }`}
-            >
-              {sessionDetails.isOpen ? "Session open" : "Session closed"}
-            </span>
-          </button>
+              >
+                <span
+                  className={`block size-5 rounded-full bg-white shadow-sm transition ${
+                    sessionDetails.isOpen ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </span>
+              <span
+                className={`text-xs font-semibold uppercase tracking-[0.1em] ${
+                  sessionDetails.isOpen ? "text-teal-800" : "text-amber-800"
+                }`}
+              >
+                {sessionDetails.isOpen ? "Session open" : "Session closed"}
+              </span>
+            </button>
+          </div>
           <Link
             className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
             href={studentUrl}

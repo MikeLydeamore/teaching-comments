@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { SubmissionViewRealtimeStatus } from "./submission-view-events";
+import {
+  parseSubmissionViewPresence,
+  type SubmissionViewRealtimeStatus,
+} from "./submission-view-events";
 
 const POLL_INTERVAL_MS = 3_000;
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
@@ -20,10 +23,16 @@ export function submissionViewReconnectDelay(attempt: number) {
 export function useSubmissionViewRealtime({
   refresh,
   sessionCode,
-}: UseSubmissionViewRealtimeOptions): SubmissionViewRealtimeStatus {
+}: UseSubmissionViewRealtimeOptions): {
+  connectedParticipants: number | null;
+  status: SubmissionViewRealtimeStatus;
+} {
   const refreshRef = useRef(refresh);
   const [status, setStatus] =
     useState<SubmissionViewRealtimeStatus>("reconnecting");
+  const [connectedParticipants, setConnectedParticipants] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     refreshRef.current = refresh;
@@ -85,6 +94,7 @@ export function useSubmissionViewRealtime({
       if (disposed || eventSource) return;
       clearReconnectTimer();
       setStatus("reconnecting");
+      setConnectedParticipants(null);
 
       const nextSource = new EventSource(
         `/api/sessions/${encodeURIComponent(sessionCode)}/submission-view/events`,
@@ -105,8 +115,18 @@ export function useSubmissionViewRealtime({
         }
       });
 
+      nextSource.addEventListener("participant-presence", (event) => {
+        if (disposed || eventSource !== nextSource) return;
+        const nextCount = parseSubmissionViewPresence(event.data);
+
+        if (nextCount !== undefined) {
+          setConnectedParticipants(nextCount);
+        }
+      });
+
       nextSource.addEventListener("degraded", () => {
         if (!disposed && eventSource === nextSource) {
+          setConnectedParticipants(null);
           startPolling();
           requestRefresh();
         }
@@ -116,6 +136,7 @@ export function useSubmissionViewRealtime({
         if (disposed || eventSource !== nextSource) return;
         nextSource.close();
         eventSource = null;
+        setConnectedParticipants(null);
         startPolling();
         clearReconnectTimer();
         const delay = immediate
@@ -152,6 +173,7 @@ export function useSubmissionViewRealtime({
         eventSource = null;
       }
       clearReconnectTimer();
+      setConnectedParticipants(null);
       startPolling();
     };
 
@@ -172,6 +194,5 @@ export function useSubmissionViewRealtime({
     };
   }, [sessionCode]);
 
-  return status;
+  return { connectedParticipants, status };
 }
-
