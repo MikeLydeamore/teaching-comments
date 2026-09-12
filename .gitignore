@@ -49,3 +49,5 @@ next-env.d.ts
 agent/
 .claude/
 skills-lock.json
+
+docs/

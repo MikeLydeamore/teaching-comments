@@ -14,7 +14,6 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { QrCode } from "@/components/QrCode";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
-import { SubmissionViewConnectionBadge } from "@/components/SubmissionViewConnectionBadge";
 import type {
   SubmissionDto,
   SubmissionViewSettings,
@@ -208,8 +207,8 @@ export function SubmissionsPopout({
           <div className="flex flex-wrap items-center gap-3">
             <ConnectedParticipantBadge
               connectedParticipants={connectedParticipants}
+              status={realtimeStatus}
             />
-            <SubmissionViewConnectionBadge status={realtimeStatus} />
             <p className="rounded-md border border-slate-200 px-4 py-3 text-base font-semibold text-slate-700">
               {submissions.length} shown
             </p>

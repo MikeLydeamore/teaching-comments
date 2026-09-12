@@ -17,7 +17,6 @@ import { ResultsChart, type ChartType } from "@/components/ResultsChart";
 import { SessionTimer } from "@/components/SessionTimer";
 import { SubmissionImagePreview } from "@/components/SubmissionImagePreview";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
-import { SubmissionViewConnectionBadge } from "@/components/SubmissionViewConnectionBadge";
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
@@ -1331,6 +1330,7 @@ function TeacherDashboardContent({
           <div className="flex flex-wrap items-center gap-2">
             <ConnectedParticipantBadge
               connectedParticipants={connectedParticipants}
+              status={submissionRealtimeStatus}
             />
             <button
               aria-checked={sessionDetails.isOpen}
@@ -1618,7 +1618,6 @@ function TeacherDashboardContent({
               Live writing stream
             </h2>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <SubmissionViewConnectionBadge status={submissionRealtimeStatus} />
               <p className="text-sm text-slate-500">
                 {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>
