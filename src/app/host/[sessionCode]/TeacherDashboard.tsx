@@ -19,6 +19,7 @@ import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor"
 import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
+import { formatTimeAgo } from "@/lib/relative-time";
 import {
   clampTimerSeconds,
   formatTimerSeconds,
@@ -105,15 +106,6 @@ const chartTypeOptions: { label: string; value: ChartType }[] = [
   { label: "Pie", value: "pie" },
   { label: "Word cloud", value: "wordCloud" },
 ];
-
-function minutesAgo(value: string) {
-  const elapsed = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(0, Math.floor(elapsed / 60000));
-
-  if (minutes < 1) return "just now";
-  if (minutes === 1) return "1 min ago";
-  return `${minutes} min ago`;
-}
 
 function refreshStatus(value: Date | null) {
   if (!value) return "Waiting for first refresh";
@@ -2162,7 +2154,7 @@ function TeacherDashboardContent({
                   >
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
-                        {minutesAgo(submission.createdAt)}
+                        {formatTimeAgo(submission.createdAt)}
                       </p>
                       <button
                         aria-label={`${expandedSubmissionId === submission.id ? "Collapse" : "Expand"} response from ${submission.studentName || "Anonymous"}`}
