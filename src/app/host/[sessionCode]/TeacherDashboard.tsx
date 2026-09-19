@@ -370,7 +370,18 @@ function TeacherDashboardContent({
     }
 
     const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
     const triggerElement = roomControlsTriggerRef.current;
+
+    if (scrollbarWidth > 0) {
+      const bodyPaddingRight = Number.parseFloat(
+        window.getComputedStyle(document.body).paddingRight,
+      );
+      document.body.style.paddingRight = `${bodyPaddingRight + scrollbarWidth}px`;
+    }
+
     document.body.style.overflow = "hidden";
     roomControlsCloseRef.current?.focus();
 
@@ -412,6 +423,7 @@ function TeacherDashboardContent({
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
       document.removeEventListener("keydown", handleKeyDown);
       triggerElement?.focus();
     };
