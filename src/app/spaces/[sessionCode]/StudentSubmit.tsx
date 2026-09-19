@@ -12,10 +12,10 @@ import {
 import { DrawingPad } from "@/components/DrawingPad";
 import { GiphyPicker } from "@/components/GiphyPicker";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
-import { InlineCodeText } from "@/components/InlineCodeText";
 import { ParticipantPollOverlay } from "@/components/ParticipantPollOverlay";
 import { SessionTimer, formatTimerSeconds } from "@/components/SessionTimer";
 import { ImageUploadPanel, type PreparedImage } from "@/components/ImageUploadPanel";
+import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor";
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
 import { isMarkdownSubmitShortcut } from "@/lib/submission-markdown-editor";
@@ -349,9 +349,12 @@ export function StudentSubmit({
             variant="student"
           />
         </div>
-        <p className="mt-2 text-lg leading-7 text-slate-900">
-          <InlineCodeText>{currentPrompt}</InlineCodeText>
-        </p>
+        <SubmissionMarkdown
+          className="mt-2 text-lg leading-7 text-slate-900"
+          imageEmbedsEnabled={imageEmbedsEnabled}
+        >
+          {currentPrompt}
+        </SubmissionMarkdown>
         {currentTimerDurationSeconds > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
             Timer length: {formatTimerSeconds(currentTimerDurationSeconds)}
