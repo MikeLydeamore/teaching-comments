@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { AccountMenu } from "@/components/AccountMenu";
 import { getCurrentTeacher, isAdminAuthenticated, isAdminTeacher } from "@/lib/auth-server";
+import { findUserProfilesByEmail } from "@/lib/auth-users";
 import { listSpaceMembers, listTeacherSpaces } from "@/lib/edie-store";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import {
@@ -43,9 +44,11 @@ const claimMessages: Record<string, string> = {
 
 const transferMessages: Record<string, string> = {
   ok: "Ownership transferred. Previous owners are now editors.",
-  invalid: "Enter a valid email address to transfer to.",
+  invalid: "Enter a valid username or email address to transfer to.",
   forbidden: "Only allow-listed admins can transfer spaces.",
   "not-found": "That space could not be found.",
+  "person-not-found": "No Ed.ie account has that username.",
+  unavailable: "Account details are temporarily unavailable. Please try again.",
 };
 
 export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageProps) {
@@ -58,7 +61,7 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
   const query = await searchParams;
   const isAdmin = isAdminTeacher(teacher) && (await isAdminAuthenticated());
   const spaces = isAdmin ? await listTeacherSpaces() : [];
-  const ownersBySpace = new Map<string, string[]>();
+  const ownerEmailsBySpace = new Map<string, string[]>();
   const memberCounts = new Map<string, number>();
   const ownerless = new Set<string>();
 
@@ -72,13 +75,17 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
       const ownerEmails = activeMembers
         .filter((member) => member.role === "owner")
         .map((member) => member.email);
-      ownersBySpace.set(space.code, ownerEmails);
+      ownerEmailsBySpace.set(space.code, ownerEmails);
 
       if (!ownerEmails.length) {
         ownerless.add(space.code);
       }
     }
   }
+
+  const ownerProfiles = await findUserProfilesByEmail(
+    [...ownerEmailsBySpace.values()].flat(),
+  );
 
   const createMessage = query.spaceCreate
     ? createMessages[query.spaceCreate] ?? ""
@@ -234,7 +241,7 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                     </thead>
                     <tbody>
                       {spaces.map((space) => {
-                        const owners = ownersBySpace.get(space.code) ?? [];
+                        const owners = ownerEmailsBySpace.get(space.code) ?? [];
 
                         return (
                           <tr className="border-b border-slate-100 align-top transition hover:bg-slate-50 last:border-0" key={space.code}>
@@ -252,11 +259,19 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                             </td>
                             <td className="py-4 pr-4 text-xs text-slate-600">
                               {owners.length ? (
-                                owners.map((email) => (
-                                  <span className="block break-all" key={email}>
-                                    {email}
-                                  </span>
-                                ))
+                                owners.map((email) => {
+                                  const profile = ownerProfiles.ok
+                                    ? ownerProfiles.profiles.get(email.toLowerCase())
+                                    : null;
+                                  const username =
+                                    profile?.displayUsername ?? profile?.username;
+
+                                  return (
+                                    <span className="block break-all" key={email}>
+                                      {username ? `@${username}` : email}
+                                    </span>
+                                  );
+                                })
                               ) : (
                                 <span className="font-semibold text-amber-700">
                                   Unowned
@@ -291,9 +306,10 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                                   <input
                                     className="h-8 w-44 rounded-md border border-slate-300 px-2 text-xs text-slate-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
                                     id={`transfer-${space.code}`}
-                                    name="ownerEmail"
-                                    placeholder="new-owner@email"
-                                    type="email"
+                                    autoCapitalize="none"
+                                    name="ownerIdentity"
+                                    placeholder="@username or email"
+                                    spellCheck={false}
                                   />
                                   <PendingSubmitButton
                                     className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
@@ -310,7 +326,7 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                     </tbody>
                   </table>
                   <p className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                    Transferring makes the new email the single owner; previous
+                    Transferring makes the selected account the single owner; previous
                     owners keep access as editors.
                   </p>
                 </div>

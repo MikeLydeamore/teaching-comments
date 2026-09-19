@@ -17,6 +17,8 @@ import {
   isAdminAuthenticated,
   isAdminTeacher,
 } from "@/lib/auth-server";
+import { findUserProfileByUsername } from "@/lib/auth-users";
+import { parseMemberInviteIdentity } from "@/lib/space-member-identity";
 
 function adminSpacesPath(status: string, spaceCode = "") {
   const params = new URLSearchParams({ spaceCreate: status });
@@ -114,12 +116,29 @@ export async function transferSpaceOwnership(formData: FormData) {
   await requireAdmin();
 
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
+  const identity = parseMemberInviteIdentity(formData.get("ownerIdentity"));
   let ownerEmail: string;
 
-  try {
-    ownerEmail = normalizeSpaceEmail(String(formData.get("ownerEmail") ?? ""));
-  } catch {
+  if (!identity.ok) {
     redirect(transferPath("invalid", spaceCode));
+  }
+
+  if (identity.kind === "username") {
+    let profile;
+
+    try {
+      profile = await findUserProfileByUsername(identity.username);
+    } catch {
+      redirect(transferPath("unavailable", spaceCode));
+    }
+
+    if (!profile) {
+      redirect(transferPath("person-not-found", spaceCode));
+    }
+
+    ownerEmail = profile.email;
+  } else {
+    ownerEmail = identity.email;
   }
 
   const space = await getTeacherSpace(spaceCode);
