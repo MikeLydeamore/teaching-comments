@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next"
-import { ThemeSelector } from "@/components/ThemeSelector";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,7 +36,6 @@ try {
       </head>
       <body className="min-h-full">
         {children}
-        <ThemeSelector />
         <Analytics />
         <SpeedInsights/>
       </body>

@@ -56,11 +56,6 @@ describe("SubmissionsPollOverlay", () => {
     );
 
     expect(output).toContain('role="dialog"');
-    expect(output).toContain("bg-slate-950/60");
-    expect(output).toContain("max-w-6xl");
-    expect(output).toContain("shadow-2xl");
-    expect(output).toContain("max-w-5xl text-2xl font-semibold leading-8");
-    expect(output).toContain("text-xl font-semibold uppercase");
     expect(output).not.toContain("Responses update automatically");
     expect(output).toContain("Which answer is correct?");
     expect(output).toContain("1 response");

@@ -50,4 +50,11 @@ agent/
 .claude/
 skills-lock.json
 
+# Personal setup notes
+setup-oauth.md
+database/grants-auth-tables.sql
+
+# Personal setup notes
+setup-oauth.md
+database/grants-auth-tables.sql
 docs/

@@ -31,7 +31,6 @@ type HostPollManagerProps = {
 };
 
 const pollExtensions = [15, 30, 60];
-const pollQuickAdjustments = [-5, -15, -30, 5, 15, 30];
 const activePollRefreshIntervalMs = 3_000;
 const idlePollRefreshIntervalMs = 15_000;
 const pollQuestionBankRefreshIntervalMs = 10_000;
