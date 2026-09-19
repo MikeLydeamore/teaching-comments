@@ -211,7 +211,7 @@ export default async function TeacherHomePage({
               <h3 className="mt-4 font-semibold text-slate-950">No spaces yet</h3>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">
                 Ask an Ed.ie admin to create a space for you, or ask a space
-                owner to share an existing one with your email.
+                owner to share an existing one with your username or sign-in email.
               </p>
             </div>
           )}

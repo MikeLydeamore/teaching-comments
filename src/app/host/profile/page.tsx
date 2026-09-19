@@ -4,6 +4,7 @@ import { AccountMenu } from "@/components/AccountMenu";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import { ProfileForm } from "./ProfileForm";
+import { UsernameForm } from "./UsernameForm";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,10 @@ export default async function ProfilePage() {
 
           <div>
             <ProfileForm displayName={teacher.name} />
+
+            <div className="border-t border-slate-200">
+              <UsernameForm displayUsername={teacher.displayUsername} />
+            </div>
 
             <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-center gap-3 border-t border-slate-200 pt-4 sm:grid-cols-[7rem_minmax(0,1fr)_7rem]">
               <label

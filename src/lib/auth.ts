@@ -3,8 +3,16 @@ import "server-only";
 import { PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
+import { username } from "better-auth/plugins";
 import { resolveAuthDatabaseUrl } from "./auth-database-url";
+import {
+  isValidUsernameValue,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  validateUsername,
+} from "./user-profile";
 
 const DEV_FALLBACK_SECRET = "edie-local-development-secret-not-for-production";
 
@@ -43,6 +51,8 @@ export type AuthSession = {
     email: string;
     emailVerified: boolean;
     image: string | null;
+    username: string | null;
+    displayUsername: string | null;
   };
 };
 
@@ -100,7 +110,50 @@ function createAuthInstance() {
         trustedProviders: ["google", "github"],
       },
     },
-    plugins: [nextCookies()],
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/update-user") return;
+
+        const body = ctx.body as Record<string, unknown>;
+        const hasUsername = "username" in body;
+        const hasDisplayUsername = "displayUsername" in body;
+
+        if (!hasUsername && !hasDisplayUsername) return;
+
+        if (
+          typeof body.username !== "string" ||
+          typeof body.displayUsername !== "string"
+        ) {
+          throw new APIError("BAD_REQUEST", {
+            message: "Username and display username must be updated together.",
+          });
+        }
+
+        const result = validateUsername(body.displayUsername);
+
+        if (!result.ok || result.username !== body.username.toLowerCase()) {
+          throw new APIError("BAD_REQUEST", {
+            message: result.ok
+              ? "Display username must match the username."
+              : result.message,
+          });
+        }
+
+        body.username = result.username;
+        body.displayUsername = result.displayUsername;
+      }),
+    },
+    plugins: [
+      username({
+        minUsernameLength: USERNAME_MIN_LENGTH,
+        maxUsernameLength: USERNAME_MAX_LENGTH,
+        usernameValidator: isValidUsernameValue,
+        displayUsernameValidator: isValidUsernameValue,
+        usernameNormalization: (value) => value.toLowerCase(),
+        displayUsernameNormalization: (value) => value.trim(),
+      }),
+      nextCookies(),
+    ],
   });
 }
 

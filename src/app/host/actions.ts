@@ -52,6 +52,10 @@ async function requireTeacher(returnTo = "/host") {
     redirect(loginRedirectPath(returnTo));
   }
 
+  if (!teacher.username) {
+    redirect("/host");
+  }
+
   return teacher;
 }
 

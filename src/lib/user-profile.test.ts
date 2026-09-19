@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DISPLAY_NAME_MAX_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
   validateDisplayName,
+  validateUsername,
 } from "./user-profile";
 
 describe("validateDisplayName", () => {
@@ -37,4 +40,53 @@ describe("validateDisplayName", () => {
       message: "Display names cannot contain line breaks or control characters.",
     });
   });
+});
+
+describe("validateUsername", () => {
+  it("normalizes an optional @ prefix while preserving display case", () => {
+    expect(validateUsername("  @Jane_Smith  ")).toEqual({
+      ok: true,
+      username: "jane_smith",
+      displayUsername: "Jane_Smith",
+    });
+  });
+
+  it.each([undefined, null, "", "@", "  "])("rejects an empty value", (value) => {
+    expect(validateUsername(value)).toEqual({
+      ok: false,
+      message: "Enter a username.",
+    });
+  });
+
+  it("enforces the username length limits", () => {
+    expect(validateUsername("a".repeat(USERNAME_MIN_LENGTH - 1))).toEqual({
+      ok: false,
+      message: `Usernames must be ${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters.`,
+    });
+    expect(validateUsername("a".repeat(USERNAME_MAX_LENGTH + 1))).toEqual({
+      ok: false,
+      message: `Usernames must be ${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} characters.`,
+    });
+  });
+
+  it.each(["_jane", "jane-smith", "jane.smith", "jane smith"])(
+    "rejects unsupported characters in %s",
+    (value) => {
+      expect(validateUsername(value)).toEqual({
+        ok: false,
+        message:
+          "Use letters, numbers, and underscores, starting with a letter or number.",
+      });
+    },
+  );
+
+  it.each(["admin", "Administrator", "EDIE", "support", "system"])(
+    "rejects reserved username %s",
+    (value) => {
+      expect(validateUsername(value)).toEqual({
+        ok: false,
+        message: "That username is reserved.",
+      });
+    },
+  );
 });

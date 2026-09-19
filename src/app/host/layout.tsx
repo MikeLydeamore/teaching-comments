@@ -1,9 +1,18 @@
+import { UsernameSetupGate } from "@/components/UsernameSetupGate";
+import { getCurrentTeacher } from "@/lib/auth-server";
+
 export const dynamic = "force-dynamic";
 
-export default function HostLayout({
+export default async function HostLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const teacher = await getCurrentTeacher();
+
+  if (teacher && !teacher.username) {
+    return <UsernameSetupGate name={teacher.name} />;
+  }
+
   return children;
 }

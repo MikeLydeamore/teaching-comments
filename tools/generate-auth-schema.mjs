@@ -8,6 +8,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
+import { username } from "better-auth/plugins";
 
 const pool = new Pool({
   // Introspected during generation; must be a reachable Postgres.
@@ -26,6 +27,24 @@ const auth = betterAuth({
       trustedProviders: ["google", "github"],
     },
   },
+  plugins: [
+    username({
+      minUsernameLength: 3,
+      maxUsernameLength: 30,
+      usernameValidator: (value) =>
+        /^[A-Za-z0-9][A-Za-z0-9_]*$/.test(value) &&
+        !["admin", "administrator", "edie", "support", "system"].includes(
+          value.toLowerCase(),
+        ),
+      displayUsernameValidator: (value) =>
+        /^[A-Za-z0-9][A-Za-z0-9_]*$/.test(value) &&
+        !["admin", "administrator", "edie", "support", "system"].includes(
+          value.toLowerCase(),
+        ),
+      usernameNormalization: (value) => value.toLowerCase(),
+      displayUsernameNormalization: (value) => value.trim(),
+    }),
+  ],
 });
 
 const migrations = await getMigrations(auth.options);

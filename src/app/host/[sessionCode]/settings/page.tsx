@@ -5,7 +5,7 @@ import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { getCurrentTeacher, getSpaceRoleForUser } from "@/lib/auth-server";
 import { findUserProfilesByEmail } from "@/lib/auth-users";
 import { getTeacherSpace, listSpaceMembers } from "@/lib/edie-store";
-import { normalizeSpaceEmail } from "@/lib/edie-store-model";
+import { buildSpaceMemberView } from "@/lib/space-member-view";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import {
   changeSpaceMemberRole,
@@ -17,7 +17,9 @@ const memberMessages: Record<string, string> = {
   added: "Invitation sent. They will get access after accepting it.",
   removed: "Member removed.",
   exists: "That person is already a member of this space.",
-  invalid: "Enter a valid email address.",
+  invalid: "Enter a valid username or email address.",
+  "not-found": "No Ed.ie account has that username.",
+  unavailable: "Member accounts are temporarily unavailable. Please try again.",
 };
 
 export default async function SpaceSettingsPage({
@@ -25,7 +27,7 @@ export default async function SpaceSettingsPage({
   searchParams,
 }: {
   params: Promise<{ sessionCode: string }>;
-  searchParams: Promise<{ member?: string; email?: string }>;
+  searchParams: Promise<{ member?: string }>;
 }) {
   const { sessionCode: spaceCodeParam } = await params;
   const teacher = await getCurrentTeacher();
@@ -43,7 +45,9 @@ export default async function SpaceSettingsPage({
 
   const query = await searchParams;
   const members = await listSpaceMembers(space.code);
-  const profiles = await findUserProfilesByEmail(members.map((member) => member.email));
+  const profileResult = await findUserProfilesByEmail(
+    members.map((member) => member.email),
+  );
   const isOwner = role === "owner";
   const activeMemberCount = members.filter(
     (member) => member.status === "active",
@@ -90,7 +94,7 @@ export default async function SpaceSettingsPage({
                 Manage access
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Members sign in with Google or GitHub using the exact email below.
+                Invite co-hosts by username without sharing sign-in email addresses.
               </p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
@@ -120,22 +124,23 @@ export default async function SpaceSettingsPage({
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Invite a co-host</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-600">Grant access by email and choose what they can manage.</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">Use an exact username or an email address and choose what they can manage.</p>
               </div>
             </div>
             <form action={inviteSpaceMember} className="mt-4 grid gap-4 md:grid-cols-[1fr_160px_auto]">
               <input name="spaceCode" type="hidden" value={space.code} />
               <div>
-                <label className="text-sm font-semibold text-slate-700" htmlFor="member-email">
-                  Email
+                <label className="text-sm font-semibold text-slate-700" htmlFor="member-identity">
+                  Username or email
                 </label>
                 <input
+                  autoCapitalize="none"
                   className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                  defaultValue={query.email ? normalizeSpaceEmail(query.email) : ""}
-                  id="member-email"
-                  name="email"
-                  placeholder="colleague@school.edu"
-                  type="email"
+                  id="member-identity"
+                  name="identity"
+                  placeholder="@colleague or colleague@school.edu"
+                  required
+                  spellCheck={false}
                 />
               </div>
               <div>
@@ -182,75 +187,96 @@ export default async function SpaceSettingsPage({
               <p className="mt-1 text-sm text-slate-500">People with access and pending invitations.</p>
             </div>
           </div>
-          {members.length ? (
+          {!profileResult.ok ? (
+            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900" role="alert">
+              Member details are temporarily unavailable. No private account information has been shown.
+            </p>
+          ) : members.length ? (
             <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
-              {members.map((member) => {
-                const profile = profiles.get(member.email.toLowerCase());
-                const displayName = profile?.name ?? member.email;
+              {members.map((member, index) => {
+                const profile = profileResult.profiles.get(member.email.toLowerCase()) ?? null;
+                const view = buildSpaceMemberView({
+                  isOwner,
+                  member,
+                  profile,
+                  viewerId: teacher.id,
+                });
 
                 return (
-                  <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={member.email}>
+                  <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={`${member.createdAt}-${index}`}>
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-1 ring-teal-200">
-                        {profile?.image ? (
+                        {view.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             alt=""
                             className="h-full w-full object-cover"
-                            src={profile.image}
+                            src={view.image}
                           />
                         ) : (
-                          displayName.charAt(0).toUpperCase()
+                          view.displayName.charAt(0).toUpperCase()
                         )}
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-950">
-                          {displayName}
-                          {member.email === teacher.email ? (
+                          {view.displayName}
+                          {view.isSelf ? (
                             <span className="ml-2 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 ring-1 ring-teal-200">
                               you
                             </span>
                           ) : null}
-                          {member.status === "pending" ? (
+                          {view.status === "pending" ? (
                             <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200">
                               invite pending
                             </span>
                           ) : null}
                         </p>
                         <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-slate-500">
-                          <span className="truncate">{member.email}</span>
-                          <span aria-hidden>·</span>
+                          {view.handle ? (
+                            <>
+                              <span className="truncate">{view.handle}</span>
+                              <span aria-hidden>·</span>
+                            </>
+                          ) : null}
                           <span className="shrink-0 font-semibold capitalize text-slate-600">
-                            {member.role}
+                            {view.role}
                           </span>
                         </div>
                       </div>
                     </div>
-                    {isOwner && member.email !== teacher.email ? (
+                    {isOwner && !view.isSelf && view.managementTarget ? (
                       <div className="flex items-center gap-2">
                         <form action={changeSpaceMemberRole}>
                           <input name="spaceCode" type="hidden" value={space.code} />
-                          <input name="email" type="hidden" value={member.email} />
+                          {"accountId" in view.managementTarget ? (
+                            <input name="accountId" type="hidden" value={view.managementTarget.accountId} />
+                          ) : (
+                            <input name="email" type="hidden" value={view.managementTarget.email} />
+                          )}
                           <input
                             name="role"
                             type="hidden"
-                            value={member.role === "owner" ? "editor" : "owner"}
+                            value={view.role === "owner" ? "editor" : "owner"}
                           />
                           <PendingSubmitButton
                             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                             pendingChildren="Saving..."
                           >
-                            Make {member.role === "owner" ? "editor" : "owner"}
+                            Make {view.role === "owner" ? "editor" : "owner"}
                           </PendingSubmitButton>
                         </form>
                         <form action={evictSpaceMember}>
                           <input name="spaceCode" type="hidden" value={space.code} />
-                          <input name="email" type="hidden" value={member.email} />
+                          {"accountId" in view.managementTarget ? (
+                            <input name="accountId" type="hidden" value={view.managementTarget.accountId} />
+                          ) : (
+                            <input name="email" type="hidden" value={view.managementTarget.email} />
+                          )}
                           <PendingSubmitButton
                             className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-400"
                             pendingChildren="Removing..."
                           >
-                            {member.status === "pending" ? "Cancel invite" : "Remove"}
+                            {view.status === "pending" ? "Cancel invite" : "Remove"}
                           </PendingSubmitButton>
                         </form>
                       </div>

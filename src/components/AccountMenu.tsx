@@ -9,6 +9,7 @@ export type AccountMenuUser = {
   name: string;
   email: string;
   image: string | null;
+  displayUsername?: string | null;
 };
 
 export function AccountMenu({
@@ -81,7 +82,9 @@ export function AccountMenu({
               <p className="truncate text-sm font-semibold text-slate-950">
                 {user.name}
               </p>
-              <p className="truncate text-xs text-slate-500">{user.email}</p>
+              <p className="truncate text-xs text-slate-500">
+                {user.displayUsername ? `@${user.displayUsername}` : user.email}
+              </p>
             </div>
           </div>
           <nav className="p-2">

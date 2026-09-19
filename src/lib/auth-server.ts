@@ -5,12 +5,14 @@ import { getAuth } from "@/lib/auth";
 import { getSpaceMemberRole } from "@/lib/edie-store";
 import type { SpaceRole } from "@/lib/edie-store-model";
 
-type CurrentTeacher = {
+export type CurrentTeacher = {
   id: string;
   name: string;
   email: string;
   emailVerified: boolean;
   image: string | null;
+  username: string | null;
+  displayUsername: string | null;
 };
 
 function adminAllowList() {
@@ -33,6 +35,8 @@ export async function getCurrentTeacher(): Promise<CurrentTeacher | null> {
     email: session.user.email,
     emailVerified: session.user.emailVerified ?? false,
     image: session.user.image ?? null,
+    username: session.user.username ?? null,
+    displayUsername: session.user.displayUsername ?? null,
   };
 }
 
@@ -40,6 +44,7 @@ export async function getCurrentTeacher(): Promise<CurrentTeacher | null> {
 export function isAdminTeacher(teacher: CurrentTeacher) {
   return (
     teacher.emailVerified &&
+    Boolean(teacher.username) &&
     Boolean(teacher.email) &&
     adminAllowList().includes(teacher.email.toLowerCase())
   );
@@ -59,7 +64,7 @@ export async function getSpaceRoleForUser(
 ): Promise<SpaceRole | null> {
   const teacher = await getCurrentTeacher();
 
-  if (!teacher) {
+  if (!teacher?.username) {
     return null;
   }
 

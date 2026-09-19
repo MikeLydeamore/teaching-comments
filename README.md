@@ -10,7 +10,7 @@ This includes:
 - a host dashboard at `/host/default/demo-lecture`
 - host-generated QR codes for the student session link
 - teacher accounts via Google/GitHub OAuth (no passwords)
-- teacher spaces with owner/editor sharing by email
+- teacher spaces with owner/editor sharing by private username or email invitation
 - an admin page at `/admin/spaces` for admins listed in `ADMIN_EMAILS`
 - in-session prompt editing from the host dashboard
 - per-session prompt history with response filtering by prompt
@@ -148,8 +148,10 @@ signed-in account with a membership row in `edie_space_members`:
 - **owner** — full access, can share the space and manage members
 - **editor** — run live sessions and moderate responses
 
-Members are invited by email on `/host/<space-code>/settings`; the invite
-becomes active as soon as the invitee signs in with that email.
+Every teacher chooses a unique username after their first OAuth sign-in. Space
+owners can invite an existing teacher by exact username, without seeing their
+sign-in email, or use an email address for someone who has not joined Ed.ie yet.
+Invitations remain pending until the invited teacher accepts them.
 
 Admins are verified emails listed in `ADMIN_EMAILS` (comma-separated). They
 manage all spaces from `/admin/spaces`, including claiming legacy spaces that
@@ -165,9 +167,17 @@ docker exec -i edie-auth-postgres psql -U edie -d edie_auth \
   < database/auth-schema.sql
 ```
 
+Existing auth databases created before usernames must apply the incremental
+migration before deploying username-aware code:
+
+```bash
+psql "$AUTH_DATABASE_URL" < database/add-auth-usernames.sql
+```
+
 In Neon, `AUTH_DATABASE_URL` is optional when the Better Auth tables share the
 application database. Apply `database/auth-schema.sql`, then run
 `database/add-auth-app-role-grants.sql` as the project owner. The restricted
 `edie_app` role can then use the deployment's `DATABASE_URL` for both the Ed.ie
 and Better Auth tables. An explicit `AUTH_DATABASE_URL` still takes precedence
-when auth uses a separate database.
+when auth uses a separate database. Apply `database/add-auth-usernames.sql` to
+each existing local, Preview, and Production auth database before deployment.
