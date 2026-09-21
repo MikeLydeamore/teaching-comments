@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GroupQuestion } from "@/lib/edie-store";
+import { formatTimeAgo } from "@/lib/relative-time";
 
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
@@ -33,17 +34,6 @@ function getOrCreateVoterId() {
   const nextVoterId = createVoterId();
   window.localStorage.setItem(voterIdStorageKey, nextVoterId);
   return nextVoterId;
-}
-
-function questionAge(value: string) {
-  const elapsedMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 60000),
-  );
-
-  if (elapsedMinutes < 1) return "just now";
-  if (elapsedMinutes === 1) return "1 min ago";
-  return `${elapsedMinutes} min ago`;
 }
 
 function ThumbsUpIcon({ isActive = false }: { isActive?: boolean }) {
@@ -448,7 +438,7 @@ export function GroupQuestionsPanel({
                     ? "Answered"
                     : !question.isVisible
                       ? "Hidden from participants"
-                      : questionAge(question.createdAt)}
+                      : formatTimeAgo(question.createdAt)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {canMarkAnswered ? (
