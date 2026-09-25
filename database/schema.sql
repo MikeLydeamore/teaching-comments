@@ -21,19 +21,11 @@ create table if not exists edie_teacher_spaces (
 );
 create table if not exists edie_space_members (
   space_code text not null references edie_teacher_spaces(code) on delete cascade,
-  user_id text,
-  email citext not null check (char_length(email) between 3 and 320),
+  user_id text not null,
   role text not null check (role in ('owner', 'editor')),
-  status text not null default 'pending' check (status in ('pending', 'active')),
   created_at timestamptz not null default now(),
-  primary key (space_code, email),
-  check (status <> 'active' or user_id is not null)
+  primary key (space_code, user_id)
 );
-create index if not exists edie_space_members_email_idx on edie_space_members (email);
-create index if not exists edie_space_members_email_status_idx on edie_space_members (email, status);
-create unique index if not exists edie_space_members_space_user_active_idx
-  on edie_space_members (space_code, user_id)
-  where status = 'active' and user_id is not null;
 create table if not exists edie_space_invitations (
   space_code text not null references edie_teacher_spaces(code) on delete cascade,
   email citext not null check (char_length(email) between 3 and 320),

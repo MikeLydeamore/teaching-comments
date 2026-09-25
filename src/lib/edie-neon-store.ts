@@ -309,12 +309,12 @@ export const neonStore: EdieStore = {
            SELECT $1, $2, id FROM organization
            RETURNING code, name, organization_id, created_at
          ), membership AS (
-           INSERT INTO edie_space_members (space_code, user_id, email, role, status)
-           SELECT code, $4, $5, 'owner', 'active' FROM created_space
+           INSERT INTO edie_space_members (space_code, user_id, role)
+           SELECT code, $4, 'owner' FROM created_space
            RETURNING space_code
          )
          SELECT created_space.* FROM created_space JOIN membership ON membership.space_code = created_space.code`,
-        [normalized, validateTeacherSpaceName(name), organizationName, owner.userId, normalizeSpaceEmail(owner.email)],
+        [normalized, validateTeacherSpaceName(name), organizationName, owner.userId],
       );
       return teacherSpaceFromRow(rows[0]);
     } catch (error) {
@@ -333,7 +333,7 @@ export const neonStore: EdieStore = {
   },
   async listTeacherSpacesForUser(userId) {
     const rows = await query(
-      "SELECT s.code, s.name, s.organization_id, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.user_id = $1 AND m.status = 'active' ORDER BY s.name ASC",
+      "SELECT s.code, s.name, s.organization_id, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.user_id = $1 ORDER BY s.name ASC",
       [userId],
     );
     return rows.map((row) => ({
@@ -360,13 +360,13 @@ export const neonStore: EdieStore = {
   },
   async getSpaceMemberRole(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
-    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND user_id = $2 AND status = 'active' LIMIT 1", [normalized, userId]);
+    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND user_id = $2 LIMIT 1", [normalized, userId]);
     return rows[0] ? validateSpaceRole(text(rows[0], "role")) : null;
   },
   async listSpaceMembers(spaceCode) {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) return [];
-    const rows = await query("SELECT space_code, user_id, role, created_at FROM edie_space_members WHERE space_code = $1 AND status = 'active' ORDER BY user_id ASC", [normalized]);
+    const rows = await query("SELECT space_code, user_id, role, created_at FROM edie_space_members WHERE space_code = $1 AND user_id IS NOT NULL ORDER BY user_id ASC", [normalized]);
     return rows.map(spaceMemberFromRow);
   },
   async listSpaceInvitations(spaceCode) {
@@ -374,7 +374,7 @@ export const neonStore: EdieStore = {
     const rows = await query("SELECT space_code, email, invitee_user_id, role, created_at FROM edie_space_invitations WHERE space_code = $1 ORDER BY email ASC", [normalized]);
     return rows.map(spaceInvitationFromRow);
   },
-  async addSpaceMember(spaceCode, userId, email, role = "editor") {
+  async addSpaceMember(spaceCode, userId, role = "editor") {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) throw new Error("Space code is required.");
     const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1", [normalized]);
@@ -382,14 +382,12 @@ export const neonStore: EdieStore = {
     try {
       const rows = await query(
         `WITH removed_invitation AS (
-           DELETE FROM edie_space_invitations WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
-         ), removed_legacy AS (
-           DELETE FROM edie_space_members WHERE space_code = $1 AND email = $3 AND status = 'pending'
+           DELETE FROM edie_space_invitations WHERE space_code = $1 AND invitee_user_id = $2
          )
-         INSERT INTO edie_space_members (space_code, user_id, email, role, status)
-         VALUES ($1, $2, $3, $4, 'active')
+         INSERT INTO edie_space_members (space_code, user_id, role)
+         VALUES ($1, $2, $3)
          RETURNING space_code, user_id, role, created_at`,
-        [normalized, userId, normalizeSpaceEmail(email), validateSpaceRole(role)],
+        [normalized, userId, validateSpaceRole(role)],
       );
       return spaceMemberFromRow(rows[0]);
     } catch (error) {
@@ -402,20 +400,13 @@ export const neonStore: EdieStore = {
     const normalizedEmail = normalizeSpaceEmail(email);
     try {
       const rows = await query(
-        `WITH invitation AS (
-           INSERT INTO edie_space_invitations (space_code, email, invitee_user_id, role)
-           SELECT $1, $2, $3, $4
-           WHERE NOT EXISTS (
-             SELECT 1 FROM edie_space_members
-             WHERE space_code = $1 AND status = 'active'
-               AND (user_id = $3 OR email = $2)
-           )
-           RETURNING space_code, email, invitee_user_id, role, created_at
-         ), legacy AS (
-           INSERT INTO edie_space_members (space_code, user_id, email, role, status)
-           SELECT space_code, NULL, email, role, 'pending' FROM invitation
-           RETURNING space_code
-         ) SELECT invitation.* FROM invitation JOIN legacy USING (space_code)`,
+        `INSERT INTO edie_space_invitations (space_code, email, invitee_user_id, role)
+         SELECT $1, $2, $3, $4
+         WHERE NOT EXISTS (
+           SELECT 1 FROM edie_space_members
+           WHERE space_code = $1 AND user_id = $3
+         )
+         RETURNING space_code, email, invitee_user_id, role, created_at`,
         [normalized, normalizedEmail, userId, validateSpaceRole(role)],
       );
       if (!rows[0]) throw new Error("That person is already a member of this space.");
@@ -431,14 +422,11 @@ export const neonStore: EdieStore = {
       `WITH invitation AS (
          DELETE FROM edie_space_invitations
          WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
-         RETURNING space_code, email, role
-       ), removed_legacy AS (
-         DELETE FROM edie_space_members m USING invitation i
-         WHERE m.space_code = i.space_code AND m.email = i.email AND m.status = 'pending'
+         RETURNING space_code, role
        )
-       INSERT INTO edie_space_members (space_code, user_id, email, role, status)
-       SELECT space_code, $2, $3, role, 'active' FROM invitation
-       ON CONFLICT (space_code, email) DO UPDATE SET user_id = EXCLUDED.user_id, role = EXCLUDED.role, status = 'active'
+       INSERT INTO edie_space_members (space_code, user_id, role)
+       SELECT space_code, $2, role FROM invitation
+       ON CONFLICT (space_code, user_id) DO UPDATE SET role = EXCLUDED.role
        RETURNING space_code`,
       [normalized, userId, normalizeSpaceEmail(email)],
     );
@@ -447,42 +435,35 @@ export const neonStore: EdieStore = {
   async declineSpaceInvitation(spaceCode, userId, email) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
     const rows = await query(
-      `WITH invitation AS (
-         DELETE FROM edie_space_invitations WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
-         RETURNING space_code, email
-       ), legacy AS (
-         DELETE FROM edie_space_members m USING invitation i
-         WHERE m.space_code = i.space_code AND m.email = i.email AND m.status = 'pending'
-       ) SELECT space_code FROM invitation`,
+      `DELETE FROM edie_space_invitations
+       WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
+       RETURNING space_code`,
       [normalized, userId, normalizeSpaceEmail(email)],
     );
     return rows.length > 0;
   },
   async leaveSpace(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
-    const rows = await query("DELETE FROM edie_space_members AS member WHERE member.space_code = $1 AND member.user_id = $2 AND member.status = 'active' AND (member.role = 'editor' OR EXISTS (SELECT 1 FROM edie_space_members AS other WHERE other.space_code = member.space_code AND other.user_id <> member.user_id AND other.status = 'active' AND other.role = 'owner')) RETURNING member.space_code", [normalized, userId]);
+    const rows = await query("DELETE FROM edie_space_members AS member WHERE member.space_code = $1 AND member.user_id = $2 AND (member.role = 'editor' OR EXISTS (SELECT 1 FROM edie_space_members AS other WHERE other.space_code = member.space_code AND other.user_id IS NOT NULL AND other.user_id <> member.user_id AND other.role = 'owner')) RETURNING member.space_code", [normalized, userId]);
     return rows.length > 0;
   },
   async updateSpaceMemberRole(spaceCode, userId, role) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
-    const rows = await query("UPDATE edie_space_members SET role = $3 WHERE space_code = $1 AND user_id = $2 AND status = 'active' RETURNING space_code, user_id, role, created_at", [normalized, userId, validateSpaceRole(role)]);
+    const rows = await query("UPDATE edie_space_members SET role = $3 WHERE space_code = $1 AND user_id = $2 RETURNING space_code, user_id, role, created_at", [normalized, userId, validateSpaceRole(role)]);
     return rows[0] ? spaceMemberFromRow(rows[0]) : null;
   },
   async removeSpaceMember(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) return false;
-    const rows = await query("DELETE FROM edie_space_members WHERE space_code = $1 AND user_id = $2 AND status = 'active' RETURNING space_code", [normalized, userId]);
+    const rows = await query("DELETE FROM edie_space_members WHERE space_code = $1 AND user_id = $2 RETURNING space_code", [normalized, userId]);
     return rows.length > 0;
   },
   async removeSpaceInvitation(spaceCode, email) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
     const rows = await query(
-      `WITH invitation AS (
-         DELETE FROM edie_space_invitations WHERE space_code = $1 AND email = $2 RETURNING space_code, email
-       ), legacy AS (
-         DELETE FROM edie_space_members m USING invitation i
-         WHERE m.space_code = i.space_code AND m.email = i.email AND m.status = 'pending'
-       ) SELECT space_code FROM invitation`,
+      `DELETE FROM edie_space_invitations
+       WHERE space_code = $1 AND email = $2
+       RETURNING space_code`,
       [normalized, normalizeSpaceEmail(email)],
     );
     return rows.length > 0;

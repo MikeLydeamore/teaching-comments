@@ -93,16 +93,38 @@ DATABASE_OWNER_URL="$DATABASE_OWNER_URL" AUTH_DATABASE_URL="$AUTH_DATABASE_URL" 
   npm run migrate-organizations
 DATABASE_OWNER_URL="$DATABASE_OWNER_URL" AUTH_DATABASE_URL="$AUTH_DATABASE_URL" \
   npm run migrate-organizations -- --apply
-psql "$DATABASE_OWNER_URL" < database/require-space-organizations.sql
+psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 \
+  -f database/require-space-organizations.sql
 ```
 
 When auth and application tables share a database, `DATABASE_URL` can be used
-for both connections. Keep the legacy membership email/status columns through
-the rollback soak period; current code dual-writes pending invitations while
-authorization reads stable Better Auth user IDs. Pause space creation,
-invitation acceptance, and access changes between the final successful
-`--apply` run and deployment of the new application, then rerun the dry-run if
-the deployment is delayed.
+for both connections. Pause space creation, invitation acceptance, and access
+changes between the final successful `--apply` run and deployment of the new
+application, then rerun the dry-run if the deployment is delayed.
+
+After validating the organization deployment, pause space creation and member
+or invitation changes, then finish the user-ID membership cutover. The
+preparation migration is compatible with both application builds:
+
+```bash
+psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 \
+  -f database/prepare-membership-user-id-cutover.sql
+```
+
+Deploy the application version that no longer reads or writes membership email
+or status fields, then immediately apply the contract migration with the
+table-owner connection:
+
+```bash
+psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 \
+  -f database/finish-membership-user-id-cutover.sql
+```
+
+The contract migration aborts if an active membership lacks a user ID or a
+legacy pending row has no corresponding entry in `edie_space_invitations`.
+Afterward, `edie_space_members` is keyed only by `(space_code, user_id)`; an
+invitation row itself represents pending status. Resume changes and test space
+creation, invitations, acceptance, and access only after this contract step.
 
 Set these environment variables locally and in Vercel:
 

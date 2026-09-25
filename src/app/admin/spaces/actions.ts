@@ -97,7 +97,6 @@ export async function createTeachingSpace(formData: FormData) {
   try {
     await createTeacherSpaceForOwner(spaceCode, name || spaceCode, {
       userId: owner.id,
-      email: owner.email,
       name: owner.name ?? owner.displayUsername ?? "Teacher",
     });
   } catch (error) {
@@ -127,7 +126,7 @@ export async function claimTeacherSpace(formData: FormData) {
   }
 
   try {
-    await addSpaceMember(spaceCode, admin.id, admin.email, "owner");
+    await addSpaceMember(spaceCode, admin.id, "owner");
   } catch {
     redirect(claimPath("not-found", spaceCode));
   }
@@ -197,7 +196,6 @@ export async function transferSpaceOwnership(formData: FormData) {
     await addSpaceMember(
       space.code,
       ownerProfile.id,
-      ownerProfile.email,
       "owner",
     );
   }

@@ -133,7 +133,7 @@ describe("transferSpaceOwnership", () => {
     expect(mocks.createTeacherSpaceForOwner).toHaveBeenCalledWith(
       "bstat",
       "ETX1100/5900 Business Statistics",
-      { userId: "admin-1", email: "admin@example.com", name: "Admin" },
+      { userId: "admin-1", name: "Admin" },
     );
     expect(mocks.addSpaceMember).not.toHaveBeenCalled();
   });
@@ -180,7 +180,6 @@ describe("transferSpaceOwnership", () => {
     expect(mocks.addSpaceMember).toHaveBeenCalledWith(
       "stats-101",
       "user-2",
-      "new-owner@example.com",
       "owner",
     );
   });
@@ -194,7 +193,6 @@ describe("transferSpaceOwnership", () => {
     expect(mocks.addSpaceMember).toHaveBeenCalledWith(
       "stats-101",
       "user-3",
-      "person@example.com",
       "owner",
     );
   });

@@ -616,11 +616,9 @@ export const localStore: EdieStore = {
   async addSpaceMember(
     spaceCode,
     userId,
-    email,
     role = "editor",
   ) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
     const normalizedRole = validateSpaceRole(role);
 
     if (!normalizedSpaceCode) {
@@ -657,7 +655,7 @@ export const localStore: EdieStore = {
       (invitation) =>
         !(
           invitation.spaceCode === normalizedSpaceCode &&
-          (invitation.userId === userId || invitation.email === normalizedEmail)
+          invitation.userId === userId
         ),
     );
     data.spaceMembers.push(member);

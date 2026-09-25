@@ -399,7 +399,7 @@ export type EdieStore = {
   createTeacherSpaceForOwner(
     code: string,
     name: string,
-    owner: { userId: string; email: string; name: string },
+    owner: { userId: string; name: string },
   ): Promise<TeacherSpace>;
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
@@ -417,7 +417,6 @@ export type EdieStore = {
   addSpaceMember(
     spaceCode: string,
     userId: string,
-    email: string,
     role?: SpaceRole,
   ): Promise<SpaceMember>;
   inviteSpaceMember(

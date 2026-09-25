@@ -57,21 +57,26 @@ describe("space membership (Neon backend)", () => {
   it("lists and accepts separated invitations using ID or normalized email", async () => {
     await expect(neonStore.listPendingSpaceInvitationsForUser("user-guest", "Guest@Example.com")).resolves.toEqual([expect.objectContaining({ code: "stats-101", organizationId, role: "editor" })]);
     await expect(neonStore.acceptSpaceInvitation("stats-101", "user-guest", "Guest@Example.com")).resolves.toBe(true);
-    expect(queryMock.mock.calls.map(([sql]) => String(sql))).toContainEqual(expect.stringContaining("invitee_user_id = $2 OR email = $3"));
+    const acceptance = queryMock.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.includes("ON CONFLICT (space_code, user_id)"));
+    expect(acceptance).toContain("invitee_user_id = $2 OR email = $3");
+    expect(acceptance).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");
+    expect(acceptance).not.toContain("status");
   });
 
   it("creates a personal organization, space, and owner in one statement", async () => {
-    const space = await neonStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-owner", email: "Owner@Example.com", name: "Owner" });
+    const space = await neonStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-owner", name: "Owner" });
     expect(space.organizationId).toBe(organizationId);
     const call = queryMock.mock.calls.find(([sql]) => String(sql).includes("created_space"));
     expect(call?.[0]).toContain("membership AS");
-    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organization", "user-owner", "owner@example.com"]);
+    expect(call?.[0]).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");
+    expect(call?.[0]).not.toContain("email, role, status");
+    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organization", "user-owner"]);
   });
 
-  it("dual-writes pending invitations for rollback", async () => {
+  it("keeps pending invitations out of the membership table", async () => {
     const invitation = await neonStore.inviteSpaceMember("stats-101", "Guest@Example.com", "user-guest");
     expect(invitation).toMatchObject({ email: "guest@example.com", userId: "user-guest" });
-    expect(queryMock.mock.calls.at(-1)?.[0]).toContain("legacy AS");
+    expect(queryMock.mock.calls.at(-1)?.[0]).not.toContain("edie_space_members (");
   });
 });
 
@@ -95,7 +100,7 @@ describe("space membership (local JSON backend)", () => {
   });
 
   it("creates a space with its organization and owner atomically", async () => {
-    const space = await localStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-new", email: "new@example.com", name: "New Teacher" });
+    const space = await localStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-new", name: "New Teacher" });
     expect(space.organizationId).toBeTruthy();
     await expect(localStore.getSpaceMemberRole("new-space", "user-new")).resolves.toBe("owner");
   });
@@ -109,16 +114,16 @@ describe("space membership (local JSON backend)", () => {
   });
 
   it("does not move a space when another member becomes owner", async () => {
-    await localStore.addSpaceMember("stats-101", "user-guest", "guest@example.com", "editor");
+    await localStore.addSpaceMember("stats-101", "user-guest", "editor");
     await localStore.updateSpaceMemberRole("stats-101", "user-guest", "owner");
     expect((await localStore.getTeacherSpace("stats-101"))?.organizationId).toBe(organizationId);
     await expect(localStore.listTeacherSpacesForUser("user-guest")).resolves.toEqual([expect.objectContaining({ code: "stats-101", organizationId, role: "owner" })]);
   });
 
   it("allows collaboration across organizations without granting sibling-space access", async () => {
-    await localStore.createTeacherSpaceForOwner("science", "Science", { userId: "science-owner", email: "science@example.com", name: "Science Owner" });
-    await localStore.createTeacherSpaceForOwner("private-science", "Private Science", { userId: "science-owner", email: "science@example.com", name: "Science Owner" });
-    await localStore.addSpaceMember("science", "user-guest", "guest@example.com", "editor");
+    await localStore.createTeacherSpaceForOwner("science", "Science", { userId: "science-owner", name: "Science Owner" });
+    await localStore.createTeacherSpaceForOwner("private-science", "Private Science", { userId: "science-owner", name: "Science Owner" });
+    await localStore.addSpaceMember("science", "user-guest", "editor");
 
     const spaces = await localStore.listTeacherSpacesForUser("user-guest");
     expect(spaces.map((space) => space.code)).toEqual(["science"]);

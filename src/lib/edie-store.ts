@@ -105,7 +105,7 @@ export async function getPersonalOrganization(userId: string) {
 export async function createTeacherSpaceForOwner(
   code: string,
   name: string,
-  owner: { userId: string; email: string; name: string },
+  owner: { userId: string; name: string },
 ) {
   return getStore().createTeacherSpaceForOwner(code, name, owner);
 }
@@ -141,10 +141,9 @@ export async function listSpaceInvitations(spaceCode: string) {
 export async function addSpaceMember(
   spaceCode: string,
   userId: string,
-  email: string,
   role?: SpaceRole,
 ) {
-  return getStore().addSpaceMember(spaceCode, userId, email, role);
+  return getStore().addSpaceMember(spaceCode, userId, role);
 }
 
 export async function inviteSpaceMember(
