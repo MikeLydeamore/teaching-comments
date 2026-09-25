@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
+import { ensurePersonalOrganization } from "@/lib/edie-store";
 import { validateDisplayName } from "../../../lib/user-profile";
 import { validateUsername } from "../../../lib/user-profile";
 
@@ -79,10 +80,18 @@ export async function updateUsername(
     result.username === teacher.username &&
     result.displayUsername === teacher.displayUsername
   ) {
-    return {
-      status: "success",
-      message: "Your username is already up to date.",
-    };
+    try {
+      await ensurePersonalOrganization(teacher.id, teacher.name);
+      return {
+        status: "success",
+        message: "Your username is already up to date.",
+      };
+    } catch {
+      return {
+        status: "error",
+        message: "Your account setup could not be completed. Please try again.",
+      };
+    }
   }
 
   try {
@@ -101,6 +110,15 @@ export async function updateUsername(
       message: message.includes("taken") || message.includes("unique")
         ? "That username is already taken."
         : "We could not update your username. Please try again.",
+    };
+  }
+
+  try {
+    await ensurePersonalOrganization(teacher.id, teacher.name);
+  } catch {
+    return {
+      status: "error",
+      message: "Your username was saved, but account setup could not be completed. Please try again.",
     };
   }
 

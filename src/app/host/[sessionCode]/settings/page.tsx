@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/AccountMenu";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { getCurrentTeacher, getSpaceRoleForUser } from "@/lib/auth-server";
-import { findUserProfilesByEmail } from "@/lib/auth-users";
-import { getTeacherSpace, listSpaceMembers } from "@/lib/edie-store";
+import { findUserProfilesById } from "@/lib/auth-users";
+import { getTeacherSpace, listSpaceInvitations, listSpaceMembers } from "@/lib/edie-store";
 import { buildSpaceMemberView } from "@/lib/space-member-view";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import {
@@ -44,15 +44,18 @@ export default async function SpaceSettingsPage({
   }
 
   const query = await searchParams;
-  const members = await listSpaceMembers(space.code);
-  const profileResult = await findUserProfilesByEmail(
-    members.map((member) => member.email),
-  );
+  const [members, invitations] = await Promise.all([
+    listSpaceMembers(space.code),
+    listSpaceInvitations(space.code),
+  ]);
+  const records = [...members, ...invitations];
+  const profileResult = await findUserProfilesById([
+    ...members.map((member) => member.userId),
+    ...invitations.flatMap((invitation) => invitation.userId ? [invitation.userId] : []),
+  ]);
   const isOwner = role === "owner";
-  const activeMemberCount = members.filter(
-    (member) => member.status === "active",
-  ).length;
-  const pendingInviteCount = members.length - activeMemberCount;
+  const activeMemberCount = members.length;
+  const pendingInviteCount = invitations.length;
   const message = query.member ? memberMessages[query.member] ?? "" : "";
   const succeeded = query.member === "added" || query.member === "removed";
 
@@ -191,10 +194,10 @@ export default async function SpaceSettingsPage({
             <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900" role="alert">
               Member details are temporarily unavailable. No private account information has been shown.
             </p>
-          ) : members.length ? (
+          ) : records.length ? (
             <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
-              {members.map((member, index) => {
-                const profile = profileResult.profiles.get(member.email.toLowerCase()) ?? null;
+              {records.map((member, index) => {
+                const profile = profileResult.profiles.get(member.userId ?? "") ?? null;
                 const view = buildSpaceMemberView({
                   isOwner,
                   member,
@@ -203,7 +206,7 @@ export default async function SpaceSettingsPage({
                 });
 
                 return (
-                  <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={`${member.createdAt}-${index}`}>
+                  <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={`${member.spaceCode}-${"email" in member ? member.email : member.userId}-${index}`}>
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50 text-sm font-bold text-teal-800 ring-1 ring-teal-200">
                         {view.image ? (
@@ -246,7 +249,7 @@ export default async function SpaceSettingsPage({
                     </div>
                     {isOwner && !view.isSelf && view.managementTarget ? (
                       <div className="flex items-center gap-2">
-                        <form action={changeSpaceMemberRole}>
+                        {view.status === "active" ? <form action={changeSpaceMemberRole}>
                           <input name="spaceCode" type="hidden" value={space.code} />
                           {"accountId" in view.managementTarget ? (
                             <input name="accountId" type="hidden" value={view.managementTarget.accountId} />
@@ -264,7 +267,7 @@ export default async function SpaceSettingsPage({
                           >
                             Make {view.role === "owner" ? "editor" : "owner"}
                           </PendingSubmitButton>
-                        </form>
+                        </form> : null}
                         <form action={evictSpaceMember}>
                           <input name="spaceCode" type="hidden" value={space.code} />
                           {"accountId" in view.managementTarget ? (

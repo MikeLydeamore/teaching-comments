@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  addSpaceMember: vi.fn(),
-  findUserProfileById: vi.fn(),
+  inviteSpaceMember: vi.fn(),
+  findUserProfileByEmail: vi.fn(),
   findUserProfileByUsername: vi.fn(),
   getSpaceRoleForUser: vi.fn(),
   getTeacherSpace: vi.fn(),
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`redirect:${path}`);
   }),
   removeSpaceMember: vi.fn(),
+  removeSpaceInvitation: vi.fn(),
   revalidatePath: vi.fn(),
   updateSpaceMemberRole: vi.fn(),
 }));
@@ -20,7 +21,7 @@ vi.mock("@/lib/auth-server", () => ({
   getSpaceRoleForUser: mocks.getSpaceRoleForUser,
 }));
 vi.mock("@/lib/auth-users", () => ({
-  findUserProfileById: mocks.findUserProfileById,
+  findUserProfileByEmail: mocks.findUserProfileByEmail,
   findUserProfileByUsername: mocks.findUserProfileByUsername,
 }));
 vi.mock("@/lib/space-member-identity", () => ({
@@ -37,10 +38,11 @@ vi.mock("@/lib/space-member-identity", () => ({
   },
 }));
 vi.mock("@/lib/edie-store", () => ({
-  addSpaceMember: mocks.addSpaceMember,
+  inviteSpaceMember: mocks.inviteSpaceMember,
   getTeacherSpace: mocks.getTeacherSpace,
   normalizeSpaceCode: (value: string) => value.trim().toLowerCase(),
   removeSpaceMember: mocks.removeSpaceMember,
+  removeSpaceInvitation: mocks.removeSpaceInvitation,
   updateSpaceMemberRole: mocks.updateSpaceMemberRole,
 }));
 
@@ -71,8 +73,8 @@ describe("space member settings actions", () => {
     mocks.getTeacherSpace.mockResolvedValue({ code: "stats-101", name: "Stats" });
     mocks.getSpaceRoleForUser.mockResolvedValue("owner");
     mocks.findUserProfileByUsername.mockResolvedValue(profile);
-    mocks.findUserProfileById.mockResolvedValue(profile);
-    mocks.addSpaceMember.mockResolvedValue({});
+    mocks.findUserProfileByEmail.mockResolvedValue(null);
+    mocks.inviteSpaceMember.mockResolvedValue({});
     mocks.updateSpaceMemberRole.mockResolvedValue({});
     mocks.removeSpaceMember.mockResolvedValue(true);
   });
@@ -85,9 +87,10 @@ describe("space member settings actions", () => {
     }))).rejects.toThrow("redirect:/host/stats-101/settings?member=added");
 
     expect(mocks.findUserProfileByUsername).toHaveBeenCalledWith("private_teacher");
-    expect(mocks.addSpaceMember).toHaveBeenCalledWith(
+    expect(mocks.inviteSpaceMember).toHaveBeenCalledWith(
       "stats-101",
       "private@example.com",
+      "user-2",
       "editor",
     );
   });
@@ -100,9 +103,10 @@ describe("space member settings actions", () => {
     }))).rejects.toThrow("redirect:/host/stats-101/settings?member=added");
 
     expect(mocks.findUserProfileByUsername).not.toHaveBeenCalled();
-    expect(mocks.addSpaceMember).toHaveBeenCalledWith(
+    expect(mocks.inviteSpaceMember).toHaveBeenCalledWith(
       "stats-101",
       "new@example.com",
+      null,
       "owner",
     );
   });
@@ -115,11 +119,11 @@ describe("space member settings actions", () => {
       identity: "missing_user",
       role: "editor",
     }))).rejects.toThrow("redirect:/host/stats-101/settings?member=not-found");
-    expect(mocks.addSpaceMember).not.toHaveBeenCalled();
+    expect(mocks.inviteSpaceMember).not.toHaveBeenCalled();
   });
 
   it("reports an existing membership without exposing the identity in the URL", async () => {
-    mocks.addSpaceMember.mockRejectedValue(
+    mocks.inviteSpaceMember.mockRejectedValue(
       new Error("That person is already a member of this space."),
     );
 
@@ -143,7 +147,7 @@ describe("space member settings actions", () => {
       identity: "@Private_Teacher",
       role: "editor",
     }))).rejects.toThrow("redirect:/host/stats-101/settings?member=unavailable");
-    expect(mocks.addSpaceMember).not.toHaveBeenCalled();
+    expect(mocks.inviteSpaceMember).not.toHaveBeenCalled();
   });
 
   it("uses an opaque account ID for role changes", async () => {
@@ -153,10 +157,9 @@ describe("space member settings actions", () => {
       role: "owner",
     }))).rejects.toThrow("redirect:/host/stats-101/settings");
 
-    expect(mocks.findUserProfileById).toHaveBeenCalledWith("user-2");
     expect(mocks.updateSpaceMemberRole).toHaveBeenCalledWith(
       "stats-101",
-      "private@example.com",
+      "user-2",
       "owner",
     );
   });
@@ -169,7 +172,7 @@ describe("space member settings actions", () => {
 
     expect(mocks.removeSpaceMember).toHaveBeenCalledWith(
       "stats-101",
-      "private@example.com",
+      "user-2",
     );
   });
 });

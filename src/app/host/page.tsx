@@ -62,7 +62,7 @@ export default async function TeacherHomePage({
   }
 
   const [spaces, query] = await Promise.all([
-    listTeacherSpacesForUser(teacher.email),
+    listTeacherSpacesForUser(teacher.id),
     searchParams,
   ]);
   const stats = new Map<string, SpaceStats>();

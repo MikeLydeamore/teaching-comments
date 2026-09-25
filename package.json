@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run src",
-    "reconcile-images": "node tools/reconcile-images.mjs"
+    "reconcile-images": "node tools/reconcile-images.mjs",
+    "migrate-organizations": "node tools/migrate-organizations.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

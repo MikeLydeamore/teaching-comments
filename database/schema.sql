@@ -2,21 +2,51 @@
 create extension if not exists pgcrypto;
 create extension if not exists citext;
 
+create table if not exists edie_organizations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 120),
+  kind text not null check (kind in ('personal', 'system')),
+  personal_owner_user_id text,
+  created_at timestamptz not null default now(),
+  check ((kind = 'personal') = (personal_owner_user_id is not null))
+);
+create unique index if not exists edie_organizations_personal_owner_idx
+  on edie_organizations (personal_owner_user_id)
+  where personal_owner_user_id is not null;
 create table if not exists edie_teacher_spaces (
   code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name text not null check (char_length(name) between 1 and 120),
+  organization_id uuid not null references edie_organizations(id) on delete restrict,
   created_at timestamptz not null default now()
 );
 create table if not exists edie_space_members (
   space_code text not null references edie_teacher_spaces(code) on delete cascade,
+  user_id text,
   email citext not null check (char_length(email) between 3 and 320),
   role text not null check (role in ('owner', 'editor')),
   status text not null default 'pending' check (status in ('pending', 'active')),
   created_at timestamptz not null default now(),
-  primary key (space_code, email)
+  primary key (space_code, email),
+  check (status <> 'active' or user_id is not null)
 );
 create index if not exists edie_space_members_email_idx on edie_space_members (email);
 create index if not exists edie_space_members_email_status_idx on edie_space_members (email, status);
+create unique index if not exists edie_space_members_space_user_active_idx
+  on edie_space_members (space_code, user_id)
+  where status = 'active' and user_id is not null;
+create table if not exists edie_space_invitations (
+  space_code text not null references edie_teacher_spaces(code) on delete cascade,
+  email citext not null check (char_length(email) between 3 and 320),
+  invitee_user_id text,
+  role text not null check (role in ('owner', 'editor')),
+  created_at timestamptz not null default now(),
+  primary key (space_code, email)
+);
+create unique index if not exists edie_space_invitations_space_user_idx
+  on edie_space_invitations (space_code, invitee_user_id)
+  where invitee_user_id is not null;
+create index if not exists edie_space_invitations_email_idx
+  on edie_space_invitations (email);
 create table if not exists edie_sessions (
   id text primary key default gen_random_uuid()::text,
   code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
@@ -119,6 +149,8 @@ create index if not exists edie_poll_responses_poll_updated_idx on edie_poll_res
 -- Retained for compatibility with hosted Postgres providers that grant broad owner rights by default.
 -- A Neon edie_app role needs explicit grants instead.
 alter table edie_teacher_spaces enable row level security;
+alter table edie_organizations enable row level security;
+alter table edie_space_invitations enable row level security;
 alter table edie_sessions enable row level security;
 alter table edie_submissions enable row level security;
 alter table edie_question_bank enable row level security;
@@ -130,7 +162,12 @@ alter table edie_group_question_votes enable row level security;
 alter table edie_polls enable row level security;
 alter table edie_poll_responses enable row level security;
 
-insert into edie_teacher_spaces (code,name) values ('default','Default Space') on conflict (code) do nothing;
+insert into edie_organizations (id,name,kind,personal_owner_user_id)
+values ('00000000-0000-4000-8000-000000000001','Ed.ie system','system',null)
+on conflict (id) do nothing;
+insert into edie_teacher_spaces (code,name,organization_id)
+values ('default','Default Space','00000000-0000-4000-8000-000000000001')
+on conflict (code) do nothing;
 insert into edie_sessions (id,code,space_code,title,prompt,is_open) values ('demo-lecture','demo-lecture','default','Demo Lecture','',true) on conflict (space_code,code) do nothing;
 insert into edie_prompt_history (id,session_code,prompt,started_at,ended_at)
 select '44444444-4444-4444-8444-444444444444',id,prompt,prompt_updated_at,null from edie_sessions where id='demo-lecture' on conflict (id) do nothing;

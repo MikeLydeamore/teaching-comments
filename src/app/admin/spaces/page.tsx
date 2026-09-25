@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { AccountMenu } from "@/components/AccountMenu";
 import { getCurrentTeacher, isAdminAuthenticated, isAdminTeacher } from "@/lib/auth-server";
-import { findUserProfilesByEmail } from "@/lib/auth-users";
+import { findUserProfilesById } from "@/lib/auth-users";
 import { listSpaceMembers, listTeacherSpaces } from "@/lib/edie-store";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import {
@@ -32,6 +32,10 @@ const createMessages: Record<string, string> = {
   exists: "That space code already exists.",
   invalid: "Check the space name and code.",
   missing: "Enter a space code.",
+  "owner-invalid": "Enter a valid owner email address.",
+  "owner-not-found": "The owner must already have an Ed.ie account.",
+  unavailable:
+    "The space could not be created because storage is not ready. Apply the account database migrations and try again.",
   forbidden: "Only allow-listed admins can manage spaces here.",
 };
 
@@ -47,7 +51,7 @@ const transferMessages: Record<string, string> = {
   invalid: "Enter a valid username or email address to transfer to.",
   forbidden: "Only allow-listed admins can transfer spaces.",
   "not-found": "That space could not be found.",
-  "person-not-found": "No Ed.ie account has that username.",
+  "person-not-found": "No Ed.ie account has that username or email.",
   unavailable: "Account details are temporarily unavailable. Please try again.",
 };
 
@@ -61,30 +65,27 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
   const query = await searchParams;
   const isAdmin = isAdminTeacher(teacher) && (await isAdminAuthenticated());
   const spaces = isAdmin ? await listTeacherSpaces() : [];
-  const ownerEmailsBySpace = new Map<string, string[]>();
+  const ownerIdsBySpace = new Map<string, string[]>();
   const memberCounts = new Map<string, number>();
   const ownerless = new Set<string>();
 
   if (isAdmin) {
     for (const space of spaces) {
       const members = await listSpaceMembers(space.code);
-      const activeMembers = members.filter(
-        (member) => member.status === "active",
-      );
-      memberCounts.set(space.code, activeMembers.length);
-      const ownerEmails = activeMembers
+      memberCounts.set(space.code, members.length);
+      const ownerIds = members
         .filter((member) => member.role === "owner")
-        .map((member) => member.email);
-      ownerEmailsBySpace.set(space.code, ownerEmails);
+        .map((member) => member.userId);
+      ownerIdsBySpace.set(space.code, ownerIds);
 
-      if (!ownerEmails.length) {
+      if (!ownerIds.length) {
         ownerless.add(space.code);
       }
     }
   }
 
-  const ownerProfiles = await findUserProfilesByEmail(
-    [...ownerEmailsBySpace.values()].flat(),
+  const ownerProfiles = await findUserProfilesById(
+    [...ownerIdsBySpace.values()].flat(),
   );
 
   const createMessage = query.spaceCreate
@@ -185,8 +186,8 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                     Owner email (optional)
                   </label>
                   <p className="mt-1 text-xs text-slate-500">
-                    The person this space belongs to. They get access as soon as
-                    they sign in with this email. Leave blank to own it yourself.
+                    The person this space belongs to. They must already have an
+                    Ed.ie account. Leave blank to own it yourself.
                   </p>
                   <input
                     className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
@@ -241,7 +242,7 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                     </thead>
                     <tbody>
                       {spaces.map((space) => {
-                        const owners = ownerEmailsBySpace.get(space.code) ?? [];
+                        const owners = ownerIdsBySpace.get(space.code) ?? [];
 
                         return (
                           <tr className="border-b border-slate-100 align-top transition hover:bg-slate-50 last:border-0" key={space.code}>
@@ -259,16 +260,16 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                             </td>
                             <td className="py-4 pr-4 text-xs text-slate-600">
                               {owners.length ? (
-                                owners.map((email) => {
+                                owners.map((userId) => {
                                   const profile = ownerProfiles.ok
-                                    ? ownerProfiles.profiles.get(email.toLowerCase())
+                                    ? ownerProfiles.profiles.get(userId)
                                     : null;
                                   const username =
                                     profile?.displayUsername ?? profile?.username;
 
                                   return (
-                                    <span className="block break-all" key={email}>
-                                      {username ? `@${username}` : email}
+                                    <span className="block break-all" key={userId}>
+                                      {username ? `@${username}` : "Ed.ie member"}
                                     </span>
                                   );
                                 })

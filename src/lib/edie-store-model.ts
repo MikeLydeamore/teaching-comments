@@ -57,6 +57,7 @@ export type SubmissionImageDto = Pick<
 export type TeacherSpace = {
   code: string;
   name: string;
+  organizationId: string;
   createdAt: string;
 };
 
@@ -64,13 +65,26 @@ export type TeacherSpaceSummary = TeacherSpace;
 
 export type SpaceRole = "owner" | "editor";
 
-export type SpaceMembershipStatus = "pending" | "active";
-
 export type SpaceMember = {
   spaceCode: string;
-  email: string;
+  userId: string;
   role: SpaceRole;
-  status: SpaceMembershipStatus;
+  createdAt: string;
+};
+
+export type SpaceInvitationRecord = {
+  spaceCode: string;
+  email: string;
+  userId: string | null;
+  role: SpaceRole;
+  createdAt: string;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  kind: "personal" | "system";
+  personalOwnerUserId: string | null;
   createdAt: string;
 };
 
@@ -84,10 +98,6 @@ export type SpaceInvitation = TeacherSpaceSummary & {
 };
 
 const SPACE_ROLE_ROLES: readonly SpaceRole[] = ["owner", "editor"];
-const SPACE_MEMBERSHIP_STATUSES: readonly SpaceMembershipStatus[] = [
-  "pending",
-  "active",
-];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizeSpaceEmail(email: string) {
@@ -106,16 +116,6 @@ export function validateSpaceRole(role: string): SpaceRole {
   }
 
   return role as SpaceRole;
-}
-
-export function validateSpaceMembershipStatus(
-  status: string,
-): SpaceMembershipStatus {
-  if (!(SPACE_MEMBERSHIP_STATUSES as readonly string[]).includes(status)) {
-    throw new Error("Unknown space membership status.");
-  }
-
-  return status as SpaceMembershipStatus;
 }
 
 export type Session = {
@@ -391,33 +391,59 @@ export type ArchiveSessionActivityResult = {
 };
 
 export type EdieStore = {
-  createTeacherSpace(code: string, name: string): Promise<TeacherSpace>;
+  ensurePersonalOrganization(
+    userId: string,
+    ownerName: string,
+  ): Promise<Organization>;
+  getPersonalOrganization(userId: string): Promise<Organization | null>;
+  createTeacherSpaceForOwner(
+    code: string,
+    name: string,
+    owner: { userId: string; email: string; name: string },
+  ): Promise<TeacherSpace>;
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
-  listTeacherSpacesForUser(email: string): Promise<SpaceWithRole[]>;
+  listTeacherSpacesForUser(userId: string): Promise<SpaceWithRole[]>;
   listPendingSpaceInvitationsForUser(
+    userId: string,
     email: string,
   ): Promise<SpaceInvitation[]>;
   getSpaceMemberRole(
     spaceCode: string,
-    email: string,
+    userId: string,
   ): Promise<SpaceRole | null>;
   listSpaceMembers(spaceCode: string): Promise<SpaceMember[]>;
+  listSpaceInvitations(spaceCode: string): Promise<SpaceInvitationRecord[]>;
   addSpaceMember(
     spaceCode: string,
+    userId: string,
     email: string,
     role?: SpaceRole,
-    status?: SpaceMembershipStatus,
   ): Promise<SpaceMember>;
-  acceptSpaceInvitation(spaceCode: string, email: string): Promise<boolean>;
-  declineSpaceInvitation(spaceCode: string, email: string): Promise<boolean>;
-  leaveSpace(spaceCode: string, email: string): Promise<boolean>;
-  updateSpaceMemberRole(
+  inviteSpaceMember(
     spaceCode: string,
     email: string,
+    userId: string | null,
+    role?: SpaceRole,
+  ): Promise<SpaceInvitationRecord>;
+  acceptSpaceInvitation(
+    spaceCode: string,
+    userId: string,
+    email: string,
+  ): Promise<boolean>;
+  declineSpaceInvitation(
+    spaceCode: string,
+    userId: string,
+    email: string,
+  ): Promise<boolean>;
+  leaveSpace(spaceCode: string, userId: string): Promise<boolean>;
+  updateSpaceMemberRole(
+    spaceCode: string,
+    userId: string,
     role: SpaceRole,
   ): Promise<SpaceMember | null>;
-  removeSpaceMember(spaceCode: string, email: string): Promise<boolean>;
+  removeSpaceMember(spaceCode: string, userId: string): Promise<boolean>;
+  removeSpaceInvitation(spaceCode: string, email: string): Promise<boolean>;
   getSession(code: string): Promise<Session | null>;
   getSessionInSpace(spaceCode: string, code: string): Promise<Session | null>;
   getOrCreateSession(code: string): Promise<Session>;

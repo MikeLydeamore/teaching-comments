@@ -1,5 +1,5 @@
 import type { MemberProfile } from "./auth-users";
-import type { SpaceMember } from "./edie-store-model";
+import type { SpaceInvitationRecord, SpaceMember } from "./edie-store-model";
 
 export type SpaceMemberManagementTarget =
   | { accountId: string; email?: never }
@@ -12,7 +12,7 @@ export type SpaceMemberView = {
   isSelf: boolean;
   managementTarget: SpaceMemberManagementTarget | null;
   role: SpaceMember["role"];
-  status: SpaceMember["status"];
+  status: "active" | "pending";
 };
 
 export function buildSpaceMemberView({
@@ -22,10 +22,12 @@ export function buildSpaceMemberView({
   viewerId,
 }: {
   isOwner: boolean;
-  member: SpaceMember;
+  member: SpaceMember | SpaceInvitationRecord;
   profile: MemberProfile | null;
   viewerId: string;
 }): SpaceMemberView {
+  const isInvitation = "email" in member;
+
   if (profile) {
     const profileName = profile.name?.trim();
     const safeDisplayName =
@@ -37,24 +39,32 @@ export function buildSpaceMemberView({
       displayName: safeDisplayName,
       handle: profile.displayUsername ? `@${profile.displayUsername}` : null,
       image: profile.image,
-      isSelf: profile.id === viewerId,
-      managementTarget: { accountId: profile.id },
+      isSelf: !isInvitation && profile.id === viewerId,
+      managementTarget: isInvitation
+        ? { email: member.email }
+        : { accountId: profile.id },
       role: member.role,
-      status: member.status,
+      status: isInvitation ? "pending" : "active",
     };
   }
 
   return {
     displayName: isOwner
-      ? member.email
-      : member.status === "pending"
+      ? isInvitation
+        ? member.email
+        : "Ed.ie member"
+      : isInvitation
         ? "Pending email invitation"
         : "Ed.ie member",
     handle: null,
     image: null,
     isSelf: false,
-    managementTarget: isOwner ? { email: member.email } : null,
+    managementTarget: isOwner
+      ? isInvitation
+        ? { email: member.email }
+        : { accountId: member.userId }
+      : null,
     role: member.role,
-    status: member.status,
+    status: isInvitation ? "pending" : "active",
   };
 }

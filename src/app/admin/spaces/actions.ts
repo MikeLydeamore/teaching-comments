@@ -3,9 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  acceptSpaceInvitation,
   addSpaceMember,
-  createTeacherSpace,
+  createTeacherSpaceForOwner,
   getTeacherSpace,
   listSpaceMembers,
   normalizeSpaceCode,
@@ -17,7 +16,11 @@ import {
   isAdminAuthenticated,
   isAdminTeacher,
 } from "@/lib/auth-server";
-import { findUserProfileByUsername } from "@/lib/auth-users";
+import {
+  findUserProfileByEmail,
+  findUserProfileByUsername,
+  type MemberProfile,
+} from "@/lib/auth-users";
 import { parseMemberInviteIdentity } from "@/lib/space-member-identity";
 
 function adminSpacesPath(status: string, spaceCode = "") {
@@ -65,24 +68,45 @@ export async function createTeachingSpace(formData: FormData) {
     redirect(adminSpacesPath("missing"));
   }
 
-  let ownerEmail = admin.email;
+  let owner: MemberProfile = {
+    id: admin.id,
+    email: admin.email,
+    name: admin.name,
+    image: admin.image,
+    username: admin.username,
+    displayUsername: admin.displayUsername,
+  };
 
   if (rawOwnerEmail) {
+    let ownerEmail: string;
     try {
       ownerEmail = normalizeSpaceEmail(rawOwnerEmail);
     } catch {
       redirect(adminSpacesPath("owner-invalid", spaceCode));
     }
+    let profile;
+    try {
+      profile = await findUserProfileByEmail(ownerEmail);
+    } catch {
+      redirect(adminSpacesPath("unavailable", spaceCode));
+    }
+    if (!profile) redirect(adminSpacesPath("owner-not-found", spaceCode));
+    owner = profile;
   }
 
   try {
-    const space = await createTeacherSpace(spaceCode, name || spaceCode);
-    await addSpaceMember(space.code, ownerEmail, "owner", "active");
+    await createTeacherSpaceForOwner(spaceCode, name || spaceCode, {
+      userId: owner.id,
+      email: owner.email,
+      name: owner.name ?? owner.displayUsername ?? "Teacher",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const reason = message.includes("already exists")
       ? "exists"
-      : "invalid";
+      : message.startsWith("Space name") || message.startsWith("Space code")
+        ? "invalid"
+        : "unavailable";
     redirect(adminSpacesPath(reason, spaceCode));
   }
 
@@ -97,13 +121,13 @@ export async function claimTeacherSpace(formData: FormData) {
   const existingMembers = await listSpaceMembers(spaceCode);
 
   if (existingMembers.some(
-    (member) => member.role === "owner" && member.status === "active",
+    (member) => member.role === "owner",
   )) {
     redirect(claimPath("claimed", spaceCode));
   }
 
   try {
-    await addSpaceMember(spaceCode, admin.email, "owner", "active");
+    await addSpaceMember(spaceCode, admin.id, admin.email, "owner");
   } catch {
     redirect(claimPath("not-found", spaceCode));
   }
@@ -117,7 +141,7 @@ export async function transferSpaceOwnership(formData: FormData) {
 
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const identity = parseMemberInviteIdentity(formData.get("ownerIdentity"));
-  let ownerEmail: string;
+  let ownerProfile;
 
   if (!identity.ok) {
     redirect(transferPath("invalid", spaceCode));
@@ -136,9 +160,14 @@ export async function transferSpaceOwnership(formData: FormData) {
       redirect(transferPath("person-not-found", spaceCode));
     }
 
-    ownerEmail = profile.email;
+    ownerProfile = profile;
   } else {
-    ownerEmail = identity.email;
+    try {
+      ownerProfile = await findUserProfileByEmail(identity.email);
+    } catch {
+      redirect(transferPath("unavailable", spaceCode));
+    }
+    if (!ownerProfile) redirect(transferPath("person-not-found", spaceCode));
   }
 
   const space = await getTeacherSpace(spaceCode);
@@ -152,24 +181,25 @@ export async function transferSpaceOwnership(formData: FormData) {
   for (const member of members) {
     if (
       member.role === "owner" &&
-      member.status === "active" &&
-      member.email !== ownerEmail
+      member.userId !== ownerProfile.id
     ) {
-      await updateSpaceMemberRole(space.code, member.email, "editor");
+      await updateSpaceMemberRole(space.code, member.userId, "editor");
     }
   }
 
-  const target = members.find((member) => member.email === ownerEmail);
+  const target = members.find((member) => member.userId === ownerProfile.id);
 
   if (target) {
     if (target.role !== "owner") {
-      await updateSpaceMemberRole(space.code, ownerEmail, "owner");
-    }
-    if (target.status === "pending") {
-      await acceptSpaceInvitation(space.code, ownerEmail);
+      await updateSpaceMemberRole(space.code, ownerProfile.id, "owner");
     }
   } else {
-    await addSpaceMember(space.code, ownerEmail, "owner", "active");
+    await addSpaceMember(
+      space.code,
+      ownerProfile.id,
+      ownerProfile.email,
+      "owner",
+    );
   }
 
   revalidatePath("/admin/spaces");

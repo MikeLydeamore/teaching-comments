@@ -31,7 +31,6 @@ import {
   validateQuestionText,
   validateTeacherSpaceName,
   normalizeSpaceEmail,
-  validateSpaceMembershipStatus,
   validateSpaceRole,
   type GroupQuestion,
   type PromptHistoryItem,
@@ -46,8 +45,10 @@ import {
   type SubmissionViewSettings,
   type SubmissionViewSettingsPatch,
   type TeacherSpace,
+  type Organization,
   type SpaceMember,
   type SpaceInvitation,
+  type SpaceInvitationRecord,
   type SpaceWithRole,
 } from "./edie-store-model";
 
@@ -62,7 +63,9 @@ type StoreData = {
   submissionViewSettings: SubmissionViewSettings[];
   submissions: Submission[];
   teacherSpaces: TeacherSpace[];
+  organizations: Organization[];
   spaceMembers: SpaceMember[];
+  spaceInvitations: SpaceInvitationRecord[];
 };
 
 type StoredGroupQuestion = Omit<GroupQuestion, "hasVoted" | "voteCount"> & {
@@ -71,6 +74,7 @@ type StoredGroupQuestion = Omit<GroupQuestion, "hasVoted" | "voteCount"> & {
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const STORE_PATH = path.join(DATA_DIR, "edie-store.json");
+const DEFAULT_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
 
 function defaultStore(): StoreData {
   const createdAt = now();
@@ -82,6 +86,16 @@ function defaultStore(): StoreData {
     pollQuestionBank: [],
     polls: [],
     spaceMembers: [],
+    spaceInvitations: [],
+    organizations: [
+      {
+        id: DEFAULT_ORGANIZATION_ID,
+        name: "Ed.ie system",
+        kind: "system",
+        personalOwnerUserId: null,
+        createdAt,
+      },
+    ],
     promptHistory: [
       {
         id: promptHistoryId,
@@ -96,6 +110,7 @@ function defaultStore(): StoreData {
       {
         code: DEFAULT_SPACE_CODE,
         name: "Default Space",
+        organizationId: DEFAULT_ORGANIZATION_ID,
         createdAt,
       },
     ],
@@ -186,17 +201,30 @@ async function readStore(): Promise<StoreData> {
   const raw = await readFile(STORE_PATH, "utf8");
   const data = JSON.parse(raw) as Partial<StoreData>;
   const createdAt = now();
+  const organizations = data.organizations?.length
+    ? data.organizations
+    : [
+        {
+          id: DEFAULT_ORGANIZATION_ID,
+          name: "Ed.ie system",
+          kind: "system" as const,
+          personalOwnerUserId: null,
+          createdAt,
+        },
+      ];
   const teacherSpaces = data.teacherSpaces?.length
     ? data.teacherSpaces.map((space) => ({
         code: normalizeSpaceCode(space.code) || DEFAULT_SPACE_CODE,
         name: space.name ?? (titleFromCode(space.code) || "Hosted Space"),
+        organizationId: space.organizationId ?? DEFAULT_ORGANIZATION_ID,
         createdAt: space.createdAt ?? createdAt,
       }))
     : [
         {
           code: DEFAULT_SPACE_CODE,
           name: "Default Space",
-            createdAt,
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          createdAt,
         },
       ];
   const sessions = (data.sessions ?? []).map((session) => ({
@@ -246,13 +274,27 @@ async function readStore(): Promise<StoreData> {
       endedAt: poll.endedAt ?? null,
     })),
     teacherSpaces,
-    spaceMembers: (data.spaceMembers ?? []).map((member) => ({
-      ...member,
-      spaceCode: normalizeSpaceCode(member.spaceCode),
-      email: normalizeSpaceEmail(member.email),
-      role: validateSpaceRole(member.role),
-      status: validateSpaceMembershipStatus(member.status ?? "active"),
-      createdAt: member.createdAt ?? now(),
+    organizations,
+    spaceMembers: (data.spaceMembers ?? []).map((member) => {
+      if (!member.userId) {
+        throw new Error(
+          "The local Ed.ie store contains legacy email memberships. Reset .data/edie-store.json or migrate it before continuing.",
+        );
+      }
+
+      return {
+        spaceCode: normalizeSpaceCode(member.spaceCode),
+        userId: member.userId,
+        role: validateSpaceRole(member.role),
+        createdAt: member.createdAt ?? now(),
+      };
+    }),
+    spaceInvitations: (data.spaceInvitations ?? []).map((invitation) => ({
+      spaceCode: normalizeSpaceCode(invitation.spaceCode),
+      email: normalizeSpaceEmail(invitation.email),
+      userId: invitation.userId ?? null,
+      role: validateSpaceRole(invitation.role),
+      createdAt: invitation.createdAt ?? now(),
     })),
     questionBank: (data.questionBank ?? []).map((question) => ({
       ...question,
@@ -319,6 +361,51 @@ async function writeStore(data: StoreData) {
 
 let bankMutationTail = Promise.resolve();
 let submissionViewMutationTail = Promise.resolve();
+let storeMutationTail = Promise.resolve();
+
+async function serializeStoreMutation<T>(operation: () => Promise<T>) {
+  const previousMutation = storeMutationTail;
+  let finishMutation = () => {};
+
+  storeMutationTail = new Promise<void>((resolve) => {
+    finishMutation = resolve;
+  });
+
+  await previousMutation;
+
+  try {
+    return await operation();
+  } finally {
+    finishMutation();
+  }
+}
+
+function personalOrganizationName(ownerName: string) {
+  const name = ownerName.trim() || "Teacher";
+  return `${name.slice(0, 95)}'s organization`;
+}
+
+function ensurePersonalOrganizationInData(
+  data: StoreData,
+  userId: string,
+  ownerName: string,
+) {
+  const existing = data.organizations.find(
+    (organization) => organization.personalOwnerUserId === userId,
+  );
+
+  if (existing) return existing;
+
+  const organization: Organization = {
+    id: randomUUID(),
+    name: personalOrganizationName(ownerName),
+    kind: "personal",
+    personalOwnerUserId: userId,
+    createdAt: now(),
+  };
+  data.organizations.push(organization);
+  return organization;
+}
 
 async function serializeBankMutation<T>(operation: () => Promise<T>) {
   const previousMutation = bankMutationTail;
@@ -357,29 +444,63 @@ async function serializeSubmissionViewMutation<T>(
 }
 
 export const localStore: EdieStore = {
-  async createTeacherSpace(code, name) {
+  async getPersonalOrganization(userId) {
+    const data = await readStore();
+    return data.organizations.find(
+      (organization) => organization.personalOwnerUserId === userId,
+    ) ?? null;
+  },
+
+  async ensurePersonalOrganization(userId, ownerName) {
+    if (!userId.trim()) throw new Error("User ID is required.");
+
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const organization = ensurePersonalOrganizationInData(
+        data,
+        userId,
+        ownerName,
+      );
+      await writeStore(data);
+      return { ...organization };
+    });
+  },
+
+  async createTeacherSpaceForOwner(code, name, owner) {
     const spaceCode = normalizeSpaceCode(code);
 
     if (!spaceCode) {
       throw new Error("Space code is required.");
     }
 
-    const data = await readStore();
-    const existing = data.teacherSpaces.find((space) => space.code === spaceCode);
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const existing = data.teacherSpaces.find((space) => space.code === spaceCode);
 
-    if (existing) {
-      throw new Error("That space code already exists.");
-    }
+      if (existing) throw new Error("That space code already exists.");
 
-    const space: TeacherSpace = {
-      code: spaceCode,
-      name: validateTeacherSpaceName(name),
-      createdAt: now(),
-    };
-
-    data.teacherSpaces.push(space);
-    await writeStore(data);
-    return space;
+      const organization = ensurePersonalOrganizationInData(
+        data,
+        owner.userId,
+        owner.name,
+      );
+      const createdAt = now();
+      const space: TeacherSpace = {
+        code: spaceCode,
+        name: validateTeacherSpaceName(name),
+        organizationId: organization.id,
+        createdAt,
+      };
+      data.teacherSpaces.push(space);
+      data.spaceMembers.push({
+        spaceCode,
+        userId: owner.userId,
+        role: "owner",
+        createdAt,
+      });
+      await writeStore(data);
+      return space;
+    });
   },
 
   async getTeacherSpace(code) {
@@ -397,21 +518,18 @@ export const localStore: EdieStore = {
     const data = await readStore();
 
     return data.teacherSpaces
-      .map(({ code, name, createdAt }) => ({ code, name, createdAt }))
+      .map(({ code, name, organizationId, createdAt }) => ({ code, name, organizationId, createdAt }))
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
-  async listTeacherSpacesForUser(email) {
-    const normalizedEmail = normalizeSpaceEmail(email);
+  async listTeacherSpacesForUser(userId) {
     const data = await readStore();
 
     return data.teacherSpaces
       .map((summary) => {
         const member = data.spaceMembers.find(
           (item) =>
-            item.spaceCode === summary.code &&
-            item.email === normalizedEmail &&
-            item.status === "active",
+            item.spaceCode === summary.code && item.userId === userId,
         );
 
         if (!member) {
@@ -424,14 +542,14 @@ export const localStore: EdieStore = {
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
-  async listPendingSpaceInvitationsForUser(email) {
+  async listPendingSpaceInvitationsForUser(userId, email) {
     const normalizedEmail = normalizeSpaceEmail(email);
     const data = await readStore();
 
-    return data.spaceMembers
+    return data.spaceInvitations
       .filter(
-        (member) =>
-          member.email === normalizedEmail && member.status === "pending",
+        (invitation) =>
+          invitation.userId === userId || invitation.email === normalizedEmail,
       )
       .map((member) => {
         const space = data.teacherSpaces.find(
@@ -454,9 +572,8 @@ export const localStore: EdieStore = {
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
-  async getSpaceMemberRole(spaceCode, email) {
+  async getSpaceMemberRole(spaceCode, userId) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
 
     if (!normalizedSpaceCode) {
       return null;
@@ -465,10 +582,10 @@ export const localStore: EdieStore = {
     const data = await readStore();
     const member = data.spaceMembers.find(
       (item) =>
-        item.spaceCode === normalizedSpaceCode && item.email === normalizedEmail,
+        item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
 
-    return member?.status === "active" ? member.role : null;
+    return member?.role ?? null;
   },
 
   async listSpaceMembers(spaceCode) {
@@ -483,19 +600,28 @@ export const localStore: EdieStore = {
     return data.spaceMembers
       .filter((member) => member.spaceCode === normalizedSpaceCode)
       .map((member) => ({ ...member }))
+      .sort((left, right) => left.userId.localeCompare(right.userId));
+  },
+
+  async listSpaceInvitations(spaceCode) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+    if (!normalizedSpaceCode) return [];
+    const data = await readStore();
+    return data.spaceInvitations
+      .filter((invitation) => invitation.spaceCode === normalizedSpaceCode)
+      .map((invitation) => ({ ...invitation }))
       .sort((left, right) => left.email.localeCompare(right.email));
   },
 
   async addSpaceMember(
     spaceCode,
+    userId,
     email,
     role = "editor",
-    status = "pending",
   ) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedEmail = normalizeSpaceEmail(email);
     const normalizedRole = validateSpaceRole(role);
-    const normalizedStatus = validateSpaceMembershipStatus(status);
 
     if (!normalizedSpaceCode) {
       throw new Error("Space code is required.");
@@ -513,7 +639,7 @@ export const localStore: EdieStore = {
     const existing = data.spaceMembers.find(
       (item) =>
         item.spaceCode === normalizedSpaceCode &&
-        item.email === normalizedEmail,
+        item.userId === userId,
     );
 
     if (existing) {
@@ -522,66 +648,105 @@ export const localStore: EdieStore = {
 
     const member: SpaceMember = {
       spaceCode: normalizedSpaceCode,
-      email: normalizedEmail,
+      userId,
       role: normalizedRole,
-      status: normalizedStatus,
       createdAt: now(),
     };
 
+    data.spaceInvitations = data.spaceInvitations.filter(
+      (invitation) =>
+        !(
+          invitation.spaceCode === normalizedSpaceCode &&
+          (invitation.userId === userId || invitation.email === normalizedEmail)
+        ),
+    );
     data.spaceMembers.push(member);
     await writeStore(data);
     return member;
   },
 
-  async acceptSpaceInvitation(spaceCode, email) {
+  async inviteSpaceMember(spaceCode, email, userId, role = "editor") {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedEmail = normalizeSpaceEmail(email);
-    const data = await readStore();
-    const member = data.spaceMembers.find(
-      (item) =>
-        item.spaceCode === normalizedSpaceCode &&
-        item.email === normalizedEmail &&
-        item.status === "pending",
-    );
+    const normalizedRole = validateSpaceRole(role);
+    if (!normalizedSpaceCode) throw new Error("Space code is required.");
 
-    if (!member) {
-      return false;
+    const data = await readStore();
+    if (!data.teacherSpaces.some((space) => space.code === normalizedSpaceCode)) {
+      throw new Error("That space could not be found.");
+    }
+    if (userId && data.spaceMembers.some((member) => member.spaceCode === normalizedSpaceCode && member.userId === userId)) {
+      throw new Error("That person is already a member of this space.");
+    }
+    if (data.spaceInvitations.some((invitation) => invitation.spaceCode === normalizedSpaceCode && (invitation.email === normalizedEmail || Boolean(userId && invitation.userId === userId)))) {
+      throw new Error("That person is already a member of this space.");
     }
 
-    member.status = "active";
+    const invitation: SpaceInvitationRecord = {
+      spaceCode: normalizedSpaceCode,
+      email: normalizedEmail,
+      userId,
+      role: normalizedRole,
+      createdAt: now(),
+    };
+    data.spaceInvitations.push(invitation);
     await writeStore(data);
-    return true;
+    return invitation;
   },
 
-  async declineSpaceInvitation(spaceCode, email) {
+  async acceptSpaceInvitation(spaceCode, userId, email) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedEmail = normalizeSpaceEmail(email);
     const data = await readStore();
-    const index = data.spaceMembers.findIndex(
+    const index = data.spaceInvitations.findIndex(
       (item) =>
         item.spaceCode === normalizedSpaceCode &&
-        item.email === normalizedEmail &&
-        item.status === "pending",
+        (item.userId === userId || item.email === normalizedEmail),
     );
 
     if (index === -1) {
       return false;
     }
 
-    data.spaceMembers.splice(index, 1);
+    const invitation = data.spaceInvitations[index];
+    if (!data.spaceMembers.some((member) => member.spaceCode === normalizedSpaceCode && member.userId === userId)) {
+      data.spaceMembers.push({
+        spaceCode: normalizedSpaceCode,
+        userId,
+        role: invitation.role,
+        createdAt: now(),
+      });
+    }
+    data.spaceInvitations.splice(index, 1);
     await writeStore(data);
     return true;
   },
 
-  async leaveSpace(spaceCode, email) {
+  async declineSpaceInvitation(spaceCode, userId, email) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedEmail = normalizeSpaceEmail(email);
     const data = await readStore();
-    const index = data.spaceMembers.findIndex(
+    const index = data.spaceInvitations.findIndex(
       (item) =>
         item.spaceCode === normalizedSpaceCode &&
-        item.email === normalizedEmail &&
-        item.status === "active",
+        (item.userId === userId || item.email === normalizedEmail),
+    );
+
+    if (index === -1) {
+      return false;
+    }
+
+    data.spaceInvitations.splice(index, 1);
+    await writeStore(data);
+    return true;
+  },
+
+  async leaveSpace(spaceCode, userId) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+    const data = await readStore();
+    const index = data.spaceMembers.findIndex(
+      (item) =>
+        item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
 
     if (index === -1) {
@@ -595,8 +760,7 @@ export const localStore: EdieStore = {
       !data.spaceMembers.some(
         (item) =>
           item.spaceCode === normalizedSpaceCode &&
-          item.email !== normalizedEmail &&
-          item.status === "active" &&
+          item.userId !== userId &&
           item.role === "owner",
       )
     ) {
@@ -608,9 +772,8 @@ export const localStore: EdieStore = {
     return true;
   },
 
-  async updateSpaceMemberRole(spaceCode, email, role) {
+  async updateSpaceMemberRole(spaceCode, userId, role) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
     const normalizedRole = validateSpaceRole(role);
 
     if (!normalizedSpaceCode) {
@@ -620,7 +783,7 @@ export const localStore: EdieStore = {
     const data = await readStore();
     const member = data.spaceMembers.find(
       (item) =>
-        item.spaceCode === normalizedSpaceCode && item.email === normalizedEmail,
+        item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
 
     if (!member) {
@@ -632,9 +795,8 @@ export const localStore: EdieStore = {
     return { ...member };
   },
 
-  async removeSpaceMember(spaceCode, email) {
+  async removeSpaceMember(spaceCode, userId) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
 
     if (!normalizedSpaceCode) {
       return false;
@@ -643,7 +805,7 @@ export const localStore: EdieStore = {
     const data = await readStore();
     const index = data.spaceMembers.findIndex(
       (item) =>
-        item.spaceCode === normalizedSpaceCode && item.email === normalizedEmail,
+        item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
 
     if (index === -1) {
@@ -651,6 +813,20 @@ export const localStore: EdieStore = {
     }
 
     data.spaceMembers.splice(index, 1);
+    await writeStore(data);
+    return true;
+  },
+
+  async removeSpaceInvitation(spaceCode, email) {
+    const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+    const normalizedEmail = normalizeSpaceEmail(email);
+    if (!normalizedSpaceCode) return false;
+    const data = await readStore();
+    const index = data.spaceInvitations.findIndex(
+      (invitation) => invitation.spaceCode === normalizedSpaceCode && invitation.email === normalizedEmail,
+    );
+    if (index === -1) return false;
+    data.spaceInvitations.splice(index, 1);
     await writeStore(data);
     return true;
   },

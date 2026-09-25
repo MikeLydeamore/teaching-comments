@@ -68,5 +68,5 @@ export async function getSpaceRoleForUser(
     return null;
   }
 
-  return getSpaceMemberRole(spaceCode, teacher.email);
+  return getSpaceMemberRole(spaceCode, teacher.id);
 }

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getAuth: vi.fn(),
   getCurrentTeacher: vi.fn(),
+  ensurePersonalOrganization: vi.fn(),
   headers: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
@@ -17,6 +18,9 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/auth", () => ({ getAuth: mocks.getAuth }));
 vi.mock("@/lib/auth-server", () => ({
   getCurrentTeacher: mocks.getCurrentTeacher,
+}));
+vi.mock("@/lib/edie-store", () => ({
+  ensurePersonalOrganization: mocks.ensurePersonalOrganization,
 }));
 vi.mock("@/lib/teacher-session-auth", () => ({
   loginRedirectPath: (path: string) => `/auth/login?returnTo=${encodeURIComponent(path)}`,
@@ -53,6 +57,7 @@ describe("updateDisplayName", () => {
     mocks.getCurrentTeacher.mockResolvedValue(teacher);
     mocks.headers.mockResolvedValue(new Headers());
     mocks.updateUser.mockResolvedValue({ status: true });
+    mocks.ensurePersonalOrganization.mockResolvedValue({});
     mocks.getAuth.mockReturnValue({ api: { updateUser: mocks.updateUser } });
   });
 
@@ -116,6 +121,7 @@ describe("updateUsername", () => {
     mocks.getCurrentTeacher.mockResolvedValue(teacher);
     mocks.headers.mockResolvedValue(new Headers());
     mocks.updateUser.mockResolvedValue({ status: true });
+    mocks.ensurePersonalOrganization.mockResolvedValue({});
     mocks.getAuth.mockReturnValue({ api: { updateUser: mocks.updateUser } });
   });
 
@@ -142,6 +148,7 @@ describe("updateUsername", () => {
       message: "Your username is already up to date.",
     });
     expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.ensurePersonalOrganization).toHaveBeenCalledWith("teacher-id", "Jane Smith");
   });
 
   it("updates the canonical and case-preserving username", async () => {
@@ -156,6 +163,7 @@ describe("updateUsername", () => {
       headers: expect.any(Headers),
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout");
+    expect(mocks.ensurePersonalOrganization).toHaveBeenCalledWith("teacher-id", "Jane Smith");
   });
 
   it("allows a display-case-only username change", async () => {
@@ -180,5 +188,20 @@ describe("updateUsername", () => {
       status: "error",
       message: "That username is already taken.",
     });
+  });
+
+  it("reports incomplete organization provisioning separately", async () => {
+    mocks.ensurePersonalOrganization.mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    await expect(
+      updateUsername(initialState, usernameForm("New_Name")),
+    ).resolves.toEqual({
+      status: "error",
+      message:
+        "Your username was saved, but account setup could not be completed. Please try again.",
+    });
+    expect(mocks.updateUser).toHaveBeenCalled();
   });
 });

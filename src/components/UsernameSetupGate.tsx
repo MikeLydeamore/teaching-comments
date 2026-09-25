@@ -3,7 +3,13 @@
 import { logoutTeacher } from "@/app/host/actions";
 import { UsernameForm } from "@/app/host/profile/UsernameForm";
 
-export function UsernameSetupGate({ name }: { name: string }) {
+export function UsernameSetupGate({
+  name,
+  displayUsername,
+}: {
+  name: string;
+  displayUsername?: string | null;
+}) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
       <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm">
@@ -18,7 +24,7 @@ export function UsernameSetupGate({ name }: { name: string }) {
           sharing your sign-in email.
         </p>
         <div className="mt-5">
-          <UsernameForm compact />
+          <UsernameForm compact displayUsername={displayUsername} />
         </div>
         <form action={logoutTeacher} className="mt-4 border-t border-slate-200 pt-4">
           <input name="next" type="hidden" value="/auth/login" />

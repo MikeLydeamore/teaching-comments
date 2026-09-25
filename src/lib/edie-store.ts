@@ -14,7 +14,6 @@ import {
   type CreateSubmissionInput,
   type SubmissionPatch,
   type SpaceRole,
-  type SpaceMembershipStatus,
 } from "./edie-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
@@ -52,8 +51,9 @@ export type {
   TeacherSpace,
   TeacherSpaceSummary,
   SpaceMember,
+  SpaceInvitationRecord,
   SpaceInvitation,
-  SpaceMembershipStatus,
+  Organization,
   SpaceRole,
   SpaceWithRole,
 } from "./edie-store-model";
@@ -94,8 +94,20 @@ export async function getSession(code: string) {
   return getStore().getSession(code);
 }
 
-export async function createTeacherSpace(code: string, name: string) {
-  return getStore().createTeacherSpace(code, name);
+export async function ensurePersonalOrganization(userId: string, ownerName: string) {
+  return getStore().ensurePersonalOrganization(userId, ownerName);
+}
+
+export async function getPersonalOrganization(userId: string) {
+  return getStore().getPersonalOrganization(userId);
+}
+
+export async function createTeacherSpaceForOwner(
+  code: string,
+  name: string,
+  owner: { userId: string; email: string; name: string },
+) {
+  return getStore().createTeacherSpaceForOwner(code, name, owner);
 }
 
 export async function getTeacherSpace(code: string) {
@@ -106,53 +118,70 @@ export async function listTeacherSpaces() {
   return getStore().listTeacherSpaces();
 }
 
-export async function listTeacherSpacesForUser(email: string) {
-  return getStore().listTeacherSpacesForUser(email);
+export async function listTeacherSpacesForUser(userId: string) {
+  return getStore().listTeacherSpacesForUser(userId);
 }
 
-export async function listPendingSpaceInvitationsForUser(email: string) {
-  return getStore().listPendingSpaceInvitationsForUser(email);
+export async function listPendingSpaceInvitationsForUser(userId: string, email: string) {
+  return getStore().listPendingSpaceInvitationsForUser(userId, email);
 }
 
-export async function getSpaceMemberRole(spaceCode: string, email: string) {
-  return getStore().getSpaceMemberRole(spaceCode, email);
+export async function getSpaceMemberRole(spaceCode: string, userId: string) {
+  return getStore().getSpaceMemberRole(spaceCode, userId);
 }
 
 export async function listSpaceMembers(spaceCode: string) {
   return getStore().listSpaceMembers(spaceCode);
 }
 
+export async function listSpaceInvitations(spaceCode: string) {
+  return getStore().listSpaceInvitations(spaceCode);
+}
+
 export async function addSpaceMember(
   spaceCode: string,
+  userId: string,
   email: string,
   role?: SpaceRole,
-  status?: SpaceMembershipStatus,
 ) {
-  return getStore().addSpaceMember(spaceCode, email, role, status);
+  return getStore().addSpaceMember(spaceCode, userId, email, role);
 }
 
-export async function acceptSpaceInvitation(spaceCode: string, email: string) {
-  return getStore().acceptSpaceInvitation(spaceCode, email);
+export async function inviteSpaceMember(
+  spaceCode: string,
+  email: string,
+  userId: string | null,
+  role?: SpaceRole,
+) {
+  return getStore().inviteSpaceMember(spaceCode, email, userId, role);
 }
 
-export async function declineSpaceInvitation(spaceCode: string, email: string) {
-  return getStore().declineSpaceInvitation(spaceCode, email);
+export async function acceptSpaceInvitation(spaceCode: string, userId: string, email: string) {
+  return getStore().acceptSpaceInvitation(spaceCode, userId, email);
 }
 
-export async function leaveSpace(spaceCode: string, email: string) {
-  return getStore().leaveSpace(spaceCode, email);
+export async function declineSpaceInvitation(spaceCode: string, userId: string, email: string) {
+  return getStore().declineSpaceInvitation(spaceCode, userId, email);
+}
+
+export async function leaveSpace(spaceCode: string, userId: string) {
+  return getStore().leaveSpace(spaceCode, userId);
 }
 
 export async function updateSpaceMemberRole(
   spaceCode: string,
-  email: string,
+  userId: string,
   role: SpaceRole,
 ) {
-  return getStore().updateSpaceMemberRole(spaceCode, email, role);
+  return getStore().updateSpaceMemberRole(spaceCode, userId, role);
 }
 
-export async function removeSpaceMember(spaceCode: string, email: string) {
-  return getStore().removeSpaceMember(spaceCode, email);
+export async function removeSpaceMember(spaceCode: string, userId: string) {
+  return getStore().removeSpaceMember(spaceCode, userId);
+}
+
+export async function removeSpaceInvitation(spaceCode: string, email: string) {
+  return getStore().removeSpaceInvitation(spaceCode, email);
 }
 
 export async function getSessionInSpace(spaceCode: string, code: string) {

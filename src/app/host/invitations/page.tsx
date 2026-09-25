@@ -30,7 +30,7 @@ export default async function InvitationsPage({
   }
 
   const [invitations, query] = await Promise.all([
-    listPendingSpaceInvitationsForUser(teacher.email),
+    listPendingSpaceInvitationsForUser(teacher.id, teacher.email),
     searchParams,
   ]);
   const message = query.invitation

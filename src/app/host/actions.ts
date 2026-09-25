@@ -63,7 +63,7 @@ export async function acceptSpaceInvitation(formData: FormData) {
   const teacher = await requireTeacher("/host/invitations");
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const accepted = spaceCode
-    ? await acceptInvitation(spaceCode, teacher.email)
+    ? await acceptInvitation(spaceCode, teacher.id, teacher.email)
     : false;
 
   revalidatePath("/host");
@@ -75,7 +75,7 @@ export async function declineSpaceInvitation(formData: FormData) {
   const teacher = await requireTeacher("/host/invitations");
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const declined = spaceCode
-    ? await declineInvitation(spaceCode, teacher.email)
+    ? await declineInvitation(spaceCode, teacher.id, teacher.email)
     : false;
 
   revalidatePath("/host");
@@ -87,11 +87,11 @@ export async function leaveHostedSpace(formData: FormData) {
   const teacher = await requireTeacher();
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const role = spaceCode
-    ? await getSpaceMemberRole(spaceCode, teacher.email)
+    ? await getSpaceMemberRole(spaceCode, teacher.id)
     : null;
 
   const left = role
-    ? await leaveSpace(spaceCode, teacher.email)
+    ? await leaveSpace(spaceCode, teacher.id)
     : false;
 
   revalidatePath("/host");

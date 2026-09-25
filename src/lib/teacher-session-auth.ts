@@ -13,7 +13,7 @@ type AuthorizedTeacherSession =
   | { response?: never; session: Session };
 
 export type SpaceAccess =
-  | { status: "ok"; role: "owner" | "editor" }
+  | { status: "ok"; role: "owner" | "editor"; organizationId: string }
   | { status: "unauthenticated" }
   | { status: "forbidden" };
 
@@ -34,7 +34,7 @@ export async function resolveSpaceAccess(
   const role = await getSpaceRoleForUser(space.code);
 
   if (role) {
-    return { status: "ok", role };
+    return { status: "ok", role, organizationId: space.organizationId };
   }
 
   const teacher = await getCurrentTeacher();

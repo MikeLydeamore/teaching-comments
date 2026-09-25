@@ -76,6 +76,36 @@ export async function findUserProfileById(
   return result.rows[0] ? memberProfileFromRow(result.rows[0]) : null;
 }
 
+export async function findUserProfileByEmail(
+  email: string,
+): Promise<MemberProfile | null> {
+  const result = await findUserProfilesByEmail([email]);
+  if (!result.ok) throw new Error("The auth database is not configured or unavailable.");
+  return result.profiles.get(email.trim().toLowerCase()) ?? null;
+}
+
+export async function findUserProfilesById(
+  userIds: string[],
+): Promise<MemberProfilesResult> {
+  const profiles = new Map<string, MemberProfile>();
+  const databaseUrl = resolveAuthDatabaseUrl();
+
+  if (!userIds.length) return { ok: true, profiles };
+  if (!databaseUrl) return { ok: false, profiles };
+
+  try {
+    const result = await userPool(databaseUrl).query<MemberProfile>(
+      `SELECT ${PROFILE_COLUMNS} FROM "user" WHERE id = ANY($1::text[])`,
+      [userIds],
+    );
+    for (const row of result.rows) profiles.set(row.id, memberProfileFromRow(row));
+  } catch {
+    return { ok: false, profiles: new Map() };
+  }
+
+  return { ok: true, profiles };
+}
+
 /**
  * Looks up Better Auth user profiles by email. Google/GitHub provide a
  * display name and avatar at sign-in; invited members who have never signed

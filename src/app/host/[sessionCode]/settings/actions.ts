@@ -3,16 +3,17 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
-  addSpaceMember,
   getTeacherSpace,
+  inviteSpaceMember as createSpaceInvitation,
   normalizeSpaceCode,
   removeSpaceMember,
+  removeSpaceInvitation,
   updateSpaceMemberRole,
 } from "@/lib/edie-store";
 import type { SpaceRole } from "@/lib/edie-store-model";
 import { getSpaceRoleForUser } from "@/lib/auth-server";
 import {
-  findUserProfileById,
+  findUserProfileByEmail,
   findUserProfileByUsername,
 } from "@/lib/auth-users";
 import { parseMemberInviteIdentity } from "@/lib/space-member-identity";
@@ -56,6 +57,7 @@ export async function inviteSpaceMember(formData: FormData) {
   }
 
   let email: string;
+  let userId: string | null = null;
 
   if (identity.kind === "username") {
     let profile;
@@ -71,12 +73,25 @@ export async function inviteSpaceMember(formData: FormData) {
     }
 
     email = profile.email;
+    userId = profile.id;
   } else {
     email = identity.email;
+    try {
+      userId = (await findUserProfileByEmail(email))?.id ?? null;
+    } catch {
+      // Email invitations remain valid when the optional account lookup is
+      // unavailable; acceptance binds the invitation to the signed-in user.
+      userId = null;
+    }
   }
 
   try {
-    await addSpaceMember(space.code, email, role === "owner" ? "owner" : "editor");
+    await createSpaceInvitation(
+      space.code,
+      email,
+      userId,
+      role === "owner" ? "owner" : "editor",
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     redirect(settingsPath(space.code, message.includes("already") ? "exists" : "unavailable"));
@@ -86,37 +101,21 @@ export async function inviteSpaceMember(formData: FormData) {
   redirect(settingsPath(space.code, "added"));
 }
 
-async function resolveMemberEmail(formData: FormData) {
+function resolveMemberUserId(formData: FormData) {
   const accountId = String(formData.get("accountId") ?? "").trim();
-
-  if (accountId) {
-    const profile = await findUserProfileById(accountId);
-
-    if (!profile) {
-      throw new Error("Member account unavailable.");
-    }
-
-    return profile.email;
-  }
-
-  const identity = parseMemberInviteIdentity(formData.get("email"));
-
-  if (!identity.ok || identity.kind !== "email") {
-    throw new Error("Member account unavailable.");
-  }
-
-  return identity.email;
+  if (!accountId) throw new Error("Member account unavailable.");
+  return accountId;
 }
 
 export async function changeSpaceMemberRole(formData: FormData) {
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const space = await requireOwner(spaceCode);
-  let email: string;
+  let userId: string;
   const role = String(formData.get("role") ?? "editor") as SpaceRole;
 
   try {
-    email = await resolveMemberEmail(formData);
-    await updateSpaceMemberRole(space.code, email, role === "owner" ? "owner" : "editor");
+    userId = resolveMemberUserId(formData);
+    await updateSpaceMemberRole(space.code, userId, role === "owner" ? "owner" : "editor");
   } catch {
     redirect(settingsPath(space.code, "unavailable"));
   }
@@ -127,11 +126,17 @@ export async function changeSpaceMemberRole(formData: FormData) {
 export async function evictSpaceMember(formData: FormData) {
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
   const space = await requireOwner(spaceCode);
-  let email: string;
-
   try {
-    email = await resolveMemberEmail(formData);
-    await removeSpaceMember(space.code, email);
+    const accountId = String(formData.get("accountId") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+
+    if (accountId) {
+      await removeSpaceMember(space.code, accountId);
+    } else if (email) {
+      await removeSpaceInvitation(space.code, email);
+    } else {
+      throw new Error("Member account unavailable.");
+    }
   } catch {
     redirect(settingsPath(space.code, "unavailable"));
   }

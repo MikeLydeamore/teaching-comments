@@ -66,9 +66,43 @@ npm test
 For local development, submissions are stored in `.data/edie-store.json`.
 This keeps the first step free and fast to iterate on.
 
-For a hosted deployment, you will need a PostgreSQL Server. The schema is in `database/schema.sql` and permissions set in `database/db-app-role.sql`.
-Existing databases with `edie_space_members` must also apply
-`database/add-space-invitations.sql` before deploying invitation-aware code.
+For a hosted deployment, you will need a PostgreSQL Server. The schema is in
+`database/schema.sql` and permissions are set in `database/db-app-role.sql`.
+
+When upgrading a database created before teacher accounts, apply these
+idempotent migrations in order with the database owner connection:
+
+```bash
+psql "$DATABASE_OWNER_URL" < database/drop-space-pins.sql
+psql "$DATABASE_OWNER_URL" < database/add-space-members.sql
+psql "$DATABASE_OWNER_URL" < database/add-space-invitations.sql
+psql "$DATABASE_OWNER_URL" < database/add-organizations.sql
+```
+
+The first migration removes the legacy PIN requirement. The next two create the
+legacy-compatible account ACL, and `add-organizations.sql` expands it with
+stable user IDs, separate invitations, and the invisible customer boundary.
+
+Audit live data before applying the organization backfill. This command is a
+dry run unless `--apply` is supplied, and it makes no changes if a space is
+ownerless, has multiple owners, or an active member cannot be mapped to a
+Better Auth account:
+
+```bash
+DATABASE_OWNER_URL="$DATABASE_OWNER_URL" AUTH_DATABASE_URL="$AUTH_DATABASE_URL" \
+  npm run migrate-organizations
+DATABASE_OWNER_URL="$DATABASE_OWNER_URL" AUTH_DATABASE_URL="$AUTH_DATABASE_URL" \
+  npm run migrate-organizations -- --apply
+psql "$DATABASE_OWNER_URL" < database/require-space-organizations.sql
+```
+
+When auth and application tables share a database, `DATABASE_URL` can be used
+for both connections. Keep the legacy membership email/status columns through
+the rollback soak period; current code dual-writes pending invitations while
+authorization reads stable Better Auth user IDs. Pause space creation,
+invitation acceptance, and access changes between the final successful
+`--apply` run and deployment of the new application, then rerun the dry-run if
+the deployment is delayed.
 
 Set these environment variables locally and in Vercel:
 
@@ -143,7 +177,8 @@ same session code without sharing responses, questions, or polls.
 
 Teachers sign in with Google or GitHub through Better Auth; there are no
 passwords, so there are no resets to manage. Every teacher route requires a
-signed-in account with a membership row in `edie_space_members`:
+signed-in account with a stable user-ID membership row in
+`edie_space_members`:
 
 - **owner** — full access, can share the space and manage members
 - **editor** — run live sessions and moderate responses
@@ -151,7 +186,10 @@ signed-in account with a membership row in `edie_space_members`:
 Every teacher chooses a unique username after their first OAuth sign-in. Space
 owners can invite an existing teacher by exact username, without seeing their
 sign-in email, or use an email address for someone who has not joined Ed.ie yet.
-Invitations remain pending until the invited teacher accepts them.
+Invitations live separately in `edie_space_invitations` and remain pending until
+the invited teacher accepts them. Every teacher receives an invisible personal
+organization after username onboarding, and every hosted space belongs to one
+organization so future entitlements have a durable customer boundary.
 
 Admins are verified emails listed in `ADMIN_EMAILS` (comma-separated). They
 manage all spaces from `/admin/spaces`, including claiming legacy spaces that
