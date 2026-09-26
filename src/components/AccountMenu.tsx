@@ -133,37 +133,48 @@ export function AccountMenu({
               </svg>
               Profile
             </Link>
-            {onboardingTour ? (
-              <div>
-                <button
-                  aria-controls="account-help-menu"
-                  aria-expanded={helpOpen}
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-                  role="menuitem"
-                  type="button"
-                  onClick={() => setHelpOpen((value) => !value)}
+            <div>
+              <button
+                aria-controls="account-help-menu"
+                aria-expanded={helpOpen}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                role="menuitem"
+                type="button"
+                onClick={() => setHelpOpen((value) => !value)}
+              >
+                <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8.25 9a3.75 3.75 0 1 1 6.33 2.72c-1.19 1.1-2.58 1.65-2.58 3.03M12 3a9 9 0 1 0 9 9" />
+                </svg>
+                <span className="flex-1">Help</span>
+                <svg
+                  aria-hidden="true"
+                  className={`size-4 text-slate-400 transition ${helpOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
                 >
-                  <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8.25 9a3.75 3.75 0 1 1 6.33 2.72c-1.19 1.1-2.58 1.65-2.58 3.03M12 3a9 9 0 1 0 9 9" />
-                  </svg>
-                  <span className="flex-1">Help</span>
-                  <svg
-                    aria-hidden="true"
-                    className={`size-4 text-slate-400 transition ${helpOpen ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
+                  <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {helpOpen ? (
+                <div
+                  className="ml-7 border-l border-slate-200 py-1 pl-2"
+                  id="account-help-menu"
+                  role="menu"
+                >
+                  <Link
+                    className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
+                    href="/help"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      setHelpOpen(false);
+                    }}
                   >
-                    <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                {helpOpen ? (
-                  <div
-                    className="ml-7 border-l border-slate-200 py-1 pl-2"
-                    id="account-help-menu"
-                    role="menu"
-                  >
+                    Help centre
+                  </Link>
+                  {onboardingTour ? (
                     <button
                       className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
                       role="menuitem"
@@ -176,24 +187,24 @@ export function AccountMenu({
                     >
                       Guided tour
                     </button>
-                    {onboardingTour === "session" ? (
-                      <button
-                        className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
-                        role="menuitem"
-                        type="button"
-                        onClick={() => {
-                          setOpen(false);
-                          setHelpOpen(false);
-                          startHostOnboardingTour("poll");
-                        }}
-                      >
-                        How to run a poll
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+                  ) : null}
+                  {onboardingTour === "session" ? (
+                    <button
+                      className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setHelpOpen(false);
+                        startHostOnboardingTour("poll");
+                      }}
+                    >
+                      How to run a poll
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             {children}
           </nav>
           <div className="border-y border-slate-100 bg-slate-50 px-4 py-3">

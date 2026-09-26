@@ -41,7 +41,13 @@ export default function Home() {
           </HomeNavCard>
         </section>
 
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap gap-4">
+          <Link
+            className="text-sm font-semibold text-teal-700 underline"
+            href="/help"
+          >
+            Help centre
+          </Link>
           <Link
             className="text-sm font-semibold text-teal-700 underline"
             href="/privacy"
