@@ -26,6 +26,11 @@ import {
 
 type HostPollManagerProps = {
   dashboardUrl: string;
+  pollTutorial?: {
+    isManagerOpen: boolean;
+    onManagerClose: () => void;
+    onManagerOpen: () => void;
+  };
   sessionIsOpen: boolean;
   sessionCode: string;
 };
@@ -90,6 +95,7 @@ function questionBankTextKey(text: string) {
 
 export function HostPollManager({
   dashboardUrl,
+  pollTutorial,
   sessionIsOpen,
   sessionCode,
 }: HostPollManagerProps) {
@@ -351,9 +357,13 @@ export function HostPollManager({
   );
 
   function openManager() {
-    setTab(poll ? "current" : "new");
+    setTab(pollTutorial ? "new" : poll ? "current" : "new");
     setStatus("");
-    setIsOpen(true);
+    if (pollTutorial) {
+      pollTutorial.onManagerOpen();
+    } else {
+      setIsOpen(true);
+    }
     void refreshPoll();
     void refreshHistory();
   }
@@ -695,6 +705,9 @@ export function HostPollManager({
     popoutWindow?.focus();
   }
 
+  const managerIsOpen = pollTutorial?.isManagerOpen ?? isOpen;
+  const visibleTab = pollTutorial?.isManagerOpen ? "new" : tab;
+
   return (
     <>
       <button
@@ -703,7 +716,8 @@ export function HostPollManager({
             ? "border-teal-400 bg-teal-50 text-teal-900 hover:bg-teal-100"
             : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-800"
         }`}
-        disabled={!sessionIsOpen && !pollCanBeClosed}
+        data-tour="poll-launch"
+        disabled={!pollTutorial && !sessionIsOpen && !pollCanBeClosed}
         type="button"
         onClick={openManager}
       >
@@ -716,7 +730,7 @@ export function HostPollManager({
           : "Run poll"}
       </button>
 
-      {isOpen ? (
+      {managerIsOpen ? (
         <div
           aria-labelledby="host-poll-title"
           aria-modal="true"
@@ -738,10 +752,15 @@ export function HostPollManager({
               </div>
               <button
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
+                data-tour="poll-close"
                 type="button"
                 onClick={() => {
                   setIsBankTitleDialogOpen(false);
-                  setIsOpen(false);
+                  if (pollTutorial) {
+                    pollTutorial.onManagerClose();
+                  } else {
+                    setIsOpen(false);
+                  }
                 }}
               >
                 Close
@@ -752,7 +771,7 @@ export function HostPollManager({
               {(["current", "history", "new"] as const).map((tabOption) => (
                 <button
                   className={`h-10 rounded text-sm font-semibold transition ${
-                    tab === tabOption
+                    visibleTab === tabOption
                       ? "bg-white text-slate-950 shadow-sm"
                       : "text-slate-600 hover:text-teal-800"
                   }`}
@@ -776,7 +795,7 @@ export function HostPollManager({
             </div>
 
             <div className="max-h-[75vh] overflow-y-auto p-5 sm:p-6">
-              {tab === "current" ? (
+              {visibleTab === "current" ? (
                 poll && results ? (
                   <div>
                     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -939,7 +958,7 @@ export function HostPollManager({
                     </button>
                   </div>
                 )
-              ) : tab === "history" ? (
+              ) : visibleTab === "history" ? (
                 <div>
                   <div>
                     <div className="min-w-0 flex-1">
@@ -1163,7 +1182,10 @@ export function HostPollManager({
                   />
 
                   <p className="mt-5 text-sm font-semibold text-slate-700">Answer type</p>
-                  <div className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1">
+                  <div
+                    className="mt-2 grid grid-cols-2 rounded-md border border-slate-300 bg-slate-50 p-1"
+                    data-tour="poll-answer-type"
+                  >
                     {(["single", "multiple"] as const).map((mode) => (
                       <button
                         className={`h-10 rounded text-sm font-semibold transition ${
@@ -1188,7 +1210,10 @@ export function HostPollManager({
                     ))}
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between gap-3">
+                  <div
+                    className="mt-5 flex items-center justify-between gap-3"
+                    data-tour="poll-answers-heading"
+                  >
                     <p className="text-sm font-semibold text-slate-700">Answers</p>
                     <button
                       className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:opacity-50"
@@ -1202,7 +1227,7 @@ export function HostPollManager({
                       Add answer
                     </button>
                   </div>
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2 space-y-2" data-tour="poll-answers">
                     {options.map((option, index) => (
                       <div className="flex items-center gap-2" key={index}>
                         <span className="w-6 text-right text-sm font-semibold text-slate-500">
@@ -1268,7 +1293,10 @@ export function HostPollManager({
                     </p>
                   ) : null}
 
-                  <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div
+                    className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end"
+                    data-tour="poll-timer"
+                  >
                     <div>
                       <label className="text-sm font-semibold text-slate-700" htmlFor="poll-duration">
                         Timer (minutes:seconds or seconds)
@@ -1318,6 +1346,7 @@ export function HostPollManager({
                     </p>
                     <button
                       className="h-11 rounded-md bg-amber-300 px-5 text-sm font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-tour="poll-start"
                       disabled={!canStart || isSaving}
                       type="button"
                       onClick={() => void startPoll()}
@@ -1328,7 +1357,7 @@ export function HostPollManager({
                 </div>
               )}
 
-              {tab === "current" && status ? (
+              {visibleTab === "current" && status ? (
                 <p className="mt-4 text-sm font-medium text-slate-600" aria-live="polite">
                   {status}
                 </p>

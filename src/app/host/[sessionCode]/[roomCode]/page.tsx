@@ -50,12 +50,13 @@ export default async function TeacherSpaceSessionPage({
 
   return (
     <>
-      {teacher ? <AccountMenu user={teacher} /> : null}
+      {teacher ? <AccountMenu onboardingTour="session" user={teacher} /> : null}
       <TeacherDashboard
         initialPromptHistory={promptHistory}
         initialQuestionBank={questionBank}
         initialStats={stats}
         initialSubmissionViewSettings={submissionViewSettings}
+        onboardingScope={teacher?.id ?? "teacher"}
         session={session}
         spaceCode={space.code}
         spaceName={space.name}

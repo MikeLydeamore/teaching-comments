@@ -76,12 +76,13 @@ export default async function TeacherPage({
 
   return (
     <>
-      {teacher ? <AccountMenu user={teacher} /> : null}
+      {teacher ? <AccountMenu onboardingTour="session" user={teacher} /> : null}
       <TeacherDashboard
         initialPromptHistory={promptHistory}
         initialQuestionBank={questionBank}
         initialStats={stats}
         initialSubmissionViewSettings={submissionViewSettings}
+        onboardingScope={teacher?.id ?? "teacher"}
         session={session}
       />
     </>

@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logoutTeacher } from "@/app/host/actions";
+import {
+  startHostOnboardingTour,
+  type HostOnboardingTour,
+} from "@/lib/host-onboarding";
 import { ThemeSelector } from "./ThemeSelector";
 
 export type AccountMenuUser = {
@@ -14,13 +18,17 @@ export type AccountMenuUser = {
 
 export function AccountMenu({
   children,
+  onboardingTour,
   user,
 }: {
   /** Extra nav entries rendered under the standard account navigation. */
   children?: React.ReactNode;
+  /** Offers a replay control when the current page has an onboarding guide. */
+  onboardingTour?: HostOnboardingTour;
   user: AccountMenuUser;
 }) {
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +40,7 @@ export function AccountMenu({
         !containerRef.current.contains(event.target as Node)
       ) {
         setOpen(false);
+        setHelpOpen(false);
       }
     }
 
@@ -52,7 +61,10 @@ export function AccountMenu({
         aria-haspopup="menu"
         aria-label="Account menu"
         className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-teal-50 text-sm font-bold text-teal-900 shadow-md ring-1 ring-slate-300 transition hover:ring-teal-500 focus:outline-none focus:ring-4 focus:ring-teal-100"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) setHelpOpen(false);
+          setOpen(!open);
+        }}
         type="button"
       >
         {user.image ? (
@@ -121,6 +133,67 @@ export function AccountMenu({
               </svg>
               Profile
             </Link>
+            {onboardingTour ? (
+              <div>
+                <button
+                  aria-controls="account-help-menu"
+                  aria-expanded={helpOpen}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => setHelpOpen((value) => !value)}
+                >
+                  <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8.25 9a3.75 3.75 0 1 1 6.33 2.72c-1.19 1.1-2.58 1.65-2.58 3.03M12 3a9 9 0 1 0 9 9" />
+                  </svg>
+                  <span className="flex-1">Help</span>
+                  <svg
+                    aria-hidden="true"
+                    className={`size-4 text-slate-400 transition ${helpOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {helpOpen ? (
+                  <div
+                    className="ml-7 border-l border-slate-200 py-1 pl-2"
+                    id="account-help-menu"
+                    role="menu"
+                  >
+                    <button
+                      className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setHelpOpen(false);
+                        startHostOnboardingTour(onboardingTour);
+                      }}
+                    >
+                      Guided tour
+                    </button>
+                    {onboardingTour === "session" ? (
+                      <button
+                        className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-teal-800"
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          setHelpOpen(false);
+                          startHostOnboardingTour("poll");
+                        }}
+                      >
+                        How to run a poll
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {children}
           </nav>
           <div className="border-y border-slate-100 bg-slate-50 px-4 py-3">

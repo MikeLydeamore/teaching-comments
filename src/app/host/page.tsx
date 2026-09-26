@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/AccountMenu";
+import { HostWelcome } from "@/components/HostWelcome";
 import { SpaceCardMenu } from "@/components/SpaceCardMenu";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import {
@@ -87,7 +88,7 @@ export default async function TeacherHomePage({
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
-      <AccountMenu user={teacher} />
+      <AccountMenu onboardingTour="welcome" user={teacher} />
       <div className="mx-auto max-w-5xl">
         <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-500">
           <span className="text-slate-700">Your spaces</span>
@@ -110,6 +111,11 @@ export default async function TeacherHomePage({
             </span>
           </div>
         </header>
+
+        <HostWelcome
+          hasSpaces={spaces.length > 0}
+          onboardingScope={teacher.id}
+        />
 
         {membershipMessage ? (
           <p

@@ -1,11 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import { ConnectedParticipantBadge } from "@/components/ConnectedParticipantBadge";
 import { DrawingPreview } from "@/components/DrawingPreview";
 import { GifPreview } from "@/components/GifPreview";
+import { GuidedTour, type GuidedTourStep } from "@/components/GuidedTour";
 import { GroupQuestionsPanel } from "@/components/GroupQuestionsPanel";
+import { HostGettingStarted } from "@/components/HostGettingStarted";
 import { HostPollManager } from "@/components/HostPollManager";
 import { InlineCodeText } from "@/components/InlineCodeText";
 import { PendingActionButton } from "@/components/PendingActionButton";
@@ -20,6 +29,14 @@ import { TimerDurationInput } from "@/components/TimerDurationInput";
 import { responseCounts, responseWordCounts } from "@/lib/poll-results";
 import { comparePromptRevisions } from "@/lib/prompt-sync";
 import { formatTimeAgo } from "@/lib/relative-time";
+import {
+  getHostOnboardingSnapshot,
+  HOST_ONBOARDING_EVENT,
+  hostOnboardingServerSnapshot,
+  parseHostOnboardingState,
+  subscribeToHostOnboarding,
+  writeHostOnboardingState,
+} from "@/lib/host-onboarding";
 import {
   clampTimerSeconds,
   formatTimerSeconds,
@@ -88,6 +105,7 @@ type TeacherDashboardProps = {
   initialPromptHistory: PromptHistoryItem[];
   initialQuestionBank: QuestionBankItem[];
   initialSubmissionViewSettings: SubmissionViewSettings;
+  onboardingScope: string;
   session: Session;
   initialStats: Stats;
   spaceCode?: string;
@@ -105,6 +123,139 @@ const chartTypeOptions: { label: string; value: ChartType }[] = [
   { label: "Column", value: "column" },
   { label: "Pie", value: "pie" },
   { label: "Word cloud", value: "wordCloud" },
+];
+
+const roomControlsOpenTourStep = 6;
+const roomControlsFirstDetailTourStep = 7;
+const roomControlsCloseTourStep = 9;
+
+const dashboardTourSteps: GuidedTourStep[] = [
+  {
+    description:
+      "This is the live control room for one teaching activity. Participants see the prompt and the inputs you choose; you see their responses here as they arrive.",
+    target: '[data-tour="dashboard-header"]',
+    title: "Your session dashboard",
+  },
+  {
+    description:
+      "Write the question you want participants to answer, then select Show. Add questions to the bank when you expect to reuse them.",
+    target: '[data-tour="prompt"]',
+    title: "Show a prompt",
+  },
+  {
+    description:
+      "Turn Accepting responses on when the room is ready. Turn it off at the end to prevent new responses while keeping the activity available to you.",
+    target: '[data-tour="session-access"]',
+    title: "Open participant access",
+  },
+  {
+    description:
+      "Open the QR code on your classroom display. Participants can also use the student page with the space and session codes; they do not need an account.",
+    target: '[data-tour="qr-popout"]',
+    title: "Invite the room",
+  },
+  {
+    description:
+      "Text, drawings, GIFs, and images arrive in the live stream. You can expand, copy, edit, hide, and reorder response cards.",
+    target: '[data-tour="response-stream"]',
+    title: "Watch responses arrive",
+  },
+  {
+    description:
+      "Visualise the current response view, run a live poll, or pop submissions into a presentation-friendly window.",
+    target: '[data-tour="live-tools"]',
+    title: "Use live activities",
+  },
+  {
+    description:
+      "Room controls contain filters, screening, participant input choices, CSV export, and archiving. Select the highlighted Room controls tab to open them.",
+    interactiveTarget: true,
+    target: '[data-tour="room-controls"]',
+    targetActionLabel: "Select Room controls to continue",
+    title: "Control what the room sees",
+  },
+  {
+    description:
+      "Filter the live stream by prompt or time range, switch the card order, and refresh the current response view. These display choices are shared with presentation popouts.",
+    target: '[data-tour="room-controls-display"]',
+    title: "Focus the response view",
+  },
+  {
+    description:
+      "Screen questions or submissions before showing them, and choose which response formats participants may use. Data export and archiving are available at the bottom of the drawer.",
+    target: '[data-tour="room-controls-moderation"]',
+    title: "Moderate and shape participation",
+  },
+  {
+    description:
+      "Use either highlighted control—the X in the drawer or the Room controls slider—to put the drawer away and return to the dashboard.",
+    interactiveTarget: true,
+    targets: [
+      '[data-tour="room-controls-close"]',
+      '[data-tour="room-controls"]',
+    ],
+    targetActionLabel: "Close Room controls to continue",
+    title: "Return to the live dashboard",
+  },
+  {
+    description:
+      "When the activity ends, stop accepting responses. You can export a CSV, then clear and archive the room before the next activity. This tour is always available from your account menu.",
+    title: "You are ready to teach",
+  },
+];
+
+const pollTourOpenStep = 0;
+const pollTourCloseStep = 5;
+
+const pollTourSteps: GuidedTourStep[] = [
+  {
+    description:
+      "Polls live with the other presentation tools above the response stream. Select the highlighted Run poll button to open the poll builder.",
+    interactiveTarget: true,
+    target: '[data-tour="poll-launch"]',
+    targetActionLabel: "Select Run poll to continue",
+    title: "Open polling mode",
+  },
+  {
+    description:
+      "Write your question, then choose whether participants may select one answer or several. You can also load a poll you have saved in the question bank.",
+    targets: ['#poll-question', '[data-tour="poll-answer-type"]'],
+    title: "Ask the question",
+  },
+  {
+    description:
+      "Add between two and eight answers. Mark the correct answer—or answers—so Ed.ie can reveal the solution after voting finishes.",
+    targets: [
+      '[data-tour="poll-answers-heading"]',
+      '[data-tour="poll-answers"]',
+    ],
+    title: "Set the possible answers",
+  },
+  {
+    description:
+      "Choose how long voting should stay open. You can type a duration or use the quick adjustments to add or remove time.",
+    target: '[data-tour="poll-timer"]',
+    title: "Set the timer",
+  },
+  {
+    description:
+      "Start poll sends the question to participants immediately. This guide highlights the button without selecting it, so no practice poll is launched.",
+    target: '[data-tour="poll-start"]',
+    title: "Start voting",
+  },
+  {
+    description:
+      "While a poll is live, this window shows responses and lets you extend or end voting, reveal the solution, and pop out the results. Select Close to return to the dashboard.",
+    interactiveTarget: true,
+    target: '[data-tour="poll-close"]',
+    targetActionLabel: "Select Close to continue",
+    title: "Manage the live poll",
+  },
+  {
+    description:
+      "That is the full flow: open polling mode, prepare the question and answers, set the timer, and start. You can replay this guide at any time from Help.",
+    title: "You are ready to run a poll",
+  },
 ];
 
 function refreshStatus(value: Date | null) {
@@ -283,6 +434,7 @@ function TeacherDashboardContent({
   initialPromptHistory,
   initialQuestionBank,
   initialSubmissionViewSettings,
+  onboardingScope,
   session,
   initialStats,
   spaceCode,
@@ -350,10 +502,85 @@ function TeacherDashboardContent({
   const [isUnarchiving, setIsUnarchiving] = useState(false);
   const [questionsPanelKey, setQuestionsPanelKey] = useState(0);
   const [pendingOps, setPendingOps] = useState<string[]>([]);
+  const onboardingSnapshot = useSyncExternalStore(
+    (onStoreChange) =>
+      subscribeToHostOnboarding(onboardingScope, onStoreChange),
+    () => getHostOnboardingSnapshot(onboardingScope),
+    () => hostOnboardingServerSnapshot,
+  );
+  const onboardingState = useMemo(
+    () => parseHostOnboardingState(onboardingSnapshot),
+    [onboardingSnapshot],
+  );
+  const [isTourOpen, setIsTourOpen] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [isPollTourOpen, setIsPollTourOpen] = useState(false);
+  const [pollTourStep, setPollTourStep] = useState(0);
   const roomControlsDrawerRef = useRef<HTMLElement>(null);
   const roomControlsTriggerRef = useRef<HTMLButtonElement>(null);
   const roomControlsCloseRef = useRef<HTMLButtonElement>(null);
   const toast = useToast();
+
+  const updateOnboardingState = useCallback(
+    (patch: Parameters<typeof writeHostOnboardingState>[1]) => {
+      writeHostOnboardingState(onboardingScope, patch);
+    },
+    [onboardingScope],
+  );
+
+  const startDashboardTour = useCallback(() => {
+    setIsRoomControlsOpen(false);
+    setIsPollTourOpen(false);
+    setTourStep(0);
+    setIsTourOpen(true);
+  }, []);
+
+  const startPollTour = useCallback(() => {
+    setIsRoomControlsOpen(false);
+    setIsTourOpen(false);
+    setPollTourStep(pollTourOpenStep);
+    setIsPollTourOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const openTimer = window.setTimeout(() => {
+      if (
+        parseHostOnboardingState(getHostOnboardingSnapshot(onboardingScope))
+          .sessionTourStatus === "not-started"
+      ) {
+        startDashboardTour();
+      }
+    }, 0);
+
+    function restartTour(event: Event) {
+      const tour = (event as CustomEvent).detail;
+
+      if (tour === "session") {
+        startDashboardTour();
+      } else if (tour === "poll") {
+        startPollTour();
+      }
+    }
+
+    window.addEventListener(HOST_ONBOARDING_EVENT, restartTour);
+    return () => {
+      window.clearTimeout(openTimer);
+      window.removeEventListener(HOST_ONBOARDING_EVENT, restartTour);
+    };
+  }, [onboardingScope, startDashboardTour, startPollTour]);
+
+  function changeTourStep(nextStep: number) {
+    const drawerShouldBeOpen =
+      nextStep >= roomControlsFirstDetailTourStep &&
+      nextStep <= roomControlsCloseTourStep;
+
+    setIsRoomControlsOpen(drawerShouldBeOpen);
+    setTourStep(nextStep);
+  }
+
+  function changePollTourStep(nextStep: number) {
+    setPollTourStep(nextStep);
+  }
 
   const applyExpandedSubmissionId = useCallback((nextId: string | null) => {
     if (expandedSubmissionIdRef.current === nextId) {
@@ -365,7 +592,7 @@ function TeacherDashboardContent({
   }, []);
 
   useEffect(() => {
-    if (!isRoomControlsOpen) {
+    if (!isRoomControlsOpen || isTourOpen) {
       return;
     }
 
@@ -427,7 +654,7 @@ function TeacherDashboardContent({
       document.removeEventListener("keydown", handleKeyDown);
       triggerElement?.focus();
     };
-  }, [isRoomControlsOpen]);
+  }, [isRoomControlsOpen, isTourOpen]);
 
   const beginOp = useCallback((key: string) => {
     setPendingOps((currentOps) =>
@@ -1364,6 +1591,8 @@ function TeacherDashboardContent({
   resultsSearch.set("chartType", chartType);
   const resultsUrl = `${dashboardUrl}/results?${resultsSearch.toString()}`;
   const submissionsPopoutUrl = `${dashboardUrl}/submissions`;
+  const roomControlsTourIsClosing =
+    isTourOpen && tourStep === roomControlsCloseTourStep;
 
   function popOutSubmissions() {
     window.open(
@@ -1395,7 +1624,10 @@ function TeacherDashboardContent({
           <span className="text-slate-700">{sessionDetails.title}</span>
         </nav>
 
-        <header className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
+        <header
+          className="rounded-md border border-slate-200 bg-white p-6 shadow-sm"
+          data-tour="dashboard-header"
+        >
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
@@ -1414,6 +1646,7 @@ function TeacherDashboardContent({
                 aria-checked={sessionDetails.isOpen}
                 className="inline-flex h-10 items-center gap-2.5 rounded-full border border-slate-300 bg-white pl-3 pr-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
                 disabled={isUpdatingSessionAccess}
+                data-tour="session-access"
                 role="switch"
                 title={sessionDetails.isOpen ? "Close session" : "Open session"}
                 type="button"
@@ -1444,8 +1677,12 @@ function TeacherDashboardContent({
               <Link
                 className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
                 href={qrPopoutUrl}
+                data-tour="qr-popout"
                 rel="noreferrer"
                 target="_blank"
+                onClick={() =>
+                  updateOnboardingState({ qrOpened: true })
+                }
               >
                 QR popout
               </Link>
@@ -1455,6 +1692,21 @@ function TeacherDashboardContent({
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="space-y-5">
+          {!onboardingState.checklistDismissed ? (
+            <HostGettingStarted
+              items={[
+                { complete: sessionDetails.prompt.trim().length > 0, label: "Show your first prompt" },
+                { complete: sessionDetails.isOpen, label: "Accept participant responses" },
+                { complete: onboardingState.qrOpened, label: "Open the QR code" },
+                { complete: stats.total > 0, label: "Receive the first response" },
+                { complete: onboardingState.roomControlsOpened, label: "Explore Room controls" },
+              ]}
+              onDismiss={() =>
+                updateOnboardingState({ checklistDismissed: true })
+              }
+              onStartTour={startDashboardTour}
+            />
+          ) : null}
           <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-slate-500">Timer</p>
@@ -1574,12 +1826,15 @@ function TeacherDashboardContent({
           </section>
         </aside>
 
-        <section>
+        <section data-tour="response-stream">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-950">
               Live writing stream
             </h2>
-            <div className="flex flex-wrap items-center justify-end gap-3">
+            <div
+              className="flex flex-wrap items-center justify-end gap-3"
+              data-tour="live-tools"
+            >
               <p className="text-sm text-slate-500">
                 {isLoading ? "Loading..." : `${displayedSubmissions.length} shown`}
               </p>
@@ -1597,6 +1852,19 @@ function TeacherDashboardContent({
               </button>
               <HostPollManager
                 dashboardUrl={dashboardUrl}
+                pollTutorial={
+                  isPollTourOpen
+                    ? {
+                        isManagerOpen:
+                          pollTourStep > pollTourOpenStep &&
+                          pollTourStep <= pollTourCloseStep,
+                        onManagerClose: () =>
+                          setPollTourStep(pollTourCloseStep + 1),
+                        onManagerOpen: () =>
+                          setPollTourStep(pollTourOpenStep + 1),
+                      }
+                    : undefined
+                }
                 sessionIsOpen={sessionDetails.isOpen}
                 sessionCode={session.id}
               />
@@ -1610,7 +1878,10 @@ function TeacherDashboardContent({
             </div>
           </div>
 
-          <section className="mb-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <section
+            className="mb-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+            data-tour="prompt"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-xl font-semibold text-slate-950">Prompt</h3>
@@ -1726,12 +1997,35 @@ function TeacherDashboardContent({
             }
             className={`fixed top-1/2 z-[80] flex -translate-y-1/2 items-center gap-2 rounded-l-md border border-r-0 border-slate-300 bg-white px-2 py-3 text-sm font-semibold text-slate-700 shadow-lg transition-[right,opacity,background-color,color] duration-200 hover:bg-teal-50 hover:text-teal-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 motion-reduce:transition-none ${
               isRoomControlsOpen
-                ? "pointer-events-none right-0 opacity-0 sm:pointer-events-auto sm:right-[28rem] sm:opacity-100"
+                ? roomControlsTourIsClosing
+                  ? "pointer-events-auto right-0 opacity-100 sm:right-[28rem]"
+                  : "pointer-events-none right-0 opacity-0 sm:pointer-events-auto sm:right-[28rem] sm:opacity-100"
                 : "right-0"
             }`}
+            data-tour="room-controls"
             ref={roomControlsTriggerRef}
             type="button"
-            onClick={() => setIsRoomControlsOpen((isOpen) => !isOpen)}
+            onClick={() => {
+              if (!isRoomControlsOpen) {
+                updateOnboardingState({ roomControlsOpened: true });
+              }
+              const nextIsOpen = !isRoomControlsOpen;
+              setIsRoomControlsOpen(nextIsOpen);
+
+              if (
+                nextIsOpen &&
+                isTourOpen &&
+                tourStep === roomControlsOpenTourStep
+              ) {
+                setTourStep(roomControlsFirstDetailTourStep);
+              } else if (
+                !nextIsOpen &&
+                isTourOpen &&
+                tourStep === roomControlsCloseTourStep
+              ) {
+                setTourStep(roomControlsCloseTourStep + 1);
+              }
+            }}
           >
             <svg
               aria-hidden="true"
@@ -1767,7 +2061,7 @@ function TeacherDashboardContent({
           <aside
             aria-hidden={!isRoomControlsOpen}
             aria-labelledby="teacher-room-controls-title"
-            aria-modal={isRoomControlsOpen ? "true" : undefined}
+            aria-modal={isRoomControlsOpen && !isTourOpen ? "true" : undefined}
             className={`fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-200 motion-reduce:transition-none ${
               isRoomControlsOpen ? "translate-x-0" : "translate-x-full"
             }`}
@@ -1791,9 +2085,19 @@ function TeacherDashboardContent({
               <button
                 aria-label="Close room controls"
                 className="flex size-10 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-700 transition hover:border-teal-500 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+                data-tour="room-controls-close"
                 ref={roomControlsCloseRef}
                 type="button"
-                onClick={() => setIsRoomControlsOpen(false)}
+                onClick={() => {
+                  setIsRoomControlsOpen(false);
+
+                  if (
+                    isTourOpen &&
+                    tourStep === roomControlsCloseTourStep
+                  ) {
+                    setTourStep(roomControlsCloseTourStep + 1);
+                  }
+                }}
               >
                 <svg
                   aria-hidden="true"
@@ -1810,7 +2114,7 @@ function TeacherDashboardContent({
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="divide-y divide-slate-200">
-                  <section className="p-4">
+                  <section className="p-4" data-tour="room-controls-display">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Display &amp; filters</h3>
                       <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800" role="status">
@@ -1905,7 +2209,7 @@ function TeacherDashboardContent({
                     {selectedPromptHistory ? <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500"><InlineCodeText>{selectedPromptHistory.prompt}</InlineCodeText></p> : null}
                   </section>
 
-                  <section className="p-4">
+                  <section className="p-4" data-tour="room-controls-moderation">
                     <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Moderation &amp; screening</h3>
                     <div className="mt-3 divide-y divide-slate-200">
                   <button
@@ -2096,6 +2400,36 @@ function TeacherDashboardContent({
                 submissions={chartSubmissions}
               />
             </section>
+          ) : null}
+
+          {isTourOpen ? (
+            <GuidedTour
+              currentStep={tourStep}
+              steps={dashboardTourSteps}
+              onComplete={() => {
+                updateOnboardingState({ sessionTourStatus: "completed" });
+                setIsTourOpen(false);
+                setIsRoomControlsOpen(false);
+              }}
+              onStepChange={changeTourStep}
+              onSkip={() => {
+                updateOnboardingState({ sessionTourStatus: "skipped" });
+                setIsTourOpen(false);
+                setIsRoomControlsOpen(false);
+              }}
+            />
+          ) : null}
+
+          {isPollTourOpen ? (
+            <GuidedTour
+              completeLabel="Done"
+              currentStep={pollTourStep}
+              steps={pollTourSteps}
+              tourLabel="Poll guide"
+              onComplete={() => setIsPollTourOpen(false)}
+              onStepChange={changePollTourStep}
+              onSkip={() => setIsPollTourOpen(false)}
+            />
           ) : null}
 
           {displayedSubmissions.length ? (
