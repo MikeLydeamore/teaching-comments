@@ -5,11 +5,13 @@ import { revalidatePath } from "next/cache";
 import {
   addSpaceMember,
   createTeacherSpaceForOwner,
+  ensurePersonalOrganization,
   getTeacherSpace,
   listSpaceMembers,
   normalizeSpaceCode,
   updateSpaceMemberRole,
 } from "@/lib/edie-store";
+import { EntitlementLimitError, entitlementsForOrganization } from "@/lib/entitlements";
 import { normalizeSpaceEmail } from "@/lib/edie-store-model";
 import {
   getCurrentTeacher,
@@ -95,11 +97,19 @@ export async function createTeachingSpace(formData: FormData) {
   }
 
   try {
+    const organization = await ensurePersonalOrganization(
+      owner.id,
+      owner.name ?? owner.displayUsername ?? "Teacher",
+    );
+    const entitlements = await entitlementsForOrganization(organization.id);
     await createTeacherSpaceForOwner(spaceCode, name || spaceCode, {
       userId: owner.id,
       name: owner.name ?? owner.displayUsername ?? "Teacher",
-    });
+    }, entitlements.limits.ownedSpaces);
   } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect(adminSpacesPath("space-limit", spaceCode));
+    }
     const message = error instanceof Error ? error.message : "";
     const reason = message.includes("already exists")
       ? "exists"
@@ -126,8 +136,14 @@ export async function claimTeacherSpace(formData: FormData) {
   }
 
   try {
-    await addSpaceMember(spaceCode, admin.id, "owner");
-  } catch {
+    const space = await getTeacherSpace(spaceCode);
+    if (!space) throw new Error("Space not found.");
+    const entitlements = await entitlementsForOrganization(space.organizationId);
+    await addSpaceMember(spaceCode, admin.id, "owner", entitlements.limits.teacherSeats);
+  } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect(claimPath("seat-limit", spaceCode));
+    }
     redirect(claimPath("not-found", spaceCode));
   }
 
@@ -176,28 +192,33 @@ export async function transferSpaceOwnership(formData: FormData) {
   }
 
   const members = await listSpaceMembers(space.code);
-
-  for (const member of members) {
-    if (
-      member.role === "owner" &&
-      member.userId !== ownerProfile.id
-    ) {
-      await updateSpaceMemberRole(space.code, member.userId, "editor");
-    }
-  }
-
   const target = members.find((member) => member.userId === ownerProfile.id);
 
-  if (target) {
-    if (target.role !== "owner") {
-      await updateSpaceMemberRole(space.code, ownerProfile.id, "owner");
+  try {
+    if (target) {
+      if (target.role !== "owner") {
+        await updateSpaceMemberRole(space.code, ownerProfile.id, "owner");
+      }
+    } else {
+      const entitlements = await entitlementsForOrganization(space.organizationId);
+      await addSpaceMember(
+        space.code,
+        ownerProfile.id,
+        "owner",
+        entitlements.limits.teacherSeats,
+      );
     }
-  } else {
-    await addSpaceMember(
-      space.code,
-      ownerProfile.id,
-      "owner",
-    );
+  } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect(transferPath("seat-limit", space.code));
+    }
+    redirect(transferPath("unavailable", space.code));
+  }
+
+  for (const member of members) {
+    if (member.role === "owner" && member.userId !== ownerProfile.id) {
+      await updateSpaceMemberRole(space.code, member.userId, "editor");
+    }
   }
 
   revalidatePath("/admin/spaces");

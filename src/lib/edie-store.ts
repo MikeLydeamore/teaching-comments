@@ -14,6 +14,7 @@ import {
   type CreateSubmissionInput,
   type SubmissionPatch,
   type SpaceRole,
+  type CapacityLimit,
 } from "./edie-store-model";
 
 export { normalizeSessionCode, normalizeStudentName };
@@ -54,6 +55,10 @@ export type {
   SpaceInvitationRecord,
   SpaceInvitation,
   Organization,
+  OrganizationMember,
+  OrganizationRole,
+  OrganizationSubscription,
+  CapacityLimit,
   SpaceRole,
   SpaceWithRole,
 } from "./edie-store-model";
@@ -106,8 +111,25 @@ export async function createTeacherSpaceForOwner(
   code: string,
   name: string,
   owner: { userId: string; name: string },
+  ownedSpacesLimit?: CapacityLimit,
 ) {
-  return getStore().createTeacherSpaceForOwner(code, name, owner);
+  return getStore().createTeacherSpaceForOwner(code, name, owner, ownedSpacesLimit);
+}
+
+export async function getOrganizationMemberRole(organizationId: string, userId: string) {
+  return getStore().getOrganizationMemberRole(organizationId, userId);
+}
+
+export async function listOrganizationMembers(organizationId: string) {
+  return getStore().listOrganizationMembers(organizationId);
+}
+
+export async function removeOrganizationMember(organizationId: string, userId: string) {
+  return getStore().removeOrganizationMember(organizationId, userId);
+}
+
+export async function getOrganizationSubscription(organizationId: string) {
+  return getStore().getOrganizationSubscription(organizationId);
 }
 
 export async function getTeacherSpace(code: string) {
@@ -116,6 +138,10 @@ export async function getTeacherSpace(code: string) {
 
 export async function listTeacherSpaces() {
   return getStore().listTeacherSpaces();
+}
+
+export async function listTeacherSpacesForOrganization(organizationId: string) {
+  return getStore().listTeacherSpacesForOrganization(organizationId);
 }
 
 export async function listTeacherSpacesForUser(userId: string) {
@@ -142,8 +168,9 @@ export async function addSpaceMember(
   spaceCode: string,
   userId: string,
   role?: SpaceRole,
+  teacherSeatsLimit?: CapacityLimit,
 ) {
-  return getStore().addSpaceMember(spaceCode, userId, role);
+  return getStore().addSpaceMember(spaceCode, userId, role, teacherSeatsLimit);
 }
 
 export async function inviteSpaceMember(
@@ -155,8 +182,8 @@ export async function inviteSpaceMember(
   return getStore().inviteSpaceMember(spaceCode, email, userId, role);
 }
 
-export async function acceptSpaceInvitation(spaceCode: string, userId: string, verifiedEmail: string | null) {
-  return getStore().acceptSpaceInvitation(spaceCode, userId, verifiedEmail);
+export async function acceptSpaceInvitation(spaceCode: string, userId: string, verifiedEmail: string | null, teacherSeatsLimit?: CapacityLimit) {
+  return getStore().acceptSpaceInvitation(spaceCode, userId, verifiedEmail, teacherSeatsLimit);
 }
 
 export async function declineSpaceInvitation(spaceCode: string, userId: string, verifiedEmail: string | null) {

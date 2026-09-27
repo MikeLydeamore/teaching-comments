@@ -37,6 +37,7 @@ const createMessages: Record<string, string> = {
   unavailable:
     "The space could not be created because storage is not ready. Apply the account database migrations and try again.",
   forbidden: "Only allow-listed admins can manage spaces here.",
+  "space-limit": "This organization has reached its hosted-space limit. Existing spaces remain available.",
 };
 
 const claimMessages: Record<string, string> = {
@@ -44,6 +45,7 @@ const claimMessages: Record<string, string> = {
   claimed: "That space already has an owner. Use transfer instead.",
   forbidden: "Only allow-listed admins can claim spaces.",
   "not-found": "That space could not be found.",
+  "seat-limit": "This organization has no teacher seats available.",
 };
 
 const transferMessages: Record<string, string> = {
@@ -53,6 +55,7 @@ const transferMessages: Record<string, string> = {
   "not-found": "That space could not be found.",
   "person-not-found": "No Ed.ie account has that username or email.",
   unavailable: "Account details are temporarily unavailable. Please try again.",
+  "seat-limit": "This organization has no teacher seats available for the new owner.",
 };
 
 export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageProps) {

@@ -1,6 +1,7 @@
 import { UsernameSetupGate } from "@/components/UsernameSetupGate";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import { getPersonalOrganization } from "@/lib/edie-store";
+import { validateEntitlementConfiguration } from "@/lib/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function HostLayout({
 }: {
   children: React.ReactNode;
 }) {
+  validateEntitlementConfiguration();
   const teacher = await getCurrentTeacher();
 
   if (teacher) {

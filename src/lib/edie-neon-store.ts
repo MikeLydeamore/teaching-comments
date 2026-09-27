@@ -44,9 +44,12 @@ import {
   type SubmissionViewSettingsPatch,
   type TeacherSpace,
   type Organization,
+  type OrganizationMember,
+  type OrganizationSubscription,
   type SpaceMember,
   type SpaceInvitationRecord,
 } from "./edie-store-model";
+import { EntitlementLimitError } from "./entitlement-model";
 
 type Row = Record<string, unknown>;
 
@@ -76,6 +79,28 @@ function organizationFromRow(row: Row): Organization {
     kind: text(row, "kind") as Organization["kind"],
     personalOwnerUserId: nullableText(row, "personal_owner_user_id"),
     createdAt: text(row, "created_at"),
+  };
+}
+
+function organizationMemberFromRow(row: Row): OrganizationMember {
+  return {
+    organizationId: text(row, "organization_id"),
+    userId: text(row, "user_id"),
+    role: text(row, "role") as OrganizationMember["role"],
+    createdAt: text(row, "created_at"),
+  };
+}
+
+function subscriptionFromRow(row: Row): OrganizationSubscription {
+  return {
+    organizationId: text(row, "organization_id"),
+    providerCustomerId: nullableText(row, "provider_customer_id"),
+    providerSubscriptionId: nullableText(row, "provider_subscription_id"),
+    plan: text(row, "plan_key") as OrganizationSubscription["plan"],
+    status: text(row, "status") as OrganizationSubscription["status"],
+    currentPeriodEnd: nullableText(row, "current_period_end"),
+    cancelAtPeriodEnd: bool(row, "cancel_at_period_end"),
+    updatedAt: text(row, "updated_at"),
   };
 }
 
@@ -120,6 +145,17 @@ function databaseError(error: unknown): never {
 async function query<T extends Row = Row>(text: string, values: unknown[] = []) {
   try {
     return (await sql().query(text, values)) as T[];
+  } catch (error) {
+    databaseError(error);
+  }
+}
+
+async function transaction(statements: Array<{ text: string; values?: unknown[] }>) {
+  try {
+    const database = sql();
+    return await database.transaction(
+      (tx) => statements.map((statement) => tx.query(statement.text, statement.values ?? [])),
+    ) as Row[][];
   } catch (error) {
     databaseError(error);
   }
@@ -283,30 +319,106 @@ export const neonStore: EdieStore = {
     if (!userId.trim()) throw new Error("User ID is required.");
     const organizationName = `${(ownerName.trim() || "Teacher").slice(0, 95)}'s organization`;
     const rows = await query(
-      `INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
-       VALUES ($1, 'personal', $2)
-       ON CONFLICT (personal_owner_user_id) WHERE personal_owner_user_id IS NOT NULL
-       DO UPDATE SET personal_owner_user_id = EXCLUDED.personal_owner_user_id
-       RETURNING id, name, kind, personal_owner_user_id, created_at`,
+      `WITH organization AS (
+         INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
+         VALUES ($1, 'personal', $2)
+         ON CONFLICT (personal_owner_user_id) WHERE personal_owner_user_id IS NOT NULL
+         DO UPDATE SET personal_owner_user_id = EXCLUDED.personal_owner_user_id
+         RETURNING id, name, kind, personal_owner_user_id, created_at
+       ), membership AS (
+         INSERT INTO edie_organization_members (organization_id, user_id, role)
+         SELECT id, $2, 'owner' FROM organization
+         ON CONFLICT (organization_id, user_id) DO UPDATE SET role = 'owner'
+       )
+       SELECT * FROM organization`,
       [organizationName, userId],
     );
     return organizationFromRow(rows[0]);
   },
-  async createTeacherSpaceForOwner(code, name, owner) {
+  async getOrganizationMemberRole(organizationId, userId) {
+    const rows = await query(
+      "SELECT role FROM edie_organization_members WHERE organization_id = $1 AND user_id = $2 LIMIT 1",
+      [organizationId, userId],
+    );
+    return rows[0] ? text(rows[0], "role") as OrganizationMember["role"] : null;
+  },
+  async listOrganizationMembers(organizationId) {
+    const rows = await query(
+      "SELECT organization_id, user_id, role, created_at FROM edie_organization_members WHERE organization_id = $1 ORDER BY user_id",
+      [organizationId],
+    );
+    return rows.map(organizationMemberFromRow);
+  },
+  async removeOrganizationMember(organizationId, userId) {
+    const rows = await query(
+      `WITH target AS (
+         SELECT organization_id, user_id FROM edie_organization_members
+         WHERE organization_id = $1 AND user_id = $2 AND role = 'member'
+           AND NOT EXISTS (
+             SELECT 1 FROM edie_teacher_spaces space
+             JOIN edie_space_members membership ON membership.space_code = space.code
+             WHERE space.organization_id = $1
+               AND membership.user_id = $2 AND membership.role = 'owner'
+               AND NOT EXISTS (
+                 SELECT 1 FROM edie_space_members other_owner
+                 WHERE other_owner.space_code = space.code
+                   AND other_owner.user_id <> $2 AND other_owner.role = 'owner'
+               )
+           )
+       ), removed_space_memberships AS (
+         DELETE FROM edie_space_members member
+         USING edie_teacher_spaces space, target
+         WHERE member.space_code = space.code
+           AND space.organization_id = target.organization_id
+           AND member.user_id = target.user_id
+       ), removed_invitations AS (
+         DELETE FROM edie_space_invitations invitation
+         USING edie_teacher_spaces space, target
+         WHERE invitation.space_code = space.code
+           AND space.organization_id = target.organization_id
+           AND invitation.invitee_user_id = target.user_id
+       )
+       DELETE FROM edie_organization_members member USING target
+       WHERE member.organization_id = target.organization_id
+         AND member.user_id = target.user_id
+       RETURNING member.user_id`,
+      [organizationId, userId],
+    );
+    return rows.length > 0;
+  },
+  async getOrganizationSubscription(organizationId) {
+    const rows = await query(
+      "SELECT organization_id, provider_customer_id, provider_subscription_id, plan_key, status, current_period_end, cancel_at_period_end, updated_at FROM edie_subscriptions WHERE organization_id = $1 LIMIT 1",
+      [organizationId],
+    );
+    return rows[0] ? subscriptionFromRow(rows[0]) : null;
+  },
+  async createTeacherSpaceForOwner(code, name, owner, ownedSpacesLimit = null) {
     const normalized = normalizeSpaceCode(code);
     if (!normalized) throw new Error("Space code is required.");
     const organizationName = `${(owner.name.trim() || "Teacher").slice(0, 95)}'s organization`;
     try {
-      const rows = await query(
-        `WITH organization AS (
+      const results = await transaction([
+        { text: `WITH organization AS (
            INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
            VALUES ($3, 'personal', $4)
            ON CONFLICT (personal_owner_user_id) WHERE personal_owner_user_id IS NOT NULL
            DO UPDATE SET personal_owner_user_id = EXCLUDED.personal_owner_user_id
-           RETURNING id
+           RETURNING id, name, kind, personal_owner_user_id, created_at
+         ), membership AS (
+           INSERT INTO edie_organization_members (organization_id, user_id, role)
+           SELECT id, $4, 'owner' FROM organization
+           ON CONFLICT (organization_id, user_id) DO UPDATE SET role = 'owner'
+         ) SELECT * FROM organization`, values: [normalized, validateTeacherSpaceName(name), organizationName, owner.userId] },
+        { text: "SELECT id FROM edie_organizations WHERE personal_owner_user_id = $1 FOR UPDATE", values: [owner.userId] },
+        { text: `WITH organization AS (
+           SELECT id FROM edie_organizations WHERE personal_owner_user_id = $4
          ), created_space AS (
            INSERT INTO edie_teacher_spaces (code, name, organization_id)
            SELECT $1, $2, id FROM organization
+           WHERE $5::integer IS NULL OR (
+             SELECT count(*) FROM edie_teacher_spaces WHERE organization_id = organization.id
+           ) < $5
            RETURNING code, name, organization_id, created_at
          ), membership AS (
            INSERT INTO edie_space_members (space_code, user_id, role)
@@ -314,9 +426,13 @@ export const neonStore: EdieStore = {
            RETURNING space_code
          )
          SELECT created_space.* FROM created_space JOIN membership ON membership.space_code = created_space.code`,
-        [normalized, validateTeacherSpaceName(name), organizationName, owner.userId],
-      );
-      return teacherSpaceFromRow(rows[0]);
+          values: [normalized, validateTeacherSpaceName(name), organizationName, owner.userId, ownedSpacesLimit] },
+      ]);
+      const row = results[2][0];
+      if (!row && ownedSpacesLimit !== null) {
+        throw new EntitlementLimitError("ownedSpaces", ownedSpacesLimit);
+      }
+      return teacherSpaceFromRow(row);
     } catch (error) {
       if (error instanceof NeonStoreError && error.status === 409) throw new Error("That space code already exists.");
       throw error;
@@ -331,9 +447,20 @@ export const neonStore: EdieStore = {
     const rows = await query("SELECT code, name, organization_id, created_at FROM edie_teacher_spaces ORDER BY name ASC");
     return rows.map(teacherSpaceFromRow);
   },
+  async listTeacherSpacesForOrganization(organizationId) {
+    const rows = await query(
+      "SELECT code, name, organization_id, created_at FROM edie_teacher_spaces WHERE organization_id = $1 ORDER BY name ASC",
+      [organizationId],
+    );
+    return rows.map(teacherSpaceFromRow);
+  },
   async listTeacherSpacesForUser(userId) {
     const rows = await query(
-      "SELECT s.code, s.name, s.organization_id, s.created_at, m.role FROM edie_teacher_spaces s JOIN edie_space_members m ON m.space_code = s.code WHERE m.user_id = $1 ORDER BY s.name ASC",
+      `SELECT s.code, s.name, s.organization_id, s.created_at, m.role
+       FROM edie_teacher_spaces s
+       JOIN edie_space_members m ON m.space_code = s.code
+       JOIN edie_organization_members om ON om.organization_id = s.organization_id AND om.user_id = m.user_id
+       WHERE m.user_id = $1 ORDER BY s.name ASC`,
       [userId],
     );
     return rows.map((row) => ({
@@ -360,7 +487,15 @@ export const neonStore: EdieStore = {
   },
   async getSpaceMemberRole(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return null;
-    const rows = await query("SELECT role FROM edie_space_members WHERE space_code = $1 AND user_id = $2 LIMIT 1", [normalized, userId]);
+    const rows = await query(
+      `SELECT member.role FROM edie_space_members member
+       JOIN edie_teacher_spaces space ON space.code = member.space_code
+       JOIN edie_organization_members organization_member
+         ON organization_member.organization_id = space.organization_id
+        AND organization_member.user_id = member.user_id
+       WHERE member.space_code = $1 AND member.user_id = $2 LIMIT 1`,
+      [normalized, userId],
+    );
     return rows[0] ? validateSpaceRole(text(rows[0], "role")) : null;
   },
   async listSpaceMembers(spaceCode) {
@@ -374,22 +509,46 @@ export const neonStore: EdieStore = {
     const rows = await query("SELECT space_code, email, invitee_user_id, role, created_at FROM edie_space_invitations WHERE space_code = $1 ORDER BY email ASC", [normalized]);
     return rows.map(spaceInvitationFromRow);
   },
-  async addSpaceMember(spaceCode, userId, role = "editor") {
+  async addSpaceMember(spaceCode, userId, role = "editor", teacherSeatsLimit = null) {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) throw new Error("Space code is required.");
-    const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1", [normalized]);
-    if (!space.length) throw new Error("That space could not be found.");
     try {
-      const rows = await query(
-        `WITH removed_invitation AS (
-           DELETE FROM edie_space_invitations WHERE space_code = $1 AND invitee_user_id = $2
-         )
-         INSERT INTO edie_space_members (space_code, user_id, role)
-         VALUES ($1, $2, $3)
-         RETURNING space_code, user_id, role, created_at`,
-        [normalized, userId, validateSpaceRole(role)],
-      );
-      return spaceMemberFromRow(rows[0]);
+      const results = await transaction([
+        { text: `SELECT organization.id FROM edie_organizations organization
+                 JOIN edie_teacher_spaces space ON space.organization_id = organization.id
+                 WHERE space.code = $1 FOR UPDATE`, values: [normalized] },
+        { text: `WITH target AS (
+                   SELECT organization_id FROM edie_teacher_spaces WHERE code = $1
+                 ), eligible AS (
+                   SELECT organization_id FROM target
+                   WHERE EXISTS (
+                     SELECT 1 FROM edie_organization_members
+                     WHERE organization_id = target.organization_id AND user_id = $2
+                   ) OR $4::integer IS NULL OR (
+                     SELECT count(*) FROM edie_organization_members
+                     WHERE organization_id = target.organization_id
+                   ) < $4
+                 ), organization_member AS (
+                   INSERT INTO edie_organization_members (organization_id, user_id, role)
+                   SELECT organization_id, $2, 'member' FROM eligible
+                   ON CONFLICT (organization_id, user_id) DO NOTHING
+                 ), removed_invitation AS (
+                   DELETE FROM edie_space_invitations
+                   WHERE space_code = $1 AND invitee_user_id = $2
+                     AND EXISTS (SELECT 1 FROM eligible)
+                 )
+                 INSERT INTO edie_space_members (space_code, user_id, role)
+                 SELECT $1, $2, $3 FROM eligible
+                 RETURNING space_code, user_id, role, created_at`,
+          values: [normalized, userId, validateSpaceRole(role), teacherSeatsLimit] },
+      ]);
+      const row = results[1][0];
+      if (!row) {
+        if (!results[0].length) throw new Error("That space could not be found.");
+        if (teacherSeatsLimit !== null) throw new EntitlementLimitError("teacherSeats", teacherSeatsLimit);
+        throw new Error("That person could not be added.");
+      }
+      return spaceMemberFromRow(row);
     } catch (error) {
       if (error instanceof NeonStoreError && error.status === 409) throw new Error("That person is already a member of this space.");
       throw error;
@@ -416,25 +575,52 @@ export const neonStore: EdieStore = {
       throw error;
     }
   },
-  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail) {
+  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail, teacherSeatsLimit = null) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
-    const rows = await query(
-      `WITH invitation AS (
-         DELETE FROM edie_space_invitations
-         WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
-         RETURNING space_code, role
-       )
-       INSERT INTO edie_space_members (space_code, user_id, role)
-       SELECT space_code, $2, role FROM invitation
-       ON CONFLICT (space_code, user_id) DO UPDATE SET role = EXCLUDED.role
-       RETURNING space_code`,
-      [
-        normalized,
-        userId,
-        verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null,
-      ],
+    const email = verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null;
+    const results = await transaction([
+      { text: `SELECT organization.id FROM edie_organizations organization
+               JOIN edie_teacher_spaces space ON space.organization_id = organization.id
+               WHERE space.code = $1 FOR UPDATE`, values: [normalized] },
+      { text: `WITH invitation AS (
+                 SELECT invitation.space_code, invitation.role, space.organization_id
+                 FROM edie_space_invitations invitation
+                 JOIN edie_teacher_spaces space ON space.code = invitation.space_code
+                 WHERE invitation.space_code = $1
+                   AND (invitation.invitee_user_id = $2 OR invitation.email = $3)
+               ), eligible AS (
+                 SELECT * FROM invitation
+                 WHERE EXISTS (
+                   SELECT 1 FROM edie_organization_members
+                   WHERE organization_id = invitation.organization_id AND user_id = $2
+                 ) OR $4::integer IS NULL OR (
+                   SELECT count(*) FROM edie_organization_members
+                   WHERE organization_id = invitation.organization_id
+                 ) < $4
+               ), organization_member AS (
+                 INSERT INTO edie_organization_members (organization_id, user_id, role)
+                 SELECT organization_id, $2, 'member' FROM eligible
+                 ON CONFLICT (organization_id, user_id) DO NOTHING
+               ), space_member AS (
+                 INSERT INTO edie_space_members (space_code, user_id, role)
+                 SELECT space_code, $2, role FROM eligible
+                 ON CONFLICT (space_code, user_id) DO UPDATE SET role = EXCLUDED.role
+                 RETURNING space_code
+               )
+               DELETE FROM edie_space_invitations
+               WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
+                 AND EXISTS (SELECT 1 FROM space_member)
+               RETURNING space_code`, values: [normalized, userId, email, teacherSeatsLimit] },
+    ]);
+    if (results[1].length) return true;
+    const invitation = await query(
+      "SELECT 1 FROM edie_space_invitations WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)",
+      [normalized, userId, email],
     );
-    return rows.length > 0;
+    if (invitation.length && teacherSeatsLimit !== null) {
+      throw new EntitlementLimitError("teacherSeats", teacherSeatsLimit);
+    }
+    return false;
   },
   async declineSpaceInvitation(spaceCode, userId, verifiedEmail) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
@@ -452,7 +638,32 @@ export const neonStore: EdieStore = {
   },
   async leaveSpace(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
-    const rows = await query("DELETE FROM edie_space_members AS member WHERE member.space_code = $1 AND member.user_id = $2 AND (member.role = 'editor' OR EXISTS (SELECT 1 FROM edie_space_members AS other WHERE other.space_code = member.space_code AND other.user_id IS NOT NULL AND other.user_id <> member.user_id AND other.role = 'owner')) RETURNING member.space_code", [normalized, userId]);
+    const rows = await query(
+      `WITH target AS (
+         SELECT space.organization_id FROM edie_teacher_spaces space WHERE space.code = $1
+       ), removed AS (
+         DELETE FROM edie_space_members AS member
+         WHERE member.space_code = $1 AND member.user_id = $2
+           AND (member.role = 'editor' OR EXISTS (
+             SELECT 1 FROM edie_space_members AS other
+             WHERE other.space_code = member.space_code AND other.user_id <> member.user_id AND other.role = 'owner'
+           ))
+         RETURNING member.space_code
+       ), released AS (
+         DELETE FROM edie_organization_members organization_member
+         USING target
+         WHERE organization_member.organization_id = target.organization_id
+           AND organization_member.user_id = $2 AND organization_member.role = 'member'
+           AND EXISTS (SELECT 1 FROM removed)
+           AND NOT EXISTS (
+             SELECT 1 FROM edie_space_members other_member
+             JOIN edie_teacher_spaces other_space ON other_space.code = other_member.space_code
+             WHERE other_member.user_id = $2 AND other_space.organization_id = target.organization_id
+               AND other_member.space_code <> $1
+           )
+       ) SELECT * FROM removed`,
+      [normalized, userId],
+    );
     return rows.length > 0;
   },
   async updateSpaceMemberRole(spaceCode, userId, role) {
@@ -463,7 +674,25 @@ export const neonStore: EdieStore = {
   async removeSpaceMember(spaceCode, userId) {
     const normalized = normalizeSpaceCode(spaceCode);
     if (!normalized) return false;
-    const rows = await query("DELETE FROM edie_space_members WHERE space_code = $1 AND user_id = $2 RETURNING space_code", [normalized, userId]);
+    const rows = await query(
+      `WITH target AS (
+         SELECT organization_id FROM edie_teacher_spaces WHERE code = $1
+       ), removed AS (
+         DELETE FROM edie_space_members WHERE space_code = $1 AND user_id = $2 RETURNING space_code
+       ), released AS (
+         DELETE FROM edie_organization_members organization_member USING target
+         WHERE organization_member.organization_id = target.organization_id
+           AND organization_member.user_id = $2 AND organization_member.role = 'member'
+           AND EXISTS (SELECT 1 FROM removed)
+           AND NOT EXISTS (
+             SELECT 1 FROM edie_space_members other_member
+             JOIN edie_teacher_spaces other_space ON other_space.code = other_member.space_code
+             WHERE other_member.user_id = $2 AND other_space.organization_id = target.organization_id
+               AND other_member.space_code <> $1
+           )
+       ) SELECT * FROM removed`,
+      [normalized, userId],
+    );
     return rows.length > 0;
   },
   async removeSpaceInvitation(spaceCode, email) {

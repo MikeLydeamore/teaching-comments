@@ -11,6 +11,7 @@ vi.mock("node:fs/promises", () => fsMock);
 
 import { localStore } from "./edie-local-store";
 import { neonStore } from "./edie-neon-store";
+import { EntitlementLimitError } from "./entitlement-model";
 
 const organizationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
@@ -29,7 +30,11 @@ function seededLocalData() {
 beforeEach(() => {
   process.env.DATABASE_URL = "postgresql://test.invalid/test";
   queryMock.mockReset(); neonMock.mockReset();
-  neonMock.mockReturnValue({ query: queryMock });
+  neonMock.mockReturnValue({
+    query: queryMock,
+    transaction: async (callback: (tx: { query: typeof queryMock }) => Promise<unknown>[]) =>
+      Promise.all(callback({ query: queryMock })),
+  });
   fsMock.mkdir.mockReset(); fsMock.readFile.mockReset(); fsMock.writeFile.mockReset();
 });
 
@@ -38,8 +43,8 @@ describe("space membership (Neon backend)", () => {
     queryMock.mockImplementation(async (statement: string) => {
       if (statement.startsWith("SELECT s.code") && statement.includes("edie_space_invitations")) return [{ code: "stats-101", name: "Stats 101", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z"), role: "editor", invited_at: new Date("2026-01-02T03:04:06.000Z") }];
       if (statement.startsWith("SELECT s.code")) return [{ code: "stats-101", name: "Stats 101", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z"), role: "owner" }];
-      if (statement.startsWith("SELECT role FROM edie_space_members")) return [{ role: "owner" }];
-      if (statement.includes("INSERT INTO edie_organizations") && statement.includes("created_space")) return [{ code: "new-space", name: "New Space", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z") }];
+      if (statement.includes("SELECT member.role")) return [{ role: "owner" }];
+      if (statement.includes("INSERT INTO edie_teacher_spaces") && statement.includes("created_space")) return [{ code: "new-space", name: "New Space", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z") }];
       if (statement.includes("INSERT INTO edie_organizations")) return [{ id: organizationId, name: "Owner's organization", kind: "personal", personal_owner_user_id: "user-owner", created_at: new Date("2026-01-02T03:04:04.000Z") }];
       if (statement.includes("INSERT INTO edie_space_invitations")) return [{ space_code: "stats-101", email: "guest@example.com", invitee_user_id: "user-guest", role: "editor", created_at: new Date("2026-01-02T03:04:06.000Z") }];
       if (statement.includes("DELETE FROM edie_space_invitations")) return [{ space_code: "stats-101" }];
@@ -70,7 +75,7 @@ describe("space membership (Neon backend)", () => {
     expect(call?.[0]).toContain("membership AS");
     expect(call?.[0]).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");
     expect(call?.[0]).not.toContain("email, role, status");
-    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organization", "user-owner"]);
+    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organization", "user-owner", null]);
   });
 
   it("keeps pending invitations out of the membership table", async () => {
@@ -151,5 +156,97 @@ describe("space membership (local JSON backend)", () => {
     const spaces = await localStore.listTeacherSpacesForUser("user-guest");
     expect(spaces.map((space) => space.code)).toEqual(["science"]);
     expect(spaces[0].organizationId).not.toBe(organizationId);
+  });
+
+  it("counts one organization seat across several spaces", async () => {
+    await localStore.createTeacherSpaceForOwner("stats-102", "Stats 102", {
+      userId: "user-owner",
+      name: "Owner",
+    });
+    await localStore.addSpaceMember("stats-101", "user-guest", "editor", 2);
+    await expect(
+      localStore.addSpaceMember("stats-102", "user-guest", "editor", 2),
+    ).resolves.toMatchObject({ userId: "user-guest" });
+    await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(2);
+  });
+
+  it("serializes concurrent seat consumption", async () => {
+    const results = await Promise.allSettled([
+      localStore.addSpaceMember("stats-101", "user-a", "editor", 2),
+      localStore.addSpaceMember("stats-101", "user-b", "editor", 2),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejection = results.find((result) => result.status === "rejected") as PromiseRejectedResult;
+    expect(rejection.reason).toBeInstanceOf(EntitlementLimitError);
+  });
+
+  it("leaves an invitation pending when acceptance exceeds the seat limit", async () => {
+    await localStore.inviteSpaceMember("stats-101", "guest@example.com", "user-guest");
+    await expect(
+      localStore.acceptSpaceInvitation("stats-101", "user-guest", "guest@example.com", 1),
+    ).rejects.toBeInstanceOf(EntitlementLimitError);
+    await expect(
+      localStore.listPendingSpaceInvitationsForUser("user-guest", "guest@example.com"),
+    ).resolves.toHaveLength(1);
+  });
+
+  it("serializes concurrent space creation", async () => {
+    const results = await Promise.allSettled([
+      localStore.createTeacherSpaceForOwner("new-a", "New A", { userId: "user-owner", name: "Owner" }, 2),
+      localStore.createTeacherSpaceForOwner("new-b", "New B", { userId: "user-owner", name: "Owner" }, 2),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejection = results.find((result) => result.status === "rejected") as PromiseRejectedResult;
+    expect(rejection.reason).toBeInstanceOf(EntitlementLimitError);
+  });
+
+  it("requires organization membership as well as space membership", async () => {
+    const data = JSON.parse(persisted);
+    data.organizationMembers = [{
+      organizationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      userId: "someone-else",
+      role: "member",
+      createdAt: "2026-01-02T03:04:06.000Z",
+    }];
+    persisted = JSON.stringify(data);
+    await expect(localStore.getSpaceMemberRole("stats-101", "user-owner")).resolves.toBeNull();
+  });
+
+  it("releases a non-owner seat after its last space assignment is removed", async () => {
+    await localStore.addSpaceMember("stats-101", "user-guest", "editor", 2);
+    await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(2);
+    await localStore.removeSpaceMember("stats-101", "user-guest");
+    await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(1);
+  });
+
+  it("removes a seat and all of its organization space access", async () => {
+    await localStore.createTeacherSpaceForOwner("stats-102", "Stats 102", {
+      userId: "user-owner",
+      name: "Owner",
+    });
+    await localStore.addSpaceMember("stats-101", "user-guest", "editor", 2);
+    await localStore.addSpaceMember("stats-102", "user-guest", "editor", 2);
+    await expect(
+      localStore.removeOrganizationMember(organizationId, "user-guest"),
+    ).resolves.toBe(true);
+    await expect(localStore.getSpaceMemberRole("stats-101", "user-guest")).resolves.toBeNull();
+    await expect(localStore.getSpaceMemberRole("stats-102", "user-guest")).resolves.toBeNull();
+    await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(1);
+  });
+
+  it("protects organization owners from seat removal", async () => {
+    await expect(
+      localStore.removeOrganizationMember(organizationId, "user-owner"),
+    ).resolves.toBe(false);
+    await expect(localStore.getSpaceMemberRole("stats-101", "user-owner")).resolves.toBe("owner");
+  });
+
+  it("protects the sole owner of a space from organization removal", async () => {
+    await localStore.addSpaceMember("stats-101", "user-guest", "owner", 2);
+    await localStore.updateSpaceMemberRole("stats-101", "user-owner", "editor");
+    await expect(
+      localStore.removeOrganizationMember(organizationId, "user-guest"),
+    ).resolves.toBe(false);
+    await expect(localStore.getSpaceMemberRole("stats-101", "user-guest")).resolves.toBe("owner");
   });
 });

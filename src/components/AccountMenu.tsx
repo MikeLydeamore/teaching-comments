@@ -113,6 +113,17 @@ export function AccountMenu({
             </Link>
             <Link
               className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              href="/host/organization"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+            >
+              <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M5.25 21V5.25A2.25 2.25 0 0 1 7.5 3h9a2.25 2.25 0 0 1 2.25 2.25V21M9 7.5h6M9 11.25h6M9 15h6" />
+              </svg>
+              Organisation
+            </Link>
+            <Link
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
               href="/host/invitations"
               onClick={() => setOpen(false)}
               role="menuitem"

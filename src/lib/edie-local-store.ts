@@ -46,11 +46,14 @@ import {
   type SubmissionViewSettingsPatch,
   type TeacherSpace,
   type Organization,
+  type OrganizationMember,
+  type OrganizationSubscription,
   type SpaceMember,
   type SpaceInvitation,
   type SpaceInvitationRecord,
   type SpaceWithRole,
 } from "./edie-store-model";
+import { assertCapacity } from "./entitlement-model";
 
 type StoreData = {
   groupQuestions: StoredGroupQuestion[];
@@ -64,6 +67,8 @@ type StoreData = {
   submissions: Submission[];
   teacherSpaces: TeacherSpace[];
   organizations: Organization[];
+  organizationMembers: OrganizationMember[];
+  subscriptions: OrganizationSubscription[];
   spaceMembers: SpaceMember[];
   spaceInvitations: SpaceInvitationRecord[];
 };
@@ -87,6 +92,8 @@ function defaultStore(): StoreData {
     polls: [],
     spaceMembers: [],
     spaceInvitations: [],
+    organizationMembers: [],
+    subscriptions: [],
     organizations: [
       {
         id: DEFAULT_ORGANIZATION_ID,
@@ -227,6 +234,33 @@ async function readStore(): Promise<StoreData> {
           createdAt,
         },
       ];
+  const spaceMembers = (data.spaceMembers ?? []).map((member) => {
+    if (!member.userId) {
+      throw new Error(
+        "The local Ed.ie store contains legacy email memberships. Reset .data/edie-store.json or migrate it before continuing.",
+      );
+    }
+
+    return {
+      spaceCode: normalizeSpaceCode(member.spaceCode),
+      userId: member.userId,
+      role: validateSpaceRole(member.role),
+      createdAt: member.createdAt ?? now(),
+    };
+  });
+  const organizationMembers = data.organizationMembers?.length
+    ? data.organizationMembers
+    : [...new Map(spaceMembers.map((member) => {
+        const space = teacherSpaces.find((item) => item.code === member.spaceCode);
+        const organization = organizations.find((item) => item.id === space?.organizationId);
+        const key = `${space?.organizationId}\0${member.userId}`;
+        return [key, {
+          organizationId: space?.organizationId ?? DEFAULT_ORGANIZATION_ID,
+          userId: member.userId,
+          role: organization?.personalOwnerUserId === member.userId ? "owner" as const : "member" as const,
+          createdAt: member.createdAt,
+        }];
+      })).values()];
   const sessions = (data.sessions ?? []).map((session) => ({
     ...session,
     id: session.id ?? session.code,
@@ -275,20 +309,9 @@ async function readStore(): Promise<StoreData> {
     })),
     teacherSpaces,
     organizations,
-    spaceMembers: (data.spaceMembers ?? []).map((member) => {
-      if (!member.userId) {
-        throw new Error(
-          "The local Ed.ie store contains legacy email memberships. Reset .data/edie-store.json or migrate it before continuing.",
-        );
-      }
-
-      return {
-        spaceCode: normalizeSpaceCode(member.spaceCode),
-        userId: member.userId,
-        role: validateSpaceRole(member.role),
-        createdAt: member.createdAt ?? now(),
-      };
-    }),
+    spaceMembers,
+    organizationMembers,
+    subscriptions: data.subscriptions ?? [],
     spaceInvitations: (data.spaceInvitations ?? []).map((invitation) => ({
       spaceCode: normalizeSpaceCode(invitation.spaceCode),
       email: normalizeSpaceEmail(invitation.email),
@@ -394,7 +417,19 @@ function ensurePersonalOrganizationInData(
     (organization) => organization.personalOwnerUserId === userId,
   );
 
-  if (existing) return existing;
+  if (existing) {
+    if (!data.organizationMembers.some(
+      (member) => member.organizationId === existing.id && member.userId === userId,
+    )) {
+      data.organizationMembers.push({
+        organizationId: existing.id,
+        userId,
+        role: "owner",
+        createdAt: existing.createdAt,
+      });
+    }
+    return existing;
+  }
 
   const organization: Organization = {
     id: randomUUID(),
@@ -404,7 +439,62 @@ function ensurePersonalOrganizationInData(
     createdAt: now(),
   };
   data.organizations.push(organization);
+  data.organizationMembers.push({
+    organizationId: organization.id,
+    userId,
+    role: "owner",
+    createdAt: organization.createdAt,
+  });
   return organization;
+}
+
+function organizationForSpace(data: StoreData, spaceCode: string) {
+  const space = data.teacherSpaces.find((item) => item.code === spaceCode);
+  return space?.organizationId ?? null;
+}
+
+function ensureOrganizationSeat(
+  data: StoreData,
+  organizationId: string,
+  userId: string,
+  teacherSeatsLimit: number | null | undefined,
+) {
+  const existing = data.organizationMembers.find(
+    (member) => member.organizationId === organizationId && member.userId === userId,
+  );
+  if (existing) return existing;
+  const members = data.organizationMembers.filter(
+    (member) => member.organizationId === organizationId,
+  );
+  assertCapacity("teacherSeats", teacherSeatsLimit ?? null, members.length);
+  const member: OrganizationMember = {
+    organizationId,
+    userId,
+    role: "member",
+    createdAt: now(),
+  };
+  data.organizationMembers.push(member);
+  return member;
+}
+
+function releaseUnusedOrganizationSeat(
+  data: StoreData,
+  organizationId: string,
+  userId: string,
+) {
+  const member = data.organizationMembers.find(
+    (item) => item.organizationId === organizationId && item.userId === userId,
+  );
+  if (!member || member.role === "owner") return;
+  const stillAssigned = data.spaceMembers.some((spaceMember) => {
+    if (spaceMember.userId !== userId) return false;
+    return organizationForSpace(data, spaceMember.spaceCode) === organizationId;
+  });
+  if (!stillAssigned) {
+    data.organizationMembers = data.organizationMembers.filter(
+      (item) => item !== member,
+    );
+  }
 }
 
 async function serializeBankMutation<T>(operation: () => Promise<T>) {
@@ -466,7 +556,65 @@ export const localStore: EdieStore = {
     });
   },
 
-  async createTeacherSpaceForOwner(code, name, owner) {
+  async getOrganizationMemberRole(organizationId, userId) {
+    const data = await readStore();
+    return data.organizationMembers.find(
+      (member) => member.organizationId === organizationId && member.userId === userId,
+    )?.role ?? null;
+  },
+
+  async listOrganizationMembers(organizationId) {
+    const data = await readStore();
+    return data.organizationMembers
+      .filter((member) => member.organizationId === organizationId)
+      .map((member) => ({ ...member }));
+  },
+
+  async removeOrganizationMember(organizationId, userId) {
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const member = data.organizationMembers.find(
+        (item) => item.organizationId === organizationId && item.userId === userId,
+      );
+      if (!member || member.role === "owner") return false;
+      const spaceCodes = new Set(
+        data.teacherSpaces
+          .filter((space) => space.organizationId === organizationId)
+          .map((space) => space.code),
+      );
+      const isSoleSpaceOwner = data.spaceMembers.some((spaceMember) =>
+        spaceCodes.has(spaceMember.spaceCode) &&
+        spaceMember.userId === userId &&
+        spaceMember.role === "owner" &&
+        !data.spaceMembers.some((other) =>
+          other.spaceCode === spaceMember.spaceCode &&
+          other.userId !== userId &&
+          other.role === "owner",
+        ),
+      );
+      if (isSoleSpaceOwner) return false;
+      data.spaceMembers = data.spaceMembers.filter(
+        (spaceMember) => !(spaceMember.userId === userId && spaceCodes.has(spaceMember.spaceCode)),
+      );
+      data.spaceInvitations = data.spaceInvitations.filter(
+        (invitation) => !(invitation.userId === userId && spaceCodes.has(invitation.spaceCode)),
+      );
+      data.organizationMembers = data.organizationMembers.filter(
+        (item) => item !== member,
+      );
+      await writeStore(data);
+      return true;
+    });
+  },
+
+  async getOrganizationSubscription(organizationId) {
+    const data = await readStore();
+    return data.subscriptions.find(
+      (subscription) => subscription.organizationId === organizationId,
+    ) ?? null;
+  },
+
+  async createTeacherSpaceForOwner(code, name, owner, ownedSpacesLimit = null) {
     const spaceCode = normalizeSpaceCode(code);
 
     if (!spaceCode) {
@@ -483,6 +631,11 @@ export const localStore: EdieStore = {
         data,
         owner.userId,
         owner.name,
+      );
+      assertCapacity(
+        "ownedSpaces",
+        ownedSpacesLimit,
+        data.teacherSpaces.filter((space) => space.organizationId === organization.id).length,
       );
       const createdAt = now();
       const space: TeacherSpace = {
@@ -522,17 +675,33 @@ export const localStore: EdieStore = {
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
+  async listTeacherSpacesForOrganization(organizationId) {
+    const data = await readStore();
+    return data.teacherSpaces
+      .filter((space) => space.organizationId === organizationId)
+      .map(({ code, name, organizationId: id, createdAt }) => ({
+        code,
+        name,
+        organizationId: id,
+        createdAt,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  },
+
   async listTeacherSpacesForUser(userId) {
     const data = await readStore();
 
     return data.teacherSpaces
       .map((summary) => {
+        const organizationMember = data.organizationMembers.find(
+          (item) => item.organizationId === summary.organizationId && item.userId === userId,
+        );
         const member = data.spaceMembers.find(
           (item) =>
             item.spaceCode === summary.code && item.userId === userId,
         );
 
-        if (!member) {
+        if (!member || !organizationMember) {
           return null;
         }
 
@@ -587,8 +756,11 @@ export const localStore: EdieStore = {
       (item) =>
         item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
-
-    return member?.role ?? null;
+    const space = data.teacherSpaces.find((item) => item.code === normalizedSpaceCode);
+    const organizationMember = data.organizationMembers.find(
+      (item) => item.organizationId === space?.organizationId && item.userId === userId,
+    );
+    return organizationMember ? member?.role ?? null : null;
   },
 
   async listSpaceMembers(spaceCode) {
@@ -620,6 +792,7 @@ export const localStore: EdieStore = {
     spaceCode,
     userId,
     role = "editor",
+    teacherSeatsLimit = null,
   ) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedRole = validateSpaceRole(role);
@@ -628,42 +801,29 @@ export const localStore: EdieStore = {
       throw new Error("Space code is required.");
     }
 
-    const data = await readStore();
-    const space = data.teacherSpaces.find(
-      (item) => item.code === normalizedSpaceCode,
-    );
-
-    if (!space) {
-      throw new Error("That space could not be found.");
-    }
-
-    const existing = data.spaceMembers.find(
-      (item) =>
-        item.spaceCode === normalizedSpaceCode &&
-        item.userId === userId,
-    );
-
-    if (existing) {
-      throw new Error("That person is already a member of this space.");
-    }
-
-    const member: SpaceMember = {
-      spaceCode: normalizedSpaceCode,
-      userId,
-      role: normalizedRole,
-      createdAt: now(),
-    };
-
-    data.spaceInvitations = data.spaceInvitations.filter(
-      (invitation) =>
-        !(
-          invitation.spaceCode === normalizedSpaceCode &&
-          invitation.userId === userId
-        ),
-    );
-    data.spaceMembers.push(member);
-    await writeStore(data);
-    return member;
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const space = data.teacherSpaces.find(
+        (item) => item.code === normalizedSpaceCode,
+      );
+      if (!space) throw new Error("That space could not be found.");
+      if (data.spaceMembers.some((item) => item.spaceCode === normalizedSpaceCode && item.userId === userId)) {
+        throw new Error("That person is already a member of this space.");
+      }
+      ensureOrganizationSeat(data, space.organizationId, userId, teacherSeatsLimit);
+      const member: SpaceMember = {
+        spaceCode: normalizedSpaceCode,
+        userId,
+        role: normalizedRole,
+        createdAt: now(),
+      };
+      data.spaceInvitations = data.spaceInvitations.filter(
+        (invitation) => !(invitation.spaceCode === normalizedSpaceCode && invitation.userId === userId),
+      );
+      data.spaceMembers.push(member);
+      await writeStore(data);
+      return member;
+    });
   },
 
   async inviteSpaceMember(spaceCode, email, userId, role = "editor") {
@@ -695,35 +855,29 @@ export const localStore: EdieStore = {
     return invitation;
   },
 
-  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail) {
+  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail, teacherSeatsLimit = null) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
     const normalizedEmail = verifiedEmail
       ? normalizeSpaceEmail(verifiedEmail)
       : null;
-    const data = await readStore();
-    const index = data.spaceInvitations.findIndex(
-      (item) =>
-        item.spaceCode === normalizedSpaceCode &&
-        (item.userId === userId ||
-          (normalizedEmail !== null && item.email === normalizedEmail)),
-    );
-
-    if (index === -1) {
-      return false;
-    }
-
-    const invitation = data.spaceInvitations[index];
-    if (!data.spaceMembers.some((member) => member.spaceCode === normalizedSpaceCode && member.userId === userId)) {
-      data.spaceMembers.push({
-        spaceCode: normalizedSpaceCode,
-        userId,
-        role: invitation.role,
-        createdAt: now(),
-      });
-    }
-    data.spaceInvitations.splice(index, 1);
-    await writeStore(data);
-    return true;
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const index = data.spaceInvitations.findIndex(
+        (item) => item.spaceCode === normalizedSpaceCode &&
+          (item.userId === userId || (normalizedEmail !== null && item.email === normalizedEmail)),
+      );
+      if (index === -1) return false;
+      const organizationId = organizationForSpace(data, normalizedSpaceCode);
+      if (!organizationId) return false;
+      ensureOrganizationSeat(data, organizationId, userId, teacherSeatsLimit);
+      const invitation = data.spaceInvitations[index];
+      if (!data.spaceMembers.some((member) => member.spaceCode === normalizedSpaceCode && member.userId === userId)) {
+        data.spaceMembers.push({ spaceCode: normalizedSpaceCode, userId, role: invitation.role, createdAt: now() });
+      }
+      data.spaceInvitations.splice(index, 1);
+      await writeStore(data);
+      return true;
+    });
   },
 
   async declineSpaceInvitation(spaceCode, userId, verifiedEmail) {
@@ -750,6 +904,7 @@ export const localStore: EdieStore = {
 
   async leaveSpace(spaceCode, userId) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
+    return serializeStoreMutation(async () => {
     const data = await readStore();
     const index = data.spaceMembers.findIndex(
       (item) =>
@@ -775,8 +930,11 @@ export const localStore: EdieStore = {
     }
 
     data.spaceMembers.splice(index, 1);
+    const organizationId = organizationForSpace(data, normalizedSpaceCode);
+    if (organizationId) releaseUnusedOrganizationSeat(data, organizationId, userId);
     await writeStore(data);
     return true;
+    });
   },
 
   async updateSpaceMemberRole(spaceCode, userId, role) {
@@ -809,6 +967,7 @@ export const localStore: EdieStore = {
       return false;
     }
 
+    return serializeStoreMutation(async () => {
     const data = await readStore();
     const index = data.spaceMembers.findIndex(
       (item) =>
@@ -820,8 +979,11 @@ export const localStore: EdieStore = {
     }
 
     data.spaceMembers.splice(index, 1);
+    const organizationId = organizationForSpace(data, normalizedSpaceCode);
+    if (organizationId) releaseUnusedOrganizationSeat(data, organizationId, userId);
     await writeStore(data);
     return true;
+    });
   },
 
   async removeSpaceInvitation(spaceCode, email) {

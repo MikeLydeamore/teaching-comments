@@ -4,12 +4,15 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   getTeacherSpace,
+  getOrganizationMemberRole,
+  listOrganizationMembers,
   inviteSpaceMember as createSpaceInvitation,
   normalizeSpaceCode,
   removeSpaceMember,
   removeSpaceInvitation,
   updateSpaceMemberRole,
 } from "@/lib/edie-store";
+import { EntitlementLimitError, assertCapacity, entitlementsForOrganization } from "@/lib/entitlements";
 import type { SpaceRole } from "@/lib/edie-store-model";
 import { getSpaceRoleForUser } from "@/lib/auth-server";
 import {
@@ -86,6 +89,18 @@ export async function inviteSpaceMember(formData: FormData) {
   }
 
   try {
+    const [entitlements, existingOrganizationRole, organizationMembers] = await Promise.all([
+      entitlementsForOrganization(space.organizationId),
+      userId ? getOrganizationMemberRole(space.organizationId, userId) : Promise.resolve(null),
+      listOrganizationMembers(space.organizationId),
+    ]);
+    if (!existingOrganizationRole) {
+      assertCapacity(
+        "teacherSeats",
+        entitlements.limits.teacherSeats,
+        organizationMembers.length,
+      );
+    }
     await createSpaceInvitation(
       space.code,
       email,
@@ -93,6 +108,9 @@ export async function inviteSpaceMember(formData: FormData) {
       role === "owner" ? "owner" : "editor",
     );
   } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect(settingsPath(space.code, "seat-limit"));
+    }
     const message = error instanceof Error ? error.message : "";
     redirect(settingsPath(space.code, message.includes("already") ? "exists" : "unavailable"));
   }

@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   findUserProfileByUsername: vi.fn(),
   getSpaceRoleForUser: vi.fn(),
   getTeacherSpace: vi.fn(),
+  getOrganizationMemberRole: vi.fn(),
+  listOrganizationMembers: vi.fn(),
+  entitlementsForOrganization: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -40,10 +43,17 @@ vi.mock("@/lib/space-member-identity", () => ({
 vi.mock("@/lib/edie-store", () => ({
   inviteSpaceMember: mocks.inviteSpaceMember,
   getTeacherSpace: mocks.getTeacherSpace,
+  getOrganizationMemberRole: mocks.getOrganizationMemberRole,
+  listOrganizationMembers: mocks.listOrganizationMembers,
   normalizeSpaceCode: (value: string) => value.trim().toLowerCase(),
   removeSpaceMember: mocks.removeSpaceMember,
   removeSpaceInvitation: mocks.removeSpaceInvitation,
   updateSpaceMemberRole: mocks.updateSpaceMemberRole,
+}));
+vi.mock("@/lib/entitlements", () => ({
+  EntitlementLimitError: class EntitlementLimitError extends Error {},
+  assertCapacity: vi.fn(),
+  entitlementsForOrganization: mocks.entitlementsForOrganization,
 }));
 
 import {
@@ -70,7 +80,10 @@ function form(values: Record<string, string>) {
 describe("space member settings actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getTeacherSpace.mockResolvedValue({ code: "stats-101", name: "Stats" });
+    mocks.getTeacherSpace.mockResolvedValue({ code: "stats-101", name: "Stats", organizationId: "org-1" });
+    mocks.getOrganizationMemberRole.mockResolvedValue(null);
+    mocks.listOrganizationMembers.mockResolvedValue([{ userId: "owner" }]);
+    mocks.entitlementsForOrganization.mockResolvedValue({ limits: { teacherSeats: null } });
     mocks.getSpaceRoleForUser.mockResolvedValue("owner");
     mocks.findUserProfileByUsername.mockResolvedValue(profile);
     mocks.findUserProfileByEmail.mockResolvedValue(null);

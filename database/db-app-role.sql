@@ -4,6 +4,8 @@
 create role edie_app login nosuperuser nocreatedb nocreaterole noinherit;
 grant usage on schema public to edie_app;
 grant select, insert, update on edie_organizations to edie_app;
+grant select, insert, update, delete on edie_organization_members to edie_app;
+grant select on edie_subscriptions to edie_app;
 grant select, insert, update on edie_teacher_spaces to edie_app;
 grant select, insert, update, delete on edie_space_members to edie_app;
 grant select, insert, update, delete on edie_space_invitations to edie_app;
@@ -28,6 +30,8 @@ to edie_app;
 -- so the owner must either disable RLS for these private tables or add equivalent policies.
 alter table edie_teacher_spaces disable row level security;
 alter table edie_organizations disable row level security;
+alter table edie_organization_members disable row level security;
+alter table edie_subscriptions disable row level security;
 alter table edie_space_invitations disable row level security;
 alter table edie_sessions disable row level security;
 alter table edie_submissions disable row level security;

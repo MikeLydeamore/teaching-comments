@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   addSpaceMember: vi.fn(),
   createTeacherSpaceForOwner: vi.fn(),
+  ensurePersonalOrganization: vi.fn(),
+  entitlementsForOrganization: vi.fn(),
   findUserProfileByEmail: vi.fn(),
   findUserProfileByUsername: vi.fn(),
   getCurrentTeacher: vi.fn(),
@@ -31,10 +33,15 @@ vi.mock("@/lib/auth-users", () => ({
 vi.mock("@/lib/edie-store", () => ({
   addSpaceMember: mocks.addSpaceMember,
   createTeacherSpaceForOwner: mocks.createTeacherSpaceForOwner,
+  ensurePersonalOrganization: mocks.ensurePersonalOrganization,
   getTeacherSpace: mocks.getTeacherSpace,
   listSpaceMembers: mocks.listSpaceMembers,
   normalizeSpaceCode: (value: string) => value.trim().toLowerCase(),
   updateSpaceMemberRole: mocks.updateSpaceMemberRole,
+}));
+vi.mock("@/lib/entitlements", () => ({
+  EntitlementLimitError: class EntitlementLimitError extends Error {},
+  entitlementsForOrganization: mocks.entitlementsForOrganization,
 }));
 vi.mock("@/lib/edie-store-model", () => ({
   normalizeSpaceEmail: (value: string) => value.trim().toLowerCase(),
@@ -94,12 +101,17 @@ describe("transferSpaceOwnership", () => {
       code: "bstat",
       name: "ETX1100/5900 Business Statistics",
     });
+    mocks.ensurePersonalOrganization.mockResolvedValue({ id: "org-1" });
+    mocks.entitlementsForOrganization.mockResolvedValue({
+      plan: "community",
+      limits: { ownedSpaces: null, teacherSeats: null },
+    });
     mocks.addSpaceMember.mockResolvedValue({
       spaceCode: "bstat",
       userId: "admin-1",
       role: "owner",
     });
-    mocks.getTeacherSpace.mockResolvedValue({ code: "stats-101", name: "Stats" });
+    mocks.getTeacherSpace.mockResolvedValue({ code: "stats-101", name: "Stats", organizationId: "org-1" });
     mocks.listSpaceMembers.mockResolvedValue([
       {
         spaceCode: "stats-101",
@@ -134,6 +146,7 @@ describe("transferSpaceOwnership", () => {
       "bstat",
       "ETX1100/5900 Business Statistics",
       { userId: "admin-1", name: "Admin" },
+      null,
     );
     expect(mocks.addSpaceMember).not.toHaveBeenCalled();
   });
@@ -181,6 +194,7 @@ describe("transferSpaceOwnership", () => {
       "stats-101",
       "user-2",
       "owner",
+      null,
     );
   });
 
@@ -194,6 +208,7 @@ describe("transferSpaceOwnership", () => {
       "stats-101",
       "user-3",
       "owner",
+      null,
     );
   });
 

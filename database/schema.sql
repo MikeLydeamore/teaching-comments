@@ -13,6 +13,29 @@ create table if not exists edie_organizations (
 create unique index if not exists edie_organizations_personal_owner_idx
   on edie_organizations (personal_owner_user_id)
   where personal_owner_user_id is not null;
+create table if not exists edie_organization_members (
+  organization_id uuid not null references edie_organizations(id) on delete cascade,
+  user_id text not null,
+  role text not null check (role in ('owner', 'member')),
+  created_at timestamptz not null default now(),
+  primary key (organization_id, user_id)
+);
+create index if not exists edie_organization_members_user_idx
+  on edie_organization_members (user_id);
+create table if not exists edie_subscriptions (
+  organization_id uuid primary key references edie_organizations(id) on delete cascade,
+  provider_customer_id text,
+  provider_subscription_id text,
+  plan_key text not null check (plan_key in ('free', 'pro')),
+  status text not null check (status in ('trialing', 'active', 'past_due', 'canceled')),
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists edie_subscriptions_provider_customer_idx
+  on edie_subscriptions (provider_customer_id) where provider_customer_id is not null;
+create unique index if not exists edie_subscriptions_provider_subscription_idx
+  on edie_subscriptions (provider_subscription_id) where provider_subscription_id is not null;
 create table if not exists edie_teacher_spaces (
   code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name text not null check (char_length(name) between 1 and 120),
@@ -142,6 +165,8 @@ create index if not exists edie_poll_responses_poll_updated_idx on edie_poll_res
 -- A Neon edie_app role needs explicit grants instead.
 alter table edie_teacher_spaces enable row level security;
 alter table edie_organizations enable row level security;
+alter table edie_organization_members enable row level security;
+alter table edie_subscriptions enable row level security;
 alter table edie_space_invitations enable row level security;
 alter table edie_sessions enable row level security;
 alter table edie_submissions enable row level security;

@@ -60,6 +60,7 @@ Open `http://localhost:3000`. Useful entry points are:
 - `/join` — student join page
 - `/spaces/default/demo-lecture` — seeded student session
 - `/host` — teacher home
+- `/host/organization` — plan, quota, and organization seat management
 - `/admin/spaces` — administration for emails in `ADMIN_EMAILS`
 
 Local application data is stored in `.data/edie-store.json`. Delete that file
@@ -120,6 +121,7 @@ Configure these environment variables in your deployment platform:
 DATABASE_URL=postgresql://edie_app:...@.../...?...pooling-options
 BETTER_AUTH_SECRET=a-random-secret-at-least-32-characters-long
 BETTER_AUTH_URL=https://your-domain.example
+EDIE_DEPLOYMENT_MODE=community
 
 # Configure at least one complete provider pair.
 GOOGLE_CLIENT_ID=
@@ -140,6 +142,35 @@ upload credentials server-only. Do not give them a `NEXT_PUBLIC_` prefix.
 
 Deploy the project, visit `/host`, and sign in. A teacher's personal
 organization is created during onboarding, after they choose a username.
+
+### Community and Cloud quotas
+
+Community deployments use the complete classroom product with unlimited
+application-level space and teacher-seat quotas. Operators still provide and
+pay for their own infrastructure and support. Set `EDIE_DEPLOYMENT_MODE` to
+`community`; no subscription or quota configuration is required.
+
+The Ed.ie-managed service sets `EDIE_DEPLOYMENT_MODE=cloud` and configures the
+Free and Pro quotas with `EDIE_CLOUD_FREE_OWNED_SPACES_LIMIT`,
+`EDIE_CLOUD_FREE_TEACHER_SEATS_LIMIT`,
+`EDIE_CLOUD_PRO_OWNED_SPACES_LIMIT`, and
+`EDIE_CLOUD_PRO_TEACHER_SEATS_LIMIT`. Each value is a non-negative integer or
+`unlimited`. Cloud organizations without an active or trialing subscription
+row receive the Free quotas.
+
+Until billing synchronization is added, an operator can assign Pro with the
+database owner connection:
+
+```sql
+insert into edie_subscriptions (organization_id, plan_key, status)
+values ('ORGANIZATION_UUID', 'pro', 'active')
+on conflict (organization_id) do update
+set plan_key = excluded.plan_key, status = excluded.status, updated_at = now();
+```
+
+This changes hosted capacity only. Community, Free, and Pro contain the same
+application features; paid support is an operational service rather than an
+application permission.
 
 ## Optional integrations
 

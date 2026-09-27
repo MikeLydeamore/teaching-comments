@@ -9,10 +9,12 @@ import {
   acceptSpaceInvitation as acceptInvitation,
   declineSpaceInvitation as declineInvitation,
   getSpaceMemberRole,
+  getTeacherSpace,
   leaveSpace,
   normalizeSessionCode,
   normalizeSpaceCode,
 } from "@/lib/edie-store";
+import { EntitlementLimitError, entitlementsForOrganization } from "@/lib/entitlements";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 
 function safeNextPath(value: FormDataEntryValue | null) {
@@ -62,13 +64,26 @@ async function requireTeacher(returnTo = "/host") {
 export async function acceptSpaceInvitation(formData: FormData) {
   const teacher = await requireTeacher("/host/invitations");
   const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
-  const accepted = spaceCode
-    ? await acceptInvitation(
-        spaceCode,
-        teacher.id,
-        teacher.emailVerified ? teacher.email : null,
-      )
-    : false;
+  let accepted = false;
+  if (spaceCode) {
+    const space = await getTeacherSpace(spaceCode);
+    try {
+      if (space) {
+        const entitlements = await entitlementsForOrganization(space.organizationId);
+        accepted = await acceptInvitation(
+          spaceCode,
+          teacher.id,
+          teacher.emailVerified ? teacher.email : null,
+          entitlements.limits.teacherSeats,
+        );
+      }
+    } catch (error) {
+      if (error instanceof EntitlementLimitError) {
+        redirect(invitationsPath("seat-limit"));
+      }
+      throw error;
+    }
+  }
 
   revalidatePath("/host");
   revalidatePath("/host/invitations");

@@ -88,6 +88,30 @@ export type Organization = {
   createdAt: string;
 };
 
+export type OrganizationRole = "owner" | "member";
+
+export type OrganizationMember = {
+  organizationId: string;
+  userId: string;
+  role: OrganizationRole;
+  createdAt: string;
+};
+
+export type SubscriptionPlan = "free" | "pro";
+
+export type OrganizationSubscription = {
+  organizationId: string;
+  providerCustomerId: string | null;
+  providerSubscriptionId: string | null;
+  plan: SubscriptionPlan;
+  status: "trialing" | "active" | "past_due" | "canceled";
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  updatedAt: string;
+};
+
+export type CapacityLimit = number | null;
+
 export type SpaceWithRole = TeacherSpaceSummary & {
   role: SpaceRole;
 };
@@ -400,9 +424,27 @@ export type EdieStore = {
     code: string,
     name: string,
     owner: { userId: string; name: string },
+    ownedSpacesLimit?: CapacityLimit,
   ): Promise<TeacherSpace>;
+  getOrganizationMemberRole(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationRole | null>;
+  listOrganizationMembers(
+    organizationId: string,
+  ): Promise<OrganizationMember[]>;
+  removeOrganizationMember(
+    organizationId: string,
+    userId: string,
+  ): Promise<boolean>;
+  getOrganizationSubscription(
+    organizationId: string,
+  ): Promise<OrganizationSubscription | null>;
   getTeacherSpace(code: string): Promise<TeacherSpace | null>;
   listTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
+  listTeacherSpacesForOrganization(
+    organizationId: string,
+  ): Promise<TeacherSpaceSummary[]>;
   listTeacherSpacesForUser(userId: string): Promise<SpaceWithRole[]>;
   listPendingSpaceInvitationsForUser(
     userId: string,
@@ -418,6 +460,7 @@ export type EdieStore = {
     spaceCode: string,
     userId: string,
     role?: SpaceRole,
+    teacherSeatsLimit?: CapacityLimit,
   ): Promise<SpaceMember>;
   inviteSpaceMember(
     spaceCode: string,
@@ -429,6 +472,7 @@ export type EdieStore = {
     spaceCode: string,
     userId: string,
     verifiedEmail: string | null,
+    teacherSeatsLimit?: CapacityLimit,
   ): Promise<boolean>;
   declineSpaceInvitation(
     spaceCode: string,
