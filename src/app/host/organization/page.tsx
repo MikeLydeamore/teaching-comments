@@ -73,8 +73,8 @@ export default async function OrganizationPage({
   const planLabel = entitlements.plan === "community"
     ? "Community"
     : entitlements.plan === "pro"
-      ? "Cloud Pro"
-      : "Cloud Free";
+      ? "Pro"
+      : "Free";
   const message = query.member ? memberMessages[query.member] ?? "" : "";
   const succeeded = query.member === "removed";
 
