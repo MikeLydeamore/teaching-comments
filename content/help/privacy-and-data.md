@@ -42,3 +42,4 @@ Read the full [Ed.ie privacy notice](/privacy) for the deployment’s current st
 - [Choose participant response types](/help/collect-responses)
 - [Export and archive activity](/help/export-and-archive)
 - [Join and take part in a session](/help/join-and-participate)
+- [Make an Ed.ie activity accessible](/help/accessibility)

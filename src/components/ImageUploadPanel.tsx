@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
@@ -87,7 +88,10 @@ export function ImageUploadPanel({ disabled, image, onChange, onProcessingChange
   });
   function remove() { preparationId.current += 1; onChange(null); setStatus(""); setIsPreparing(false); onProcessingChange(false); }
   return <div className="mt-5">
-    <p className="text-sm font-semibold text-slate-700">Private image (optional)</p>
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm font-semibold text-slate-700">Private image (optional)</p>
+      <Link className="text-xs font-semibold text-teal-700 underline" href="/help/collect-responses#collect-gifs-and-images" rel="noreferrer" target="_blank">Image help</Link>
+    </div>
     <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       {image ? <><img alt="Selected upload preview" className="max-h-64 rounded-md border border-slate-200" src={image.previewUrl} /><div className="mt-3 flex items-center gap-3"><span className="text-sm text-slate-600">{image.contentType} · {(image.blob.size / 1024).toFixed(0)} KiB</span><button className="text-sm font-semibold text-teal-700 underline" disabled={disabled || isPreparing} type="button" onClick={() => input.current?.click()}>Replace image</button><button className="text-sm font-semibold text-teal-700 underline" disabled={disabled} type="button" onClick={remove}>Remove image</button></div></> : <><p className="text-sm text-slate-600">Drag an image here, paste one, or choose a file. PNG, JPEG, WebP, HEIC, or HEIF up to 10 MiB.</p><button className="mt-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold" disabled={disabled || isPreparing} type="button" onClick={() => input.current?.click()}>Choose image</button></>}
       <input accept=".png,.jpg,.jpeg,.webp,.heic,.heif,image/png,image/jpeg,image/webp,image/heic,image/heif" className="hidden" disabled={disabled || isPreparing} ref={input} type="file" onChange={onInput} />

@@ -133,42 +133,49 @@ const dashboardTourSteps: GuidedTourStep[] = [
   {
     description:
       "This is the live control room for one teaching activity. Participants see the prompt and the inputs you choose; you see their responses here as they arrive.",
+    helpHref: "/help/run-your-first-session",
     target: '[data-tour="dashboard-header"]',
     title: "Your session dashboard",
   },
   {
     description:
       "Write the question you want participants to answer, then select Show. Add questions to the bank when you expect to reuse them.",
+    helpHref: "/help/prompts-and-question-bank#show-or-change-a-prompt",
     target: '[data-tour="prompt"]',
     title: "Show a prompt",
   },
   {
     description:
       "Turn Accepting responses on when the room is ready. Turn it off at the end to prevent new responses while keeping the activity available to you.",
+    helpHref: "/help/invite-participants#open-and-close-participant-access",
     target: '[data-tour="session-access"]',
     title: "Open participant access",
   },
   {
     description:
       "Open the QR code on your classroom display. Participants can also use the student page with the space and session codes; they do not need an account.",
+    helpHref: "/help/invite-participants#share-a-qr-code",
     target: '[data-tour="qr-popout"]',
     title: "Invite the room",
   },
   {
     description:
       "Text, drawings, GIFs, and images arrive in the live stream. You can expand, copy, edit, hide, and reorder response cards.",
+    helpHref: "/help/screen-and-display-responses#work-with-response-cards",
     target: '[data-tour="response-stream"]',
     title: "Watch responses arrive",
   },
   {
     description:
       "Visualise the current response view, run a live poll, or pop submissions into a presentation-friendly window.",
+    helpHref: "/help/understand-results#visualise-the-current-response-view",
     target: '[data-tour="live-tools"]',
     title: "Use live activities",
   },
   {
     description:
       "Room controls contain filters, screening, participant input choices, CSV export, and archiving. Select the highlighted Room controls tab to open them.",
+    helpHref: "/help/screen-and-display-responses",
     interactiveTarget: true,
     target: '[data-tour="room-controls"]',
     targetActionLabel: "Select Room controls to continue",
@@ -177,12 +184,14 @@ const dashboardTourSteps: GuidedTourStep[] = [
   {
     description:
       "Filter the live stream by prompt or time range, switch the card order, and refresh the current response view. These display choices are shared with presentation popouts.",
+    helpHref: "/help/screen-and-display-responses#filter-and-reorder-cards",
     target: '[data-tour="room-controls-display"]',
     title: "Focus the response view",
   },
   {
     description:
       "Screen questions or submissions before showing them, and choose which response formats participants may use. Data export and archiving are available at the bottom of the drawer.",
+    helpHref: "/help/screen-and-display-responses#screen-submissions-before-displaying-them",
     target: '[data-tour="room-controls-moderation"]',
     title: "Moderate and shape participation",
   },
@@ -200,6 +209,7 @@ const dashboardTourSteps: GuidedTourStep[] = [
   {
     description:
       "When the activity ends, stop accepting responses. You can export a CSV, then clear and archive the room before the next activity. This tour is always available from your account menu.",
+    helpHref: "/help/export-and-archive",
     title: "You are ready to teach",
   },
 ];
@@ -211,6 +221,7 @@ const pollTourSteps: GuidedTourStep[] = [
   {
     description:
       "Polls live with the other presentation tools above the response stream. Select the highlighted Run poll button to open the poll builder.",
+    helpHref: "/help/run-a-live-poll",
     interactiveTarget: true,
     target: '[data-tour="poll-launch"]',
     targetActionLabel: "Select Run poll to continue",
@@ -219,12 +230,14 @@ const pollTourSteps: GuidedTourStep[] = [
   {
     description:
       "Write your question, then choose whether participants may select one answer or several. You can also load a poll you have saved in the question bank.",
+    helpHref: "/help/run-a-live-poll#prepare-a-poll",
     targets: ['#poll-question', '[data-tour="poll-answer-type"]'],
     title: "Ask the question",
   },
   {
     description:
       "Add between two and eight answers. Mark the correct answer—or answers—so Ed.ie can reveal the solution after voting finishes.",
+    helpHref: "/help/run-a-live-poll#prepare-a-poll",
     targets: [
       '[data-tour="poll-answers-heading"]',
       '[data-tour="poll-answers"]',
@@ -234,6 +247,7 @@ const pollTourSteps: GuidedTourStep[] = [
   {
     description:
       "Choose how long voting should stay open. You can type a duration or use the quick adjustments to add or remove time.",
+    helpHref: "/help/run-a-live-poll#prepare-a-poll",
     target: '[data-tour="poll-timer"]',
     title: "Set the timer",
   },
@@ -246,6 +260,7 @@ const pollTourSteps: GuidedTourStep[] = [
   {
     description:
       "While a poll is live, this window shows responses and lets you extend or end voting, reveal the solution, and pop out the results. Select Close to return to the dashboard.",
+    helpHref: "/help/run-a-live-poll#control-a-live-poll",
     interactiveTarget: true,
     target: '[data-tour="poll-close"]',
     targetActionLabel: "Select Close to continue",
@@ -254,6 +269,7 @@ const pollTourSteps: GuidedTourStep[] = [
   {
     description:
       "That is the full flow: open polling mode, prepare the question and answers, set the timer, and start. You can replay this guide at any time from Help.",
+    helpHref: "/help/run-a-live-poll",
     title: "You are ready to run a poll",
   },
 ];
@@ -2210,7 +2226,12 @@ function TeacherDashboardContent({
                   </section>
 
                   <section className="p-4" data-tour="room-controls-moderation">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Moderation &amp; screening</h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Moderation &amp; screening</h3>
+                      <Link className="text-xs font-semibold text-teal-700 hover:text-teal-900" href="/help/screen-and-display-responses#screen-submissions-before-displaying-them" rel="noreferrer" target="_blank">
+                        Learn more
+                      </Link>
+                    </div>
                     <div className="mt-3 divide-y divide-slate-200">
                   <button
                     aria-checked={sessionDetails.groupQuestionsScreeningEnabled}
@@ -2268,7 +2289,12 @@ function TeacherDashboardContent({
                   </section>
 
                   <section className="p-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Participant inputs</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Participant inputs</h3>
+                    <Link className="text-xs font-semibold text-teal-700 hover:text-teal-900" href="/help/collect-responses#choose-the-available-inputs" rel="noreferrer" target="_blank">
+                      Learn more
+                    </Link>
+                  </div>
                   <div className="mt-3 divide-y divide-slate-200">
                   {([
                     ["textInputEnabled", "Text responses"],
@@ -2300,7 +2326,12 @@ function TeacherDashboardContent({
                   </section>
                 </div>
                 <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Data actions</p>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Data actions</p>
+                    <Link className="mt-1 inline-flex text-xs font-semibold text-teal-700 hover:text-teal-900" href="/help/export-and-archive" rel="noreferrer" target="_blank">
+                      Learn more
+                    </Link>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <a className="flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800" download href={`/api/sessions/${session.id}/export`}>Export CSV</a>
                     <button className="h-10 rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isArchiving || isUnarchiving} type="button" onClick={() => { void archiveRoom(); }}>

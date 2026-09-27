@@ -4,7 +4,7 @@ summary: Invite colleagues, choose roles, and coordinate simultaneous host acces
 audience: host
 category: Access and privacy
 order: 10
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 ---
 
 ## Invite a co-host
@@ -30,6 +30,12 @@ Open **Manage access** and use the controls beside the member. Owners can change
 
 Removing someone prevents future access; it does not rewrite activity they previously helped run.
 
+## Leave a hosted space
+
+On **Your spaces**, open the three-dot actions menu on the space card and select **Leave space**. Confirming removes your own access; it does not delete the space or its sessions.
+
+The final active owner cannot leave, because the space would no longer have anyone able to manage access. Make another member an owner first, then leave. Editors can leave without transferring ownership.
+
 ## Work in the same session
 
 Multiple hosts can open the same live session. Prompt changes, session access, timers, moderation, and display settings are shared.
@@ -47,3 +53,4 @@ For a smooth class, agree who controls the prompt and projector. A second host c
 
 - [Run group questions, timers, and displays](/help/questions-timers-and-displays)
 - [Run your first Ed.ie session](/help/run-your-first-session)
+- [Get access to a hosted space](/help/access-hosted-spaces)

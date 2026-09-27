@@ -33,6 +33,29 @@ function HelpLink({ href = "", children, ...props }: ComponentProps<"a">) {
   );
 }
 
+function HelpImage({ alt = "", src }: ComponentProps<"img">) {
+  if (typeof src !== "string" || !src) return null;
+
+  return (
+    <a
+      className="my-5 block overflow-hidden rounded-md border border-slate-200 bg-slate-50"
+      href={src}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {/* Help screenshots are local documentation assets and preserve their natural dimensions. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        alt={alt}
+        className="h-auto w-full"
+        decoding="async"
+        loading="lazy"
+        src={src}
+      />
+    </a>
+  );
+}
+
 export function HelpArticleMarkdown({ children }: { children: string }) {
   return (
     <Markdown
@@ -45,9 +68,17 @@ export function HelpArticleMarkdown({ children }: { children: string }) {
           return <h2 className="scroll-mt-5 border-t border-slate-200 pt-7 text-2xl font-semibold text-slate-950 first:border-0 first:pt-0" id={id}>{children}</h2>;
         },
         h3: ({ children }) => <h3 className="mt-6 text-lg font-semibold text-slate-950">{children}</h3>,
+        img: HelpImage,
         li: ({ children }) => <li className="pl-1">{children}</li>,
         ol: ({ children }) => <ol className="my-4 list-decimal space-y-2 pl-6 text-slate-700">{children}</ol>,
-        p: ({ children }) => <p className="my-3 leading-7 text-slate-700">{children}</p>,
+        p: ({ children, node }) =>
+          node?.children.some(
+            (child) => child.type === "element" && child.tagName === "img",
+          ) ? (
+            <>{children}</>
+          ) : (
+            <p className="my-3 leading-7 text-slate-700">{children}</p>
+          ),
         table: ({ children }) => <div className="my-5 overflow-x-auto rounded-md border border-slate-200"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
         td: ({ children }) => <td className="border-t border-slate-200 px-3 py-3 align-top text-slate-700">{children}</td>,
         th: ({ children }) => <th className="bg-slate-50 px-3 py-3 font-semibold text-slate-900">{children}</th>,

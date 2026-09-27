@@ -4,7 +4,7 @@ summary: Download session data, clear the live room, and understand what each ac
 audience: host
 category: Results and data
 order: 9
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 ---
 
 ## Export responses to CSV
@@ -29,6 +29,12 @@ Immediately after archiving, select **Undo archive** to restore that archived ba
 
 If you leave or reload the page, do not assume the shortcut will remain available. Export before clearing when retaining a local copy is important.
 
+## Permanently delete activity
+
+Ed.ie currently has no self-service control for permanently deleting a session or its archived activity. **Clear / archive room** is not deletion.
+
+If permanent deletion is required under your class or institution’s retention policy, contact the administrator or data owner responsible for your Ed.ie deployment. Identify the hosted space and session code, but do not send participant content through an insecure channel.
+
 ## Understand hidden, filtered, closed, and archived work
 
 | State | Still stored | Visible in the normal stream | Accepts new work |
@@ -42,3 +48,4 @@ If you leave or reload the page, do not assume the shortcut will remain availabl
 
 - [Screen and display responses](/help/screen-and-display-responses)
 - [Privacy and participant data](/help/privacy-and-data)
+- [Understand response results and summaries](/help/understand-results)

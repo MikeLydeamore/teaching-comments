@@ -4,7 +4,7 @@ summary: Prepare a prompt, invite participants, and collect your first responses
 audience: host
 category: Getting started
 order: 1
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 ---
 
 ## Before you begin
@@ -12,6 +12,10 @@ reviewed: 2026-09-26
 You need an Ed.ie host account and access to at least one hosted space. A laptop or desktop works best for the live dashboard.
 
 Allow a few minutes before class for a test run. Open the participant page in a private window or another browser so that you see the same experience as your class.
+
+![The Ed.ie session dashboard with the prompt editor, access switch, QR popout, timer, and live activity controls visible.](/help/screenshots/session-dashboard.png)
+
+Select the image to open a larger version.
 
 ## Open or create a session
 
@@ -66,3 +70,4 @@ Archiving keeps the activity available to CSV export. Ed.ie offers **Undo archiv
 - [Invite participants](/help/invite-participants)
 - [Screen and display responses](/help/screen-and-display-responses)
 - [Export and archive activity](/help/export-and-archive)
+- [Troubleshoot common problems](/help/troubleshooting)

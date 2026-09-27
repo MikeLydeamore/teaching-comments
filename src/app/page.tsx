@@ -54,6 +54,12 @@ export default function Home() {
           >
             Privacy notice
           </Link>
+          <Link
+            className="text-sm font-semibold text-teal-700 underline"
+            href="/help/accessibility"
+          >
+            Accessibility guide
+          </Link>
         </div>
       </div>
     </main>

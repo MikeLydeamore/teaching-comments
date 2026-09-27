@@ -4,12 +4,16 @@ summary: Prepare answer choices, control voting, and present or download the res
 audience: host
 category: Live activities
 order: 7
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 ---
 
 ## Before you begin
 
 The session must be accepting responses before a new poll can start. Select **Run poll** from the session dashboard.
+
+![The live poll builder showing its question editor, single- and multiple-choice controls, answer fields, correct-answer controls, and timer.](/help/screenshots/poll-builder.png)
+
+Select the image to open a larger version.
 
 ## Prepare a poll
 

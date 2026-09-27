@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type GuidedTourStep = {
   description: string;
+  helpHref?: string;
   interactiveTarget?: boolean;
   target?: string;
   targets?: string[];
@@ -283,6 +285,16 @@ export function GuidedTour({
         <p className="mt-2 text-sm leading-6 text-slate-600" id="guided-tour-description">
           {step.description}
         </p>
+        {step.helpHref ? (
+          <Link
+            className="mt-3 inline-flex text-sm font-semibold text-teal-700 underline decoration-teal-300 underline-offset-4 hover:text-teal-900"
+            href={step.helpHref}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Read the related guide
+          </Link>
+        ) : null}
         <div className="mt-5 flex items-center justify-between gap-3">
           <button
             className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:invisible"

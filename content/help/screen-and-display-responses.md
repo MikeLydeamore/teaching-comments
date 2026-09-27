@@ -4,7 +4,7 @@ summary: Moderate incoming work, focus the response stream, and prepare a classr
 audience: host
 category: Display and moderation
 order: 6
-reviewed: 2026-09-26
+reviewed: 2026-09-27
 ---
 
 ## Screen submissions before displaying them
@@ -13,11 +13,23 @@ Turn on **Screen submissions** under **Room controls** before projecting the res
 
 Screening affects new submissions. Review the existing stream before opening a projector popout, because responses already visible are not automatically hidden when screening is enabled.
 
+![Room controls showing display filters, screening switches, participant input switches, and data actions.](/help/screenshots/room-controls.png)
+
+Select the image to open a larger version.
+
 ## Hide or restore one response
 
 Use **Hide** on a response card to remove it from the visible stream. A hidden response remains available to hosts for moderation and export. Use **Show** to restore it.
 
 Hiding is appropriate for an irrelevant, duplicate, or inappropriate item. It does not close participant access or affect other responses.
+
+## Work with response cards
+
+Select the **+** control on a card to expand it across the response stream; select **−** to collapse it. Use the copy control inside a written response to place its text on the clipboard.
+
+Hosts can edit the written part of a response and save the corrected text. Editing does not replace an attached drawing, GIF, or private image. Make substantive changes only when there is a clear teaching reason, and explain them when participant meaning could otherwise be misrepresented.
+
+Drag a card by its outer edge to set a custom order. Interactive controls inside the card do not start dragging.
 
 ## Filter and reorder cards
 
@@ -53,3 +65,4 @@ You can also turn on **Response chart**, choose a column, pie, or word-cloud vie
 - [Choose participant response types](/help/collect-responses)
 - [Export and archive activity](/help/export-and-archive)
 - [Run group questions and timers](/help/questions-timers-and-displays)
+- [Understand response results and summaries](/help/understand-results)

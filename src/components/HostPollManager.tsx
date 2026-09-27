@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PollResultOption } from "@/components/PollResultOption";
 import { SessionTimer } from "@/components/SessionTimer";
@@ -749,6 +750,14 @@ export function HostPollManager({
                 >
                   Live poll
                 </h2>
+                <Link
+                  className="mt-1 inline-flex text-sm font-semibold text-teal-700 hover:text-teal-900"
+                  href="/help/run-a-live-poll"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Learn more
+                </Link>
               </div>
               <button
                 className="h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-500"
