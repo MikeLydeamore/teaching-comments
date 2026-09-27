@@ -34,13 +34,15 @@ export default async function LoginPage({
               Ed.ie
             </div>
             <p className="mt-6 text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">
-              Teacher sign-in
+              Host account
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-              Welcome back
+              Sign in or create your account
             </h1>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Sign in to reach your Ed.ie spaces and live sessions.
+              Continue with Google, Microsoft, or GitHub. New hosts choose an
+              Ed.ie username, then receive access when an administrator creates
+              a hosted space or an owner shares one with them.
             </p>
             <OAuthSignInButtons returnTo={returnTo} />
           </div>
