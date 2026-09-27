@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { PublicSiteFooter } from "@/components/PublicSiteFooter";
+import { PublicSiteHeader } from "@/components/PublicSiteHeader";
 
 export const metadata: Metadata = {
   title: "Ed.ie | Live classroom engagement",
@@ -64,51 +66,10 @@ const hostSteps = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
-        <nav
-          aria-label="Main navigation"
-          className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4"
-        >
-          <Link
-            className={`inline-flex items-center gap-2 rounded-md text-xl font-semibold text-slate-950 ${focusRing}`}
-            href="/"
-          >
-            <span className="flex size-9 items-center justify-center rounded-md bg-teal-700 text-base font-bold text-white">
-              E
-            </span>
-            Ed.ie
-          </Link>
+    <div className="min-h-screen bg-slate-100 text-slate-950">
+      <PublicSiteHeader />
 
-          <div className="flex items-center gap-5 text-sm font-semibold text-slate-600">
-            <a className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="#features">
-              Features
-            </a>
-            <a className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="#how-it-works">
-              How it works
-            </a>
-            <Link className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="/help">
-              Help
-            </Link>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            <Link
-              className={`hidden rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 min-[430px]:inline-flex ${focusRing}`}
-              href="/join"
-            >
-              Join a session
-            </Link>
-            <Link
-              className={`inline-flex rounded-md bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 ${focusRing}`}
-              href="/auth/login?returnTo=/host"
-            >
-              Create host account
-            </Link>
-          </div>
-        </nav>
-      </header>
-
+      <main>
       <section className="overflow-hidden border-b border-slate-200 bg-white">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 lg:grid-cols-[0.8fr_1.2fr] lg:py-24">
           <div>
@@ -175,7 +136,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-16 lg:py-20" id="features">
+      <section className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:py-20" id="features">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
             Participation with purpose
@@ -265,7 +226,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white" id="how-it-works">
+      <section className="scroll-mt-24 border-y border-slate-200 bg-white" id="how-it-works">
         <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
@@ -349,23 +310,9 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      </main>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-semibold text-slate-950">Ed.ie</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Live classroom engagement for every voice.
-            </p>
-          </div>
-          <nav aria-label="Footer navigation" className="flex flex-wrap gap-x-5 gap-y-3 text-sm font-semibold text-slate-600">
-            <Link className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="/join">Join</Link>
-            <Link className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="/help">Help centre</Link>
-            <Link className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="/privacy">Privacy</Link>
-            <Link className={`rounded-sm transition hover:text-teal-800 ${focusRing}`} href="/help/accessibility">Accessibility</Link>
-          </nav>
-        </div>
-      </footer>
-    </main>
+      <PublicSiteFooter />
+    </div>
   );
 }

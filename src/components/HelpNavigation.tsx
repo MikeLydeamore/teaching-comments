@@ -167,7 +167,7 @@ export function HelpNavigation({ articles }: { articles: HelpArticleIndexItem[] 
           </details>
         )}
       </aside>
-      <aside className="sticky top-5 hidden max-h-[calc(100vh-2.5rem)] overflow-y-auto rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:block">
+      <aside className="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto rounded-md border border-slate-200 bg-white p-4 shadow-sm lg:block">
         {navigationContents("help-search-desktop")}
       </aside>
     </>
