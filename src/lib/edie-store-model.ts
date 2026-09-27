@@ -406,7 +406,7 @@ export type EdieStore = {
   listTeacherSpacesForUser(userId: string): Promise<SpaceWithRole[]>;
   listPendingSpaceInvitationsForUser(
     userId: string,
-    email: string,
+    verifiedEmail: string | null,
   ): Promise<SpaceInvitation[]>;
   getSpaceMemberRole(
     spaceCode: string,
@@ -428,12 +428,12 @@ export type EdieStore = {
   acceptSpaceInvitation(
     spaceCode: string,
     userId: string,
-    email: string,
+    verifiedEmail: string | null,
   ): Promise<boolean>;
   declineSpaceInvitation(
     spaceCode: string,
     userId: string,
-    email: string,
+    verifiedEmail: string | null,
   ): Promise<boolean>;
   leaveSpace(spaceCode: string, userId: string): Promise<boolean>;
   updateSpaceMemberRole(

@@ -106,6 +106,7 @@ callback URL for each enabled provider:
 ```text
 https://your-domain.example/api/auth/callback/google
 https://your-domain.example/api/auth/callback/github
+https://your-domain.example/api/auth/callback/microsoft
 ```
 
 Preview deployments need their own allowed callback URLs if teacher sign-in
@@ -125,6 +126,10 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+# Any Microsoft work/school tenant. Use a tenant GUID for a single organization.
+MICROSOFT_TENANT_ID=organizations
 
 # Optional comma-separated allow-list for /admin/spaces.
 ADMIN_EMAILS=you@example.com

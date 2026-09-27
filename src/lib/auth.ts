@@ -69,7 +69,13 @@ function authDialect() {
   return dialect;
 }
 
-type OAuthProviderConfig = { clientId: string; clientSecret: string };
+type OAuthProviderConfig = {
+  clientId: string;
+  clientSecret: string;
+  tenantId?: string;
+  prompt?: "select_account";
+  disableProfilePhoto?: boolean;
+};
 
 function configuredSocialProviders() {
   const providers: Record<string, OAuthProviderConfig> = {};
@@ -86,6 +92,21 @@ function configuredSocialProviders() {
 
   if (githubId && githubSecret) {
     providers.github = { clientId: githubId, clientSecret: githubSecret };
+  }
+
+  const microsoftId = process.env.MICROSOFT_CLIENT_ID?.trim();
+  const microsoftSecret = process.env.MICROSOFT_CLIENT_SECRET?.trim();
+
+  if (microsoftId && microsoftSecret) {
+    providers.microsoft = {
+      clientId: microsoftId,
+      clientSecret: microsoftSecret,
+      tenantId: process.env.MICROSOFT_TENANT_ID?.trim() || "organizations",
+      prompt: "select_account",
+      // Microsoft can return a base64 photo large enough to overflow auth
+      // response headers. Ed.ie already has an initials fallback.
+      disableProfilePhoto: true,
+    };
   }
 
   return providers;

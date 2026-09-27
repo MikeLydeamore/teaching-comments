@@ -113,6 +113,29 @@ describe("space membership (local JSON backend)", () => {
     await expect(localStore.getSpaceMemberRole("stats-101", "user-guest")).resolves.toBe("editor");
   });
 
+  it("does not match an email-only invitation without a verified email", async () => {
+    await localStore.inviteSpaceMember(
+      "stats-101",
+      "guest@example.com",
+      null,
+      "editor",
+    );
+
+    await expect(
+      localStore.listPendingSpaceInvitationsForUser("user-guest", null),
+    ).resolves.toEqual([]);
+    await expect(
+      localStore.acceptSpaceInvitation("stats-101", "user-guest", null),
+    ).resolves.toBe(false);
+    await expect(
+      localStore.acceptSpaceInvitation(
+        "stats-101",
+        "user-guest",
+        "Guest@Example.com",
+      ),
+    ).resolves.toBe(true);
+  });
+
   it("does not move a space when another member becomes owner", async () => {
     await localStore.addSpaceMember("stats-101", "user-guest", "editor");
     await localStore.updateSpaceMemberRole("stats-101", "user-guest", "owner");

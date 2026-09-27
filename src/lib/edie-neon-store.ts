@@ -344,10 +344,10 @@ export const neonStore: EdieStore = {
       role: validateSpaceRole(text(row, "role")),
     }));
   },
-  async listPendingSpaceInvitationsForUser(userId, email) {
+  async listPendingSpaceInvitationsForUser(userId, verifiedEmail) {
     const rows = await query(
       "SELECT s.code, s.name, s.organization_id, s.created_at, i.role, i.created_at AS invited_at FROM edie_teacher_spaces s JOIN edie_space_invitations i ON i.space_code = s.code WHERE i.invitee_user_id = $1 OR i.email = $2 ORDER BY s.name ASC",
-      [userId, normalizeSpaceEmail(email)],
+      [userId, verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null],
     );
     return rows.map((row) => ({
       code: text(row, "code"),
@@ -416,7 +416,7 @@ export const neonStore: EdieStore = {
       throw error;
     }
   },
-  async acceptSpaceInvitation(spaceCode, userId, email) {
+  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
     const rows = await query(
       `WITH invitation AS (
@@ -428,17 +428,25 @@ export const neonStore: EdieStore = {
        SELECT space_code, $2, role FROM invitation
        ON CONFLICT (space_code, user_id) DO UPDATE SET role = EXCLUDED.role
        RETURNING space_code`,
-      [normalized, userId, normalizeSpaceEmail(email)],
+      [
+        normalized,
+        userId,
+        verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null,
+      ],
     );
     return rows.length > 0;
   },
-  async declineSpaceInvitation(spaceCode, userId, email) {
+  async declineSpaceInvitation(spaceCode, userId, verifiedEmail) {
     const normalized = normalizeSpaceCode(spaceCode); if (!normalized) return false;
     const rows = await query(
       `DELETE FROM edie_space_invitations
        WHERE space_code = $1 AND (invitee_user_id = $2 OR email = $3)
        RETURNING space_code`,
-      [normalized, userId, normalizeSpaceEmail(email)],
+      [
+        normalized,
+        userId,
+        verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null,
+      ],
     );
     return rows.length > 0;
   },

@@ -542,14 +542,17 @@ export const localStore: EdieStore = {
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
-  async listPendingSpaceInvitationsForUser(userId, email) {
-    const normalizedEmail = normalizeSpaceEmail(email);
+  async listPendingSpaceInvitationsForUser(userId, verifiedEmail) {
+    const normalizedEmail = verifiedEmail
+      ? normalizeSpaceEmail(verifiedEmail)
+      : null;
     const data = await readStore();
 
     return data.spaceInvitations
       .filter(
         (invitation) =>
-          invitation.userId === userId || invitation.email === normalizedEmail,
+          invitation.userId === userId ||
+          (normalizedEmail !== null && invitation.email === normalizedEmail),
       )
       .map((member) => {
         const space = data.teacherSpaces.find(
@@ -692,14 +695,17 @@ export const localStore: EdieStore = {
     return invitation;
   },
 
-  async acceptSpaceInvitation(spaceCode, userId, email) {
+  async acceptSpaceInvitation(spaceCode, userId, verifiedEmail) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
+    const normalizedEmail = verifiedEmail
+      ? normalizeSpaceEmail(verifiedEmail)
+      : null;
     const data = await readStore();
     const index = data.spaceInvitations.findIndex(
       (item) =>
         item.spaceCode === normalizedSpaceCode &&
-        (item.userId === userId || item.email === normalizedEmail),
+        (item.userId === userId ||
+          (normalizedEmail !== null && item.email === normalizedEmail)),
     );
 
     if (index === -1) {
@@ -720,14 +726,17 @@ export const localStore: EdieStore = {
     return true;
   },
 
-  async declineSpaceInvitation(spaceCode, userId, email) {
+  async declineSpaceInvitation(spaceCode, userId, verifiedEmail) {
     const normalizedSpaceCode = normalizeSpaceCode(spaceCode);
-    const normalizedEmail = normalizeSpaceEmail(email);
+    const normalizedEmail = verifiedEmail
+      ? normalizeSpaceEmail(verifiedEmail)
+      : null;
     const data = await readStore();
     const index = data.spaceInvitations.findIndex(
       (item) =>
         item.spaceCode === normalizedSpaceCode &&
-        (item.userId === userId || item.email === normalizedEmail),
+        (item.userId === userId ||
+          (normalizedEmail !== null && item.email === normalizedEmail)),
     );
 
     if (index === -1) {

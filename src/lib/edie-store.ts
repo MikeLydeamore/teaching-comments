@@ -122,8 +122,8 @@ export async function listTeacherSpacesForUser(userId: string) {
   return getStore().listTeacherSpacesForUser(userId);
 }
 
-export async function listPendingSpaceInvitationsForUser(userId: string, email: string) {
-  return getStore().listPendingSpaceInvitationsForUser(userId, email);
+export async function listPendingSpaceInvitationsForUser(userId: string, verifiedEmail: string | null) {
+  return getStore().listPendingSpaceInvitationsForUser(userId, verifiedEmail);
 }
 
 export async function getSpaceMemberRole(spaceCode: string, userId: string) {
@@ -155,12 +155,12 @@ export async function inviteSpaceMember(
   return getStore().inviteSpaceMember(spaceCode, email, userId, role);
 }
 
-export async function acceptSpaceInvitation(spaceCode: string, userId: string, email: string) {
-  return getStore().acceptSpaceInvitation(spaceCode, userId, email);
+export async function acceptSpaceInvitation(spaceCode: string, userId: string, verifiedEmail: string | null) {
+  return getStore().acceptSpaceInvitation(spaceCode, userId, verifiedEmail);
 }
 
-export async function declineSpaceInvitation(spaceCode: string, userId: string, email: string) {
-  return getStore().declineSpaceInvitation(spaceCode, userId, email);
+export async function declineSpaceInvitation(spaceCode: string, userId: string, verifiedEmail: string | null) {
+  return getStore().declineSpaceInvitation(spaceCode, userId, verifiedEmail);
 }
 
 export async function leaveSpace(spaceCode: string, userId: string) {
