@@ -99,7 +99,11 @@ export default async function OrganizationPage({
                 Review your plan, capacity, members, and their hosted-space access.
               </p>
             </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-800 ring-1 ring-teal-200">
+            <span className={`rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ${
+              entitlements.plan === "free"
+                ? "bg-amber-50 text-amber-900 ring-amber-200"
+                : "bg-teal-50 text-teal-800 ring-teal-200"
+            }`}>
               {planLabel}
             </span>
           </div>
