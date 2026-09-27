@@ -16,7 +16,7 @@ const invitationMessages: Record<string, string> = {
   accepted: "Invitation accepted. The hosted space is now available in Your spaces.",
   declined: "Invitation declined.",
   unavailable: "That invitation is no longer available.",
-  "seat-limit": "This organization has no teacher seats available. Your invitation remains pending.",
+  "seat-limit": "This organisation has no teacher seats available. Your invitation remains pending.",
 };
 
 export default async function InvitationsPage({

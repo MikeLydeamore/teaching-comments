@@ -209,7 +209,12 @@ async function readStore(): Promise<StoreData> {
   const data = JSON.parse(raw) as Partial<StoreData>;
   const createdAt = now();
   const organizations = data.organizations?.length
-    ? data.organizations
+    ? data.organizations.map((organization) => ({
+        ...organization,
+        name: organization.kind === "personal"
+          ? organization.name.replace(/'s organization$/, "'s organisation")
+          : organization.name,
+      }))
     : [
         {
           id: DEFAULT_ORGANIZATION_ID,
@@ -405,7 +410,7 @@ async function serializeStoreMutation<T>(operation: () => Promise<T>) {
 
 function personalOrganizationName(ownerName: string) {
   const name = ownerName.trim() || "Teacher";
-  return `${name.slice(0, 95)}'s organization`;
+  return `${name.slice(0, 95)}'s organisation`;
 }
 
 function ensurePersonalOrganizationInData(

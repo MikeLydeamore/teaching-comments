@@ -1,4 +1,4 @@
--- Phase 2 contract step. Run only after the organization backfill reports a
+-- Phase 2 contract step. Run only after the organisation backfill reports a
 -- clean validation. Legacy membership columns remain until the rollback soak
 -- period has completed.
 alter table edie_teacher_spaces

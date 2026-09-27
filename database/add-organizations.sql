@@ -1,4 +1,4 @@
--- Phase 2 expand migration. Safe to apply before the organization backfill.
+-- Phase 2 expand migration. Safe to apply before the organisation backfill.
 -- Existing email/status membership columns intentionally remain for rollback.
 create extension if not exists pgcrypto;
 create extension if not exists citext;

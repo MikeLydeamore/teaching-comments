@@ -73,10 +73,14 @@ function spaceInvitationFromRow(row: Row): SpaceInvitationRecord {
 }
 
 function organizationFromRow(row: Row): Organization {
+  const kind = text(row, "kind") as Organization["kind"];
+  const storedName = text(row, "name");
   return {
     id: text(row, "id"),
-    name: text(row, "name"),
-    kind: text(row, "kind") as Organization["kind"],
+    name: kind === "personal"
+      ? storedName.replace(/'s organization$/, "'s organisation")
+      : storedName,
+    kind,
     personalOwnerUserId: nullableText(row, "personal_owner_user_id"),
     createdAt: text(row, "created_at"),
   };
@@ -317,7 +321,7 @@ export const neonStore: EdieStore = {
   },
   async ensurePersonalOrganization(userId, ownerName) {
     if (!userId.trim()) throw new Error("User ID is required.");
-    const organizationName = `${(ownerName.trim() || "Teacher").slice(0, 95)}'s organization`;
+    const organizationName = `${(ownerName.trim() || "Teacher").slice(0, 95)}'s organisation`;
     const rows = await query(
       `WITH organization AS (
          INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
@@ -396,7 +400,7 @@ export const neonStore: EdieStore = {
   async createTeacherSpaceForOwner(code, name, owner, ownedSpacesLimit = null) {
     const normalized = normalizeSpaceCode(code);
     if (!normalized) throw new Error("Space code is required.");
-    const organizationName = `${(owner.name.trim() || "Teacher").slice(0, 95)}'s organization`;
+    const organizationName = `${(owner.name.trim() || "Teacher").slice(0, 95)}'s organisation`;
     try {
       const results = await transaction([
         { text: `WITH organization AS (

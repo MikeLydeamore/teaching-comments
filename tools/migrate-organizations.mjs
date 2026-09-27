@@ -49,7 +49,7 @@ export function planOrganizationMigration(spaces, memberships, users, organizati
       ? organizationOwnerById.get(space.organization_id)
       : null;
     if (space.organization_id && existingOwner !== owner.userId) {
-      errors.push(`Space ${space.code} is linked to an organization owned by a different user.`);
+      errors.push(`Space ${space.code} is linked to an organisation owned by a different user.`);
       continue;
     }
     spaceOwners.set(space.code, owner);
@@ -95,7 +95,7 @@ async function applyPlan(app, plan) {
 
     for (const owner of plan.spaceOwners.values()) {
       if (organizationIds.has(owner.userId)) continue;
-      const name = `${String(owner.userName || "Teacher").trim().slice(0, 95)}'s organization`;
+      const name = `${String(owner.userName || "Teacher").trim().slice(0, 95)}'s organisation`;
       const result = await client.query(
         `INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
          VALUES ($1, 'personal', $2)
@@ -171,7 +171,7 @@ async function main() {
       errors: plan.errors,
     };
     console.log(JSON.stringify(summary, null, 2));
-    if (plan.errors.length) throw new Error("Organization migration preflight failed; no changes were made.");
+    if (plan.errors.length) throw new Error("Organisation migration preflight failed; no changes were made.");
     if (apply) console.log(JSON.stringify({ validation: await applyPlan(app, plan) }, null, 2));
   } finally {
     if (auth !== app) await auth.end();

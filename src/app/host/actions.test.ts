@@ -58,7 +58,7 @@ describe("acceptSpaceInvitation", () => {
     mocks.acceptInvitation.mockResolvedValue(true);
   });
 
-  it("passes the organization seat limit to the atomic acceptance", async () => {
+  it("passes the organisation seat limit to the atomic acceptance", async () => {
     const formData = new FormData();
     formData.set("spaceCode", "stats-101");
     await expect(acceptSpaceInvitation(formData)).rejects.toThrow(

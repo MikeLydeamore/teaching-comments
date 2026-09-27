@@ -20,7 +20,7 @@ function seededLocalData() {
     groupQuestions: [], pollResponses: [], pollQuestionBank: [], polls: [],
     promptHistory: [], questionBank: [], sessions: [], submissions: [],
     submissionViewSettings: [],
-    organizations: [{ id: organizationId, name: "Owner's organization", kind: "personal", personalOwnerUserId: "user-owner", createdAt: "2026-01-02T03:04:04.000Z" }],
+    organizations: [{ id: organizationId, name: "Owner's organisation", kind: "personal", personalOwnerUserId: "user-owner", createdAt: "2026-01-02T03:04:04.000Z" }],
     teacherSpaces: [{ code: "stats-101", name: "Stats 101", organizationId, createdAt: "2026-01-02T03:04:05.000Z" }],
     spaceMembers: [{ spaceCode: "stats-101", userId: "user-owner", role: "owner", createdAt: "2026-01-02T03:04:06.000Z" }],
     spaceInvitations: [],
@@ -45,14 +45,14 @@ describe("space membership (Neon backend)", () => {
       if (statement.startsWith("SELECT s.code")) return [{ code: "stats-101", name: "Stats 101", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z"), role: "owner" }];
       if (statement.includes("SELECT member.role")) return [{ role: "owner" }];
       if (statement.includes("INSERT INTO edie_teacher_spaces") && statement.includes("created_space")) return [{ code: "new-space", name: "New Space", organization_id: organizationId, created_at: new Date("2026-01-02T03:04:05.000Z") }];
-      if (statement.includes("INSERT INTO edie_organizations")) return [{ id: organizationId, name: "Owner's organization", kind: "personal", personal_owner_user_id: "user-owner", created_at: new Date("2026-01-02T03:04:04.000Z") }];
+      if (statement.includes("INSERT INTO edie_organizations")) return [{ id: organizationId, name: "Owner's organisation", kind: "personal", personal_owner_user_id: "user-owner", created_at: new Date("2026-01-02T03:04:04.000Z") }];
       if (statement.includes("INSERT INTO edie_space_invitations")) return [{ space_code: "stats-101", email: "guest@example.com", invitee_user_id: "user-guest", role: "editor", created_at: new Date("2026-01-02T03:04:06.000Z") }];
       if (statement.includes("DELETE FROM edie_space_invitations")) return [{ space_code: "stats-101" }];
       return [];
     });
   });
 
-  it("keys space access by stable user ID and returns organization context", async () => {
+  it("keys space access by stable user ID and returns organisation context", async () => {
     const spaces = await neonStore.listTeacherSpacesForUser("user-owner");
     expect(spaces).toEqual([expect.objectContaining({ code: "stats-101", organizationId, role: "owner" })]);
     expect(queryMock.mock.calls.find(([sql]) => String(sql).startsWith("SELECT s.code"))?.[1]).toEqual(["user-owner"]);
@@ -68,14 +68,14 @@ describe("space membership (Neon backend)", () => {
     expect(acceptance).not.toContain("status");
   });
 
-  it("creates a personal organization, space, and owner in one statement", async () => {
+  it("creates a personal organisation, space, and owner in one statement", async () => {
     const space = await neonStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-owner", name: "Owner" });
     expect(space.organizationId).toBe(organizationId);
     const call = queryMock.mock.calls.find(([sql]) => String(sql).includes("created_space"));
     expect(call?.[0]).toContain("membership AS");
     expect(call?.[0]).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");
     expect(call?.[0]).not.toContain("email, role, status");
-    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organization", "user-owner", null]);
+    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organisation", "user-owner", null]);
   });
 
   it("keeps pending invitations out of the membership table", async () => {
@@ -94,7 +94,7 @@ describe("space membership (local JSON backend)", () => {
     fsMock.writeFile.mockImplementation(async (_path: unknown, data: string) => { persisted = data; });
   });
 
-  it("provisions one personal organization under concurrent retries", async () => {
+  it("provisions one personal organisation under concurrent retries", async () => {
     const [left, right] = await Promise.all([
       localStore.ensurePersonalOrganization("user-new", "New Teacher"),
       localStore.ensurePersonalOrganization("user-new", "New Teacher"),
@@ -104,7 +104,7 @@ describe("space membership (local JSON backend)", () => {
     expect(data.organizations.filter((item: { personalOwnerUserId: string }) => item.personalOwnerUserId === "user-new")).toHaveLength(1);
   });
 
-  it("creates a space with its organization and owner atomically", async () => {
+  it("creates a space with its organisation and owner atomically", async () => {
     const space = await localStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-new", name: "New Teacher" });
     expect(space.organizationId).toBeTruthy();
     await expect(localStore.getSpaceMemberRole("new-space", "user-new")).resolves.toBe("owner");
@@ -148,7 +148,7 @@ describe("space membership (local JSON backend)", () => {
     await expect(localStore.listTeacherSpacesForUser("user-guest")).resolves.toEqual([expect.objectContaining({ code: "stats-101", organizationId, role: "owner" })]);
   });
 
-  it("allows collaboration across organizations without granting sibling-space access", async () => {
+  it("allows collaboration across organisations without granting sibling-space access", async () => {
     await localStore.createTeacherSpaceForOwner("science", "Science", { userId: "science-owner", name: "Science Owner" });
     await localStore.createTeacherSpaceForOwner("private-science", "Private Science", { userId: "science-owner", name: "Science Owner" });
     await localStore.addSpaceMember("science", "user-guest", "editor");
@@ -158,7 +158,7 @@ describe("space membership (local JSON backend)", () => {
     expect(spaces[0].organizationId).not.toBe(organizationId);
   });
 
-  it("counts one organization seat across several spaces", async () => {
+  it("counts one organisation seat across several spaces", async () => {
     await localStore.createTeacherSpaceForOwner("stats-102", "Stats 102", {
       userId: "user-owner",
       name: "Owner",
@@ -200,7 +200,7 @@ describe("space membership (local JSON backend)", () => {
     expect(rejection.reason).toBeInstanceOf(EntitlementLimitError);
   });
 
-  it("requires organization membership as well as space membership", async () => {
+  it("requires organisation membership as well as space membership", async () => {
     const data = JSON.parse(persisted);
     data.organizationMembers = [{
       organizationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -219,7 +219,7 @@ describe("space membership (local JSON backend)", () => {
     await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(1);
   });
 
-  it("removes a seat and all of its organization space access", async () => {
+  it("removes a seat and all of its organisation space access", async () => {
     await localStore.createTeacherSpaceForOwner("stats-102", "Stats 102", {
       userId: "user-owner",
       name: "Owner",
@@ -234,14 +234,14 @@ describe("space membership (local JSON backend)", () => {
     await expect(localStore.listOrganizationMembers(organizationId)).resolves.toHaveLength(1);
   });
 
-  it("protects organization owners from seat removal", async () => {
+  it("protects organisation owners from seat removal", async () => {
     await expect(
       localStore.removeOrganizationMember(organizationId, "user-owner"),
     ).resolves.toBe(false);
     await expect(localStore.getSpaceMemberRole("stats-101", "user-owner")).resolves.toBe("owner");
   });
 
-  it("protects the sole owner of a space from organization removal", async () => {
+  it("protects the sole owner of a space from organisation removal", async () => {
     await localStore.addSpaceMember("stats-101", "user-guest", "owner", 2);
     await localStore.updateSpaceMemberRole("stats-101", "user-owner", "editor");
     await expect(

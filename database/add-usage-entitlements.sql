@@ -1,4 +1,4 @@
--- Phase 3: organization-wide teacher seats and Cloud subscription snapshots.
+-- Phase 3: organisation-wide teacher seats and Cloud subscription snapshots.
 -- Apply with the database owner before deploying the matching application code.
 
 create table if not exists edie_organization_members (

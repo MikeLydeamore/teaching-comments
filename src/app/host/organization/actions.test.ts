@@ -40,7 +40,7 @@ describe("removeOrganizationSeat", () => {
     mocks.removeOrganizationMember.mockResolvedValue(true);
   });
 
-  it("removes a non-owner from the signed-in owner's organization", async () => {
+  it("removes a non-owner from the signed-in owner's organisation", async () => {
     await expect(removeOrganizationSeat(removalForm("member-1"))).rejects.toThrow(
       "redirect:/host/organization?member=removed",
     );
@@ -55,7 +55,7 @@ describe("removeOrganizationSeat", () => {
     expect(mocks.removeOrganizationMember).not.toHaveBeenCalled();
   });
 
-  it("requires organization ownership", async () => {
+  it("requires organisation ownership", async () => {
     mocks.getOrganizationMemberRole.mockResolvedValue("member");
     await expect(removeOrganizationSeat(removalForm("member-1"))).rejects.toThrow(
       "redirect:/host",

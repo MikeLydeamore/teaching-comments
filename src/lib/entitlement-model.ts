@@ -17,8 +17,8 @@ export class EntitlementLimitError extends Error {
   ) {
     super(
       limitKey === "ownedSpaces"
-        ? `This organization has reached its limit of ${limit} hosted ${limit === 1 ? "space" : "spaces"}.`
-        : `This organization has reached its limit of ${limit} teacher ${limit === 1 ? "seat" : "seats"}.`,
+        ? `This organisation has reached its limit of ${limit} hosted ${limit === 1 ? "space" : "spaces"}.`
+        : `This organisation has reached its limit of ${limit} teacher ${limit === 1 ? "seat" : "seats"}.`,
     );
     this.name = "EntitlementLimitError";
   }

@@ -7,7 +7,7 @@ const users = [
   { id: "editor-id", email: "editor@example.com", name: "Editor" },
 ];
 
-describe("organization migration planning", () => {
+describe("organisation migration planning", () => {
   it("maps stable IDs, one owner, and pending invitations without writing", () => {
     const plan = planOrganizationMigration(spaces, [
       { space_code: "stats", email: "OWNER@example.com", role: "owner", status: "active" },
@@ -34,7 +34,7 @@ describe("organization migration planning", () => {
     ]));
   });
 
-  it("is clean when rerun against the same owner's organization", () => {
+  it("is clean when rerun against the same owner's organisation", () => {
     const plan = planOrganizationMigration(
       [{ ...spaces[0], organization_id: "org-1" }],
       [{ space_code: "stats", email: "owner@example.com", role: "owner", status: "active" }],

@@ -20,7 +20,7 @@ const memberMessages: Record<string, string> = {
   invalid: "Enter a valid username or email address.",
   "not-found": "No Ed.ie account has that username.",
   unavailable: "Member accounts are temporarily unavailable. Please try again.",
-  "seat-limit": "This organization has no teacher seats available. Existing members keep their access.",
+  "seat-limit": "This organisation has no teacher seats available. Existing members keep their access.",
 };
 
 export default async function SpaceSettingsPage({

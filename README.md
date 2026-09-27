@@ -60,7 +60,7 @@ Open `http://localhost:3000`. Useful entry points are:
 - `/join` — student join page
 - `/spaces/default/demo-lecture` — seeded student session
 - `/host` — teacher home
-- `/host/organization` — plan, quota, and organization seat management
+- `/host/organization` — plan, quota, and organisation seat management
 - `/admin/spaces` — administration for emails in `ADMIN_EMAILS`
 
 Local application data is stored in `.data/edie-store.json`. Delete that file
@@ -130,7 +130,7 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 MICROSOFT_CLIENT_ID=
 MICROSOFT_CLIENT_SECRET=
-# Any Microsoft work/school tenant. Use a tenant GUID for a single organization.
+# Any Microsoft work/school tenant. Use a tenant GUID for a single organisation.
 MICROSOFT_TENANT_ID=organizations
 
 # Optional comma-separated allow-list for /admin/spaces.
@@ -141,7 +141,7 @@ Keep `DATABASE_URL`, `BETTER_AUTH_SECRET`, OAuth client secrets, and all image
 upload credentials server-only. Do not give them a `NEXT_PUBLIC_` prefix.
 
 Deploy the project, visit `/host`, and sign in. A teacher's personal
-organization is created during onboarding, after they choose a username.
+organisation is created during onboarding, after they choose a username.
 
 ### Community and Cloud quotas
 
@@ -155,7 +155,7 @@ Free and Pro quotas with `EDIE_CLOUD_FREE_OWNED_SPACES_LIMIT`,
 `EDIE_CLOUD_FREE_TEACHER_SEATS_LIMIT`,
 `EDIE_CLOUD_PRO_OWNED_SPACES_LIMIT`, and
 `EDIE_CLOUD_PRO_TEACHER_SEATS_LIMIT`. Each value is a non-negative integer or
-`unlimited`. Cloud organizations without an active or trialing subscription
+`unlimited`. Cloud organisations without an active or trialling subscription
 row receive the Free quotas.
 
 Until billing synchronization is added, an operator can assign Pro with the

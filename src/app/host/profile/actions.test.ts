@@ -190,7 +190,7 @@ describe("updateUsername", () => {
     });
   });
 
-  it("reports incomplete organization provisioning separately", async () => {
+  it("reports incomplete organisation provisioning separately", async () => {
     mocks.ensurePersonalOrganization.mockRejectedValue(
       new Error("storage unavailable"),
     );
