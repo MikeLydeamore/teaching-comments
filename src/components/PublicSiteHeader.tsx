@@ -52,7 +52,7 @@ export function PublicSiteHeader() {
             className={`inline-flex h-9 items-center rounded-md bg-slate-900 px-3.5 text-sm font-semibold text-white transition hover:bg-slate-700 ${focusRing}`}
             href="/auth/login?returnTo=/host"
           >
-            Create host account
+            Login
           </Link>
         </div>
       </nav>

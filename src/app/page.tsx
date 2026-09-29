@@ -88,7 +88,7 @@ export default function Home() {
                 className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700 ${focusRing}`}
                 href="/auth/login?returnTo=/host"
               >
-                Create host account
+                Login
                 <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                 </svg>
@@ -306,7 +306,7 @@ export default function Home() {
             className={`mt-8 inline-flex min-h-12 items-center justify-center rounded-md bg-white px-6 text-sm font-semibold text-slate-900 transition hover:bg-teal-50 ${focusRing}`}
             href="/auth/login?returnTo=/host"
           >
-            Create host account
+            Login
           </Link>
         </div>
       </section>
