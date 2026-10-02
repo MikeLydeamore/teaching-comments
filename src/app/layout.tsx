@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { THEME_FAVICON_PATHS } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        <link
+          id="edie-favicon"
+          rel="icon"
+          type="image/svg+xml"
+          href={THEME_FAVICON_PATHS.default}
+        />
         <Script
           id="edie-theme-script"
           strategy="beforeInteractive"
@@ -24,7 +31,11 @@ export default function RootLayout({
             __html: `
 try {
   var theme = window.localStorage.getItem("edie_theme");
-  if (theme && theme !== "default") {
+  var faviconPaths = ${JSON.stringify(THEME_FAVICON_PATHS)};
+  if (theme && faviconPaths[theme]) {
+    document.getElementById("edie-favicon").href = faviconPaths[theme];
+  }
+  if (theme && theme !== "default" && faviconPaths[theme]) {
     document.documentElement.dataset.edieTheme = theme;
     document.documentElement.style.colorScheme =
       theme === "darkly" || theme === "midnight" ? "dark" : "light";

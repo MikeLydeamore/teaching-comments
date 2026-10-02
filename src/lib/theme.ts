@@ -17,6 +17,19 @@ export type ThemeName = (typeof themes)[number]["value"];
 
 export const DARK_THEMES: readonly ThemeName[] = ["darkly", "midnight"];
 
+export const THEME_FAVICON_PATHS: Record<ThemeName, string> = {
+  default: "/favicons/lightbulb-default.svg",
+  flatly: "/favicons/lightbulb-flatly.svg",
+  minty: "/favicons/lightbulb-minty.svg",
+  cerulean: "/favicons/lightbulb-cerulean.svg",
+  pulse: "/favicons/lightbulb-pulse.svg",
+  solar: "/favicons/lightbulb-solar.svg",
+  amethyst: "/favicons/lightbulb-amethyst.svg",
+  midnight: "/favicons/lightbulb-midnight.svg",
+  blush: "/favicons/lightbulb-blush.svg",
+  darkly: "/favicons/lightbulb-darkly.svg",
+};
+
 export function isThemeName(value: string | null): value is ThemeName {
   return themes.some((theme) => theme.value === value);
 }
@@ -30,6 +43,17 @@ export function storedTheme(): ThemeName {
   return isThemeName(value) ? value : "default";
 }
 
+export function faviconPath(theme: ThemeName) {
+  return THEME_FAVICON_PATHS[theme];
+}
+
+function applyFavicon(theme: ThemeName) {
+  const favicon = document.querySelector<HTMLLinkElement>("#edie-favicon");
+  if (favicon) {
+    favicon.href = faviconPath(theme);
+  }
+}
+
 export function applyTheme(theme: ThemeName) {
   if (theme === "default") {
     document.documentElement.removeAttribute("data-edie-theme");
@@ -40,4 +64,6 @@ export function applyTheme(theme: ThemeName) {
       ? "dark"
       : "light";
   }
+
+  applyFavicon(theme);
 }
