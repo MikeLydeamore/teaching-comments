@@ -3,18 +3,25 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
+import { requireParticipantAdmission } from "@/lib/participant-admission";
 import { IMAGE_CONTENT_TYPES, MAX_IMAGE_BYTES, imageUploadsEnabled, isUuid, sessionHash, signImageTicket, uploadClientCookieName, type ImageContentType } from "@/lib/image-upload";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/sessions/[sessionCode]/image-upload">) {
   if (!imageUploadsEnabled()) return Response.json({ error: "Image uploads are unavailable." }, { status: 404 });
   const { sessionCode } = await ctx.params;
-  const body = (await request.json().catch(() => ({}))) as { contentType?: unknown; byteSize?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { contentType?: unknown; byteSize?: unknown; participantId?: unknown };
   if (!IMAGE_CONTENT_TYPES.includes(body.contentType as ImageContentType) || !Number.isSafeInteger(body.byteSize) || (body.byteSize as number) < 1 || (body.byteSize as number) > MAX_IMAGE_BYTES) return Response.json({ error: "Choose a PNG, JPEG, or WebP image up to 10 MiB." }, { status: 400 });
   const session = await getSession(sessionCode);
   if (!session || !session.isOpen) return Response.json({ error: "This Ed.ie session is closed or unavailable." }, { status: 400 });
   if (!session.imageInputEnabled) return Response.json({ error: "Image responses are disabled for this session." }, { status: 400 });
   const cookieStore = await cookies();
   if (cookieStore.get(studentConsentCookieName(session.id))?.value !== "accepted") return Response.json({ error: "Please join the session and acknowledge the privacy notice first." }, { status: 403 });
+  try {
+    const capacityResponse = await requireParticipantAdmission(session, String(body.participantId ?? ""));
+    if (capacityResponse) return capacityResponse;
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "A valid participant identifier is required." }, { status: 400 });
+  }
   let clientId = cookieStore.get(uploadClientCookieName(session.id))?.value;
   const response = NextResponse.json(await (async () => {
     if (!isUuid(clientId)) clientId = randomUUID();

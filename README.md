@@ -152,12 +152,17 @@ pay for their own infrastructure and support. Set `EDIE_DEPLOYMENT_MODE` to
 `community`; no subscription or quota configuration is required.
 
 The Ed.ie-managed service sets `EDIE_DEPLOYMENT_MODE=cloud` and configures the
-Free and Pro quotas with `EDIE_CLOUD_FREE_OWNED_SPACES_LIMIT`,
+Free and Pro quotas with `EDIE_CLOUD_FREE_CONCURRENT_PARTICIPANTS_LIMIT`,
+`EDIE_CLOUD_PRO_CONCURRENT_PARTICIPANTS_LIMIT`,
+`EDIE_CLOUD_FREE_OWNED_SPACES_LIMIT`,
 `EDIE_CLOUD_FREE_TEACHER_SEATS_LIMIT`,
 `EDIE_CLOUD_PRO_OWNED_SPACES_LIMIT`, and
 `EDIE_CLOUD_PRO_TEACHER_SEATS_LIMIT`. Each value is a non-negative integer or
-`unlimited`. Cloud organisations without an active or trialling subscription
-row receive the Free quotas.
+`unlimited`. Concurrent participant limits apply independently to each live
+session. Cloud deployments also require `REDIS_URL` for atomic participant
+admission. If Redis becomes unavailable at runtime, sessions fail open so an
+infrastructure problem does not interrupt a class. Cloud organisations without
+an active or trialling subscription row receive the Free quotas.
 
 Until billing synchronization is added, an operator can assign Pro with the
 database owner connection:

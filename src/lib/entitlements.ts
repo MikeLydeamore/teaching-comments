@@ -27,6 +27,7 @@ function cloudPlan(plan: "free" | "pro", env: Environment): Entitlements {
   return {
     plan,
     limits: {
+      concurrentParticipants: parseLimit(env, `${prefix}_CONCURRENT_PARTICIPANTS_LIMIT`),
       ownedSpaces: parseLimit(env, `${prefix}_OWNED_SPACES_LIMIT`),
       teacherSeats: parseLimit(env, `${prefix}_TEACHER_SEATS_LIMIT`),
     },
@@ -49,6 +50,9 @@ export function validateEntitlementConfiguration(env: Environment = process.env)
   if (!env.DATABASE_URL?.trim()) {
     throw new Error("Cloud mode requires DATABASE_URL.");
   }
+  if (!env.REDIS_URL?.trim()) {
+    throw new Error("Cloud mode requires REDIS_URL for participant capacity enforcement.");
+  }
   cloudPlan("free", env);
   cloudPlan("pro", env);
 }
@@ -58,7 +62,11 @@ export class CommunityEntitlementProvider implements EntitlementProvider {
     void organizationId;
     return {
       plan: "community",
-      limits: { ownedSpaces: null, teacherSeats: null },
+      limits: {
+        concurrentParticipants: null,
+        ownedSpaces: null,
+        teacherSeats: null,
+      },
     };
   }
 }

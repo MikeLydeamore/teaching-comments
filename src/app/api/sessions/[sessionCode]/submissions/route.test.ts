@@ -5,11 +5,13 @@ const {
   getSessionMock,
   hasForbiddenImageFieldsMock,
   publishInvalidationMock,
+  requireParticipantAdmissionMock,
 } = vi.hoisted(() => ({
   addSubmissionMock: vi.fn(),
   getSessionMock: vi.fn(),
   hasForbiddenImageFieldsMock: vi.fn(),
   publishInvalidationMock: vi.fn(),
+  requireParticipantAdmissionMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -54,6 +56,9 @@ vi.mock("@/lib/submission-time-range", () => ({
 vi.mock("@/lib/submission-view-realtime", () => ({
   publishSubmissionViewInvalidation: publishInvalidationMock,
 }));
+vi.mock("@/lib/participant-admission", () => ({
+  requireParticipantAdmission: requireParticipantAdmissionMock,
+}));
 
 import { POST } from "./route";
 
@@ -69,6 +74,7 @@ beforeEach(() => {
   getSessionMock.mockReset();
   hasForbiddenImageFieldsMock.mockReset();
   publishInvalidationMock.mockReset();
+  requireParticipantAdmissionMock.mockReset();
   getSessionMock.mockResolvedValue(session);
   hasForbiddenImageFieldsMock.mockReturnValue(false);
   addSubmissionMock.mockResolvedValue({
@@ -78,6 +84,7 @@ beforeEach(() => {
     text: "Hello",
   });
   publishInvalidationMock.mockResolvedValue(true);
+  requireParticipantAdmissionMock.mockResolvedValue(null);
 });
 
 describe("submission creation route", () => {
@@ -107,5 +114,26 @@ describe("submission creation route", () => {
 
     expect(response.status).toBe(400);
     expect(publishInvalidationMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the capacity response before committing a submission", async () => {
+    requireParticipantAdmissionMock.mockResolvedValue(
+      Response.json(
+        { code: "SESSION_CAPACITY_REACHED", error: "This session is currently full." },
+        { status: 429, headers: { "Retry-After": "3" } },
+      ),
+    );
+
+    const response = await POST(
+      new Request("https://example.test/api/sessions/session-1/submissions", {
+        method: "POST",
+        body: JSON.stringify({ participantId: "participant_123", text: "Hello" }),
+      }),
+      context as never,
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("3");
+    expect(addSubmissionMock).not.toHaveBeenCalled();
   });
 });

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   disconnectMock,
+  evalMock,
   publishMock,
-  zaddMock,
   zcardMock,
   zremrangebyscoreMock,
 } = vi.hoisted(() => ({
   disconnectMock: vi.fn(),
+  evalMock: vi.fn(),
   publishMock: vi.fn(),
-  zaddMock: vi.fn(),
   zcardMock: vi.fn(),
   zremrangebyscoreMock: vi.fn(),
 }));
@@ -18,8 +18,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("ioredis", () => ({
   default: class FakeRedis {
     disconnect = disconnectMock;
+    eval = evalMock;
     publish = publishMock;
-    zadd = zaddMock;
     zcard = zcardMock;
     zremrangebyscore = zremrangebyscoreMock;
     on() {
@@ -29,9 +29,9 @@ vi.mock("ioredis", () => ({
 }));
 
 import {
+  admitSessionParticipant,
   countSessionPresence,
   publishSubmissionViewInvalidation,
-  recordSessionPresence,
   sessionPresenceKey,
   submissionViewRealtimeChannel,
   submissionViewRealtimeConfigured,
@@ -41,8 +41,8 @@ const previousRedisUrl = process.env.REDIS_URL;
 
 beforeEach(() => {
   disconnectMock.mockReset();
+  evalMock.mockReset();
   publishMock.mockReset();
-  zaddMock.mockReset();
   zcardMock.mockReset();
   zremrangebyscoreMock.mockReset();
 });
@@ -72,9 +72,8 @@ describe("submission view realtime", () => {
     await expect(publishSubmissionViewInvalidation("session-1")).resolves.toBe(
       false,
     );
-    await expect(
-      recordSessionPresence("session-1", "participant_123"),
-    ).resolves.toBe(false);
+    await expect(admitSessionParticipant("session-1", "participant_123", 30))
+      .resolves.toEqual({ status: "admitted", connectedParticipants: null });
     await expect(countSessionPresence("session-1")).resolves.toBeNull();
   });
 
@@ -105,27 +104,58 @@ describe("submission view realtime", () => {
     consoleError.mockRestore();
   });
 
-  it("records validated anonymous presence under an opaque session key", async () => {
+  it("atomically admits a participant under an opaque session key", async () => {
     process.env.REDIS_URL = "rediss://example.test";
-    zaddMock.mockResolvedValue(1);
+    evalMock.mockResolvedValue([1, 3]);
 
     await expect(
-      recordSessionPresence("space-a/session", "participant_123", 50_000),
-    ).resolves.toBe(true);
+      admitSessionParticipant("space-a/session", "participant_123", 30, 50_000),
+    ).resolves.toEqual({ status: "admitted", connectedParticipants: 3 });
 
     const key = sessionPresenceKey("space-a/session");
     expect(key).toMatch(/^edie:session-presence:/);
     expect(key).not.toContain("space-a/session");
-    expect(zaddMock).toHaveBeenCalledWith(key, 50_000, "participant_123");
+    expect(evalMock).toHaveBeenCalledWith(
+      expect.stringContaining('redis.call("ZREMRANGEBYSCORE"'),
+      1,
+      key,
+      25_000,
+      50_000,
+      "participant_123",
+      30,
+    );
   });
 
-  it("ignores malformed participant IDs", async () => {
+  it("reports full capacity and supports unlimited admission", async () => {
     process.env.REDIS_URL = "rediss://example.test";
+    evalMock.mockResolvedValueOnce([0, 30]).mockResolvedValueOnce([1, 31]);
 
     await expect(
-      recordSessionPresence("session-1", "short", 50_000),
-    ).resolves.toBe(false);
-    expect(zaddMock).not.toHaveBeenCalled();
+      admitSessionParticipant("session-1", "participant_123", 30, 50_000),
+    ).resolves.toEqual({ status: "full", connectedParticipants: 30 });
+    await expect(
+      admitSessionParticipant("session-1", "participant_456", null, 50_000),
+    ).resolves.toEqual({ status: "admitted", connectedParticipants: 31 });
+    expect(evalMock.mock.calls[1].at(-1)).toBe(-1);
+  });
+
+  it("rejects malformed participant IDs", async () => {
+    process.env.REDIS_URL = "rediss://example.test";
+    await expect(admitSessionParticipant("session-1", "short", 30, 50_000))
+      .rejects.toThrow("participant identifier");
+    expect(evalMock).not.toHaveBeenCalled();
+  });
+
+  it("fails open when atomic admission is unavailable", async () => {
+    process.env.REDIS_URL = "rediss://example.test";
+    evalMock.mockRejectedValue(new Error("unavailable"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(admitSessionParticipant("session-1", "participant_123", 30))
+      .resolves.toEqual({ status: "admitted", connectedParticipants: null });
+    expect(disconnectMock).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("prunes stale presence before returning the unique count", async () => {

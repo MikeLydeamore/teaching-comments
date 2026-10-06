@@ -10,6 +10,27 @@ const PRESENCE_ACTIVE_WINDOW_MS = 25_000;
 const PUBLISH_CONNECT_TIMEOUT_MS = 2_000;
 const PUBLISH_COMMAND_TIMEOUT_MS = 2_000;
 
+const ADMIT_PARTICIPANT_SCRIPT = `
+redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", ARGV[1])
+local existing = redis.call("ZSCORE", KEYS[1], ARGV[3])
+if existing then
+  redis.call("ZADD", KEYS[1], ARGV[2], ARGV[3])
+  return {1, redis.call("ZCARD", KEYS[1])}
+end
+local count = redis.call("ZCARD", KEYS[1])
+local limit = tonumber(ARGV[4])
+if limit < 0 or count < limit then
+  redis.call("ZADD", KEYS[1], ARGV[2], ARGV[3])
+  return {1, count + 1}
+end
+return {0, count}
+`;
+
+export type ParticipantAdmission = {
+  status: "admitted" | "full";
+  connectedParticipants: number | null;
+};
+
 let commandClient: Redis | null = null;
 
 function redisUrl() {
@@ -105,37 +126,46 @@ export async function publishSubmissionViewInvalidation(
   }
 }
 
-export async function recordSessionPresence(
+export async function admitSessionParticipant(
   sessionId: string,
   participantId: string,
+  limit: number | null,
   currentTime = Date.now(),
-): Promise<boolean> {
+): Promise<ParticipantAdmission> {
   const url = redisUrl();
 
   if (!url) {
-    return false;
+    return { status: "admitted", connectedParticipants: null };
   }
 
   let normalizedParticipantId: string;
   try {
     normalizedParticipantId = validatePollParticipantId(participantId);
   } catch {
-    return false;
+    throw new Error("A valid participant identifier is required.");
   }
 
   const client = reusableCommandClient(url);
 
   try {
-    await client.zadd(
+    const result = (await client.eval(
+      ADMIT_PARTICIPANT_SCRIPT,
+      1,
       sessionPresenceKey(sessionId),
+      currentTime - PRESENCE_ACTIVE_WINDOW_MS,
       currentTime,
       normalizedParticipantId,
-    );
-    return true;
+      limit === null ? -1 : limit,
+    )) as [number, number];
+
+    return {
+      status: Number(result[0]) === 1 ? "admitted" : "full",
+      connectedParticipants: Number(result[1]),
+    };
   } catch (error) {
     logRedisFailure("presence-write", error);
     discardCommandClient(client);
-    return false;
+    return { status: "admitted", connectedParticipants: null };
   }
 }
 

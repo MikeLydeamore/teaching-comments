@@ -5,8 +5,10 @@ import { InlineCodeText } from "@/components/InlineCodeText";
 import { formatTimerSeconds } from "@/components/SessionTimer";
 import { SubmissionMarkdown } from "@/components/SubmissionMarkdown";
 import type { ParticipantPoll } from "@/lib/edie-store";
+import { SESSION_CAPACITY_ERROR_CODE } from "@/lib/participant-capacity";
 
 type ParticipantPollOverlayProps = {
+  onCapacityReached?: () => void;
   participantId: string;
   poll: ParticipantPoll;
 };
@@ -19,6 +21,7 @@ function selectionsMatch(left: string[], right: string[]) {
 }
 
 export function ParticipantPollOverlay({
+  onCapacityReached,
   participantId,
   poll,
 }: ParticipantPollOverlayProps) {
@@ -90,6 +93,7 @@ export function ParticipantPollOverlay({
         const payload = await response.json().catch(() => ({}));
 
         if (!response.ok) {
+          if (payload.code === SESSION_CAPACITY_ERROR_CODE) onCapacityReached?.();
           selectedOptionIdsRef.current = savedOptionIdsRef.current;
           setSelectedOptionIds(savedOptionIdsRef.current);
           setStatus(payload.error ?? "Could not save answer.");

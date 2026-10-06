@@ -1,5 +1,5 @@
 export type PlanKey = "community" | "free" | "pro";
-export type LimitKey = "ownedSpaces" | "teacherSeats";
+export type LimitKey = "ownedSpaces" | "teacherSeats" | "concurrentParticipants";
 
 export type Entitlements = {
   plan: PlanKey;
@@ -18,7 +18,9 @@ export class EntitlementLimitError extends Error {
     super(
       limitKey === "ownedSpaces"
         ? `This organisation has reached its limit of ${limit} hosted ${limit === 1 ? "space" : "spaces"}.`
-        : `This organisation has reached its limit of ${limit} teacher ${limit === 1 ? "seat" : "seats"}.`,
+        : limitKey === "teacherSeats"
+          ? `This organisation has reached its limit of ${limit} teacher ${limit === 1 ? "seat" : "seats"}.`
+          : `This session has reached its limit of ${limit} concurrent ${limit === 1 ? "participant" : "participants"}.`,
     );
     this.name = "EntitlementLimitError";
   }

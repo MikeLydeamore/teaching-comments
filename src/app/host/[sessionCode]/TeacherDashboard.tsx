@@ -106,6 +106,7 @@ type TeacherDashboardProps = {
   initialQuestionBank: QuestionBankItem[];
   initialSubmissionViewSettings: SubmissionViewSettings;
   onboardingScope: string;
+  participantLimit: number | null;
   session: Session;
   initialStats: Stats;
   spaceCode?: string;
@@ -451,6 +452,7 @@ function TeacherDashboardContent({
   initialQuestionBank,
   initialSubmissionViewSettings,
   onboardingScope,
+  participantLimit,
   session,
   initialStats,
   spaceCode,
@@ -1656,6 +1658,7 @@ function TeacherDashboardContent({
             <div className="flex flex-wrap items-center gap-3">
               <ConnectedParticipantBadge
                 connectedParticipants={connectedParticipants}
+                limit={participantLimit}
                 status={submissionRealtimeStatus}
               />
               <button

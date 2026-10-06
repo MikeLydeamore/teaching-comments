@@ -20,6 +20,7 @@ import { SubmissionMarkdownEditor } from "@/components/SubmissionMarkdownEditor"
 import { getOrCreatePollParticipantId } from "@/lib/poll-participant";
 import { isMarkdownSubmitShortcut } from "@/lib/submission-markdown-editor";
 import { studentPresenceHeartbeatIsDue } from "@/lib/student-presence";
+import { SESSION_CAPACITY_ERROR_CODE } from "@/lib/participant-capacity";
 import type { DrawingData, GifData, ParticipantPoll } from "@/lib/edie-store";
 
 type StudentSubmitProps = {
@@ -97,6 +98,10 @@ export function StudentSubmit({
     typeof window === "undefined" ? "" : getOrCreatePollParticipantId(),
   );
   const lastPresenceHeartbeatAtRef = useRef<number | null>(null);
+  const [admissionStatus, setAdmissionStatus] = useState<
+    "checking" | "admitted" | "full"
+  >("checking");
+  const [isCheckingCapacity, setIsCheckingCapacity] = useState(false);
   const [activePoll, setActivePoll] = useState<ParticipantPoll | null>(null);
   const [text, setText] = useState("");
   const [drawingData, setDrawingData] = useState<DrawingData | null>(null);
@@ -131,28 +136,34 @@ export function StudentSubmit({
       query.set("participantId", pollParticipantId);
 
       const currentTime = Date.now();
-      if (
-        document.visibilityState === "visible" &&
-        studentPresenceHeartbeatIsDue(
-          lastPresenceHeartbeatAtRef.current,
-          currentTime,
-        )
-      ) {
+      if (document.visibilityState === "visible" && (
+        admissionStatus !== "admitted" ||
+        studentPresenceHeartbeatIsDue(lastPresenceHeartbeatAtRef.current, currentTime)
+      )) {
         query.set("presence", "1");
-        lastPresenceHeartbeatAtRef.current = currentTime;
       }
     }
 
     const queryString = query.toString();
+    if (admissionStatus !== "admitted") setIsCheckingCapacity(true);
     const response = await fetch(
       `/api/sessions/${sessionId}/student${queryString ? `?${queryString}` : ""}`,
-    );
+    ).catch(() => null);
+    setIsCheckingCapacity(false);
 
-    if (!response.ok) {
+    if (!response?.ok) {
       return;
     }
 
     const payload = await response.json();
+    if (payload.admission?.status === "full") {
+      setAdmissionStatus("full");
+      return;
+    }
+    if (payload.admission?.status === "admitted") {
+      lastPresenceHeartbeatAtRef.current = Date.now();
+      setAdmissionStatus("admitted");
+    }
     const nextPrompt = payload.session?.prompt;
     const nextIsOpen = payload.session?.isOpen;
     const nextTimerEndsAt = payload.session?.timerEndsAt;
@@ -188,17 +199,20 @@ export function StudentSubmit({
     if (typeof nextDrawingInputEnabled === "boolean") setDrawingInputEnabled(nextDrawingInputEnabled);
     if (typeof nextImageInputEnabled === "boolean") setImageInputEnabled(nextImageInputEnabled);
     if (typeof nextImageEmbedsEnabled === "boolean") setImageEmbedsEnabled(nextImageEmbedsEnabled);
-  }, [pollParticipantId, sessionId]);
+  }, [admissionStatus, pollParticipantId, sessionId]);
 
   useEffect(() => {
     const firstRefresh = window.setTimeout(() => {
       void refreshSession();
     }, 0);
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void refreshSession();
-      }
-    }, 3000);
+    let timer: number | undefined;
+    const scheduleRefresh = () => {
+      timer = window.setTimeout(() => {
+        if (document.visibilityState === "visible") void refreshSession();
+        scheduleRefresh();
+      }, 2500 + Math.floor(Math.random() * 1000));
+    };
+    scheduleRefresh();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -209,7 +223,7 @@ export function StudentSubmit({
 
     return () => {
       window.clearTimeout(firstRefresh);
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshSession]);
@@ -233,9 +247,9 @@ export function StudentSubmit({
       setImageStatus("Saving your response…");
     } else if (activeImage) {
       setImageStatus("Preparing secure upload…");
-      const allocation = await fetch(`/api/sessions/${sessionId}/image-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: activeImage.contentType, byteSize: activeImage.blob.size }) });
+      const allocation = await fetch(`/api/sessions/${sessionId}/image-upload`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contentType: activeImage.contentType, byteSize: activeImage.blob.size, participantId: pollParticipantId }) });
       const allocated = await allocation.json().catch(() => ({}));
-      if (!allocation.ok) { setIsSaving(false); setImageStatus(""); setError(allocated.error ?? "Could not prepare the image upload."); return; }
+      if (!allocation.ok) { if (allocated.code === SESSION_CAPACITY_ERROR_CODE) setAdmissionStatus("full"); setIsSaving(false); setImageStatus(""); setError(allocated.error ?? "Could not prepare the image upload."); return; }
       setImageStatus("Uploading image… 0%");
       try {
         uploadEtag = await uploadImage(allocated.uploadUrl, activeImage, (percent) => setImageStatus(`Uploading image… ${percent}%`));
@@ -257,6 +271,7 @@ export function StudentSubmit({
         studentName,
         text: activeText,
         website,
+        participantId: pollParticipantId,
         finalizeTicket,
         uploadEtag,
       }),
@@ -267,6 +282,7 @@ export function StudentSubmit({
     setImageStatus("");
 
     if (!response.ok) {
+      if (payload.code === SESSION_CAPACITY_ERROR_CODE) setAdmissionStatus("full");
       if (payload.imageReceiptInvalid) setUploadReceipt(null);
       setError(payload.error ?? "Could not save your writing.");
       return;
@@ -284,6 +300,34 @@ export function StudentSubmit({
       setImageStatus("");
       setError(`${reason instanceof Error ? reason.message : "Could not save your response."} Your response is still here to retry.`);
     }
+  }
+
+  if (admissionStatus !== "admitted") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-8">
+        <section className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm" aria-live="polite">
+          <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
+            Ed.ie
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950">
+            {admissionStatus === "full" ? "This session is currently full" : "Checking session capacity"}
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            {admissionStatus === "full"
+              ? "Keep this page open. We’ll let you in automatically when a place becomes available."
+              : "Please wait while we reserve your place."}
+          </p>
+          <button
+            className="mt-5 inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800 disabled:cursor-wait disabled:opacity-60"
+            disabled={isCheckingCapacity}
+            onClick={() => void refreshSession()}
+            type="button"
+          >
+            {isCheckingCapacity ? "Checking…" : "Try again"}
+          </button>
+        </section>
+      </main>
+    );
   }
 
   function handleTextKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -310,6 +354,7 @@ export function StudentSubmit({
       {activePoll && pollParticipantId ? (
         <ParticipantPollOverlay
           key={activePoll.id}
+          onCapacityReached={() => setAdmissionStatus("full")}
           participantId={pollParticipantId}
           poll={activePoll}
         />
@@ -461,6 +506,8 @@ export function StudentSubmit({
           canAsk={sessionIsOpen}
           canVote={sessionIsOpen}
           className="lg:sticky lg:top-5"
+          onCapacityReached={() => setAdmissionStatus("full")}
+          participantId={pollParticipantId}
           sessionCode={sessionId}
           studentName={studentName}
         />

@@ -11,6 +11,7 @@ import {
   listQuestionBank,
 } from "@/lib/edie-store";
 import { loginRedirectPath, resolveSpaceAccess } from "@/lib/teacher-session-auth";
+import { entitlementsForOrganization } from "@/lib/entitlements";
 import { TeacherDashboard } from "../TeacherDashboard";
 
 export default async function TeacherSpaceSessionPage({
@@ -43,6 +44,8 @@ export default async function TeacherSpaceSessionPage({
   const promptHistory = await listPromptHistory(session.id);
   const questionBank = await listQuestionBank(session.id);
   const submissionViewSettings = await getSubmissionViewSettings(session.id);
+  const participantLimit = (await entitlementsForOrganization(space.organizationId))
+    .limits.concurrentParticipants;
 
   if (!submissionViewSettings) {
     throw new Error("Session display settings are unavailable.");
@@ -57,6 +60,7 @@ export default async function TeacherSpaceSessionPage({
         initialStats={stats}
         initialSubmissionViewSettings={submissionViewSettings}
         onboardingScope={teacher?.id ?? "teacher"}
+        participantLimit={participantLimit}
         session={session}
         spaceCode={space.code}
         spaceName={space.name}

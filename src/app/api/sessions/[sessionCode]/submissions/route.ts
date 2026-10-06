@@ -7,6 +7,7 @@ import { committedObjectKey, hasForbiddenImageFields, ImageTicketVerificationErr
 import type { SubmissionImageData } from "@/lib/edie-store";
 import { assertSubmissionUsesEnabledInputs, validateSubmissionContent, normalizeStudentName } from "@/lib/edie-store-model";
 import { publishSubmissionViewInvalidation } from "@/lib/submission-view-realtime";
+import { requireParticipantAdmission } from "@/lib/participant-admission";
 
 class ImageReceiptError extends Error {
   constructor(message: string, readonly invalidReceipt: boolean) { super(message); }
@@ -69,6 +70,7 @@ export async function POST(
     website?: string;
     finalizeTicket?: unknown;
     uploadEtag?: unknown;
+    participantId?: string;
   };
 
   try {
@@ -96,6 +98,12 @@ export async function POST(
         { status: 403 },
       );
     }
+
+    const capacityResponse = await requireParticipantAdmission(
+      canonicalSession,
+      String(body.participantId ?? ""),
+    );
+    if (capacityResponse) return capacityResponse;
 
     const hasFinalize = typeof body.finalizeTicket === "string";
     const hasEtag = typeof body.uploadEtag === "string";

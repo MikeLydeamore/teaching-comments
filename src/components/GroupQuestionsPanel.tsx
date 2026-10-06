@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GroupQuestion } from "@/lib/edie-store";
 import { formatTimeAgo } from "@/lib/relative-time";
+import { SESSION_CAPACITY_ERROR_CODE } from "@/lib/participant-capacity";
 
 type GroupQuestionsPanelProps = {
   canAsk?: boolean;
   canVote?: boolean;
   className?: string;
+  onCapacityReached?: () => void;
+  participantId?: string;
   sessionCode: string;
   studentName?: string;
   variant?: "student" | "teacher";
@@ -68,6 +71,8 @@ export function GroupQuestionsPanel({
   canAsk = false,
   canVote = true,
   className = "",
+  onCapacityReached,
+  participantId,
   sessionCode,
   studentName = "",
   variant = "student",
@@ -175,6 +180,7 @@ export function GroupQuestionsPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        participantId,
         studentName,
         text: questionDraft,
         website,
@@ -184,6 +190,7 @@ export function GroupQuestionsPanel({
     setIsSaving(false);
 
     if (!response.ok) {
+      if (payload.code === SESSION_CAPACITY_ERROR_CODE) onCapacityReached?.();
       setStatus(payload.error ?? "Could not save question.");
       return;
     }
@@ -226,13 +233,13 @@ export function GroupQuestionsPanel({
     );
 
     let response: Response;
-    let payload: { error?: string; question?: GroupQuestion };
+    let payload: { code?: string; error?: string; question?: GroupQuestion };
 
     try {
       response = await fetch(`/api/group-questions/${question.id}/vote`, {
         method: question.hasVoted ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voterId }),
+        body: JSON.stringify({ participantId, voterId }),
       });
       payload = await response.json().catch(() => ({}));
     } catch {
@@ -255,6 +262,10 @@ export function GroupQuestionsPanel({
       );
       setStatus("Could not save vote.");
       return;
+    }
+
+    if (!response.ok && payload.code === SESSION_CAPACITY_ERROR_CODE) {
+      onCapacityReached?.();
     }
 
     pendingVotesRef.current.delete(question.id);

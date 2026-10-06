@@ -119,7 +119,7 @@ export default async function OrganizationPage({
           </p>
         ) : null}
 
-        <section className="mt-4 grid gap-4 sm:grid-cols-2">
+        <section className="mt-4 grid gap-4 sm:grid-cols-3">
           <article className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-600">Hosted spaces</p>
             <p className="mt-2 text-3xl font-semibold text-slate-950">
@@ -139,6 +139,15 @@ export default async function OrganizationPage({
             <p className="mt-2 text-sm text-slate-600">
               {usageLabel(members.length, entitlements.limits.teacherSeats, "seat")}
               {pendingInvitations ? ` · ${pendingInvitations} pending invitations do not use seats` : ""}
+            </p>
+          </article>
+          <article className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-slate-600">Concurrent participants</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-950">
+              {limitLabel(entitlements.limits.concurrentParticipants)}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Maximum active participant browsers per session.
             </p>
           </article>
         </section>

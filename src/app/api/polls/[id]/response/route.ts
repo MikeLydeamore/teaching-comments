@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { getPoll, getSession, savePollResponse } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
+import { requireParticipantAdmission } from "@/lib/participant-admission";
 
 export async function PUT(
   request: Request,
@@ -8,8 +9,9 @@ export async function PUT(
 ) {
   const { id } = await ctx.params;
   const poll = await getPoll(id);
+  const session = poll ? await getSession(poll.sessionCode) : null;
 
-  if (!poll || !(await getSession(poll.sessionCode))) {
+  if (!poll || !session) {
     return Response.json({ error: "Poll not found." }, { status: 404 });
   }
 
@@ -31,6 +33,12 @@ export async function PUT(
   };
 
   try {
+    const capacityResponse = await requireParticipantAdmission(
+      session,
+      String(body.participantId ?? ""),
+    );
+    if (capacityResponse) return capacityResponse;
+
     const response = await savePollResponse(
       poll.id,
       String(body.participantId ?? ""),

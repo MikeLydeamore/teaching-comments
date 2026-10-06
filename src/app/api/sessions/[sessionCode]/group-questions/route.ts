@@ -1,12 +1,14 @@
 import { addGroupQuestion, getSession, listGroupQuestions } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
+import { requireParticipantAdmission } from "@/lib/participant-admission";
 
 export async function GET(
   request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/group-questions">,
 ) {
   const { sessionCode } = await ctx.params;
-  if (!(await getSession(sessionCode))) {
+  const session = await getSession(sessionCode);
+  if (!session) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
   const url = new URL(request.url);
@@ -38,19 +40,27 @@ export async function POST(
   ctx: RouteContext<"/api/sessions/[sessionCode]/group-questions">,
 ) {
   const { sessionCode } = await ctx.params;
-  if (!(await getSession(sessionCode))) {
+  const session = await getSession(sessionCode);
+  if (!session) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
   const body = (await request.json().catch(() => ({}))) as {
     studentName?: string;
     text?: string;
     website?: string;
+    participantId?: string;
   };
 
   try {
     if (body.website) {
       return Response.json({ error: "Could not save question." }, { status: 400 });
     }
+
+    const capacityResponse = await requireParticipantAdmission(
+      session,
+      String(body.participantId ?? ""),
+    );
+    if (capacityResponse) return capacityResponse;
 
     const question = await addGroupQuestion(
       sessionCode,

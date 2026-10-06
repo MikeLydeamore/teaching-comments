@@ -4,17 +4,14 @@ import {
   getSession,
   type ParticipantPoll,
 } from "@/lib/edie-store";
-import { recordSessionPresence } from "@/lib/submission-view-realtime";
+import { admitParticipant } from "@/lib/participant-admission";
 
 export async function GET(
   request: Request,
   ctx: RouteContext<"/api/sessions/[sessionCode]/student">,
 ) {
   const { sessionCode } = await ctx.params;
-  const [session, poll] = await Promise.all([
-    getSession(sessionCode),
-    getActivePoll(sessionCode).catch(() => null),
-  ]);
+  const session = await getSession(sessionCode);
 
   if (!session) {
     return Response.json({ error: "Session not found." }, { status: 404 });
@@ -22,10 +19,27 @@ export async function GET(
 
   const searchParams = new URL(request.url).searchParams;
   const participantId = searchParams.get("participantId") ?? "";
-  const presencePromise =
-    searchParams.get("presence") === "1" && participantId
-      ? recordSessionPresence(session.id, participantId)
-      : Promise.resolve(false);
+  let admission = null;
+
+  if (searchParams.get("presence") === "1") {
+    try {
+      admission = await admitParticipant(session, participantId);
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "A valid participant identifier is required." },
+        { status: 400 },
+      );
+    }
+
+    if (admission.status === "full") {
+      return Response.json({
+        admission,
+        session: { isOpen: session.isOpen },
+      });
+    }
+  }
+
+  const poll = await getActivePoll(sessionCode).catch(() => null);
   const availablePoll = session.isOpen ? poll : null;
   const participantPoll = availablePoll
     ? {
@@ -58,10 +72,9 @@ export async function GET(
     }
   }
 
-  await presencePromise;
-
   return Response.json({
     activePoll,
+    admission,
     session: {
       code: session.code,
       isOpen: session.isOpen,

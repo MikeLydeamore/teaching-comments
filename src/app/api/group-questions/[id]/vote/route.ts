@@ -1,8 +1,12 @@
 import { getGroupQuestion, getSession, unvoteGroupQuestion, upvoteGroupQuestion } from "@/lib/edie-store";
+import { requireParticipantAdmission } from "@/lib/participant-admission";
+import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 async function questionIsAvailable(id: string) {
   const question = await getGroupQuestion(id);
-  return Boolean(question && await getSession(question.sessionCode));
+  if (!question) return null;
+  const session = await getSession(question.sessionCode);
+  return session ? { question, session } : null;
 }
 
 export async function POST(
@@ -10,12 +14,18 @@ export async function POST(
   ctx: RouteContext<"/api/group-questions/[id]/vote">,
 ) {
   const { id } = await ctx.params;
-  if (!(await questionIsAvailable(id))) {
+  const available = await questionIsAvailable(id);
+  if (!available) {
     return Response.json({ error: "Question not found." }, { status: 404 });
   }
-  const body = (await request.json().catch(() => ({}))) as { voterId?: string };
+  const body = (await request.json().catch(() => ({}))) as { participantId?: string; voterId?: string };
 
   try {
+    const authorization = await getAuthorizedTeacherSession(available.session.id);
+    if (authorization.response) {
+      const capacityResponse = await requireParticipantAdmission(available.session, String(body.participantId ?? ""));
+      if (capacityResponse) return capacityResponse;
+    }
     const question = await upvoteGroupQuestion(id, body.voterId ?? "");
 
     if (!question) {
@@ -36,12 +46,18 @@ export async function DELETE(
   ctx: RouteContext<"/api/group-questions/[id]/vote">,
 ) {
   const { id } = await ctx.params;
-  if (!(await questionIsAvailable(id))) {
+  const available = await questionIsAvailable(id);
+  if (!available) {
     return Response.json({ error: "Question not found." }, { status: 404 });
   }
-  const body = (await request.json().catch(() => ({}))) as { voterId?: string };
+  const body = (await request.json().catch(() => ({}))) as { participantId?: string; voterId?: string };
 
   try {
+    const authorization = await getAuthorizedTeacherSession(available.session.id);
+    if (authorization.response) {
+      const capacityResponse = await requireParticipantAdmission(available.session, String(body.participantId ?? ""));
+      if (capacityResponse) return capacityResponse;
+    }
     const question = await unvoteGroupQuestion(id, body.voterId ?? "");
 
     if (!question) {
