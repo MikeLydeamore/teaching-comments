@@ -65,7 +65,7 @@ export function SpaceCardMenu({
             <svg aria-hidden="true" className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.1a7.5 7.5 0 0 1 15 0M18.75 8.25v4.5M21 10.5h-4.5" />
             </svg>
-            Manage access
+            Manage
           </Link>
           <form
             action={leaveHostedSpace}

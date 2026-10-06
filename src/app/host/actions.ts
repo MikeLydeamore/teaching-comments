@@ -7,7 +7,9 @@ import { getAuth } from "@/lib/auth";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import {
   acceptSpaceInvitation as acceptInvitation,
+  createTeacherSpaceForOwner,
   declineSpaceInvitation as declineInvitation,
+  ensurePersonalOrganization,
   getSpaceMemberRole,
   getTeacherSpace,
   leaveSpace,
@@ -125,4 +127,45 @@ export async function leaveHostedSpace(formData: FormData) {
         ? "owner-cannot-leave"
         : "membership-unavailable",
   ));
+}
+
+export async function createHostedSpace(formData: FormData) {
+  const teacher = await requireTeacher();
+  const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
+  const name = String(formData.get("spaceName") ?? "");
+
+  if (!spaceCode) {
+    redirect("/host?spaceCreate=invalid");
+  }
+
+  try {
+    const organization = await ensurePersonalOrganization(
+      teacher.id,
+      teacher.name ?? teacher.displayUsername ?? "Teacher",
+    );
+    const entitlements = await entitlementsForOrganization(organization.id);
+    await createTeacherSpaceForOwner(
+      spaceCode,
+      name,
+      {
+        userId: teacher.id,
+        name: teacher.name ?? teacher.displayUsername ?? "Teacher",
+      },
+      entitlements.limits.ownedSpaces,
+    );
+  } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect("/host?spaceCreate=space-limit");
+    }
+    const message = error instanceof Error ? error.message : "";
+    const status = message.includes("already exists")
+      ? "exists"
+      : message.startsWith("Space name") || message.startsWith("Space code")
+        ? "invalid"
+        : "unavailable";
+    redirect(`/host?spaceCreate=${status}`);
+  }
+
+  revalidatePath("/host");
+  redirect(`/host/${spaceCode}`);
 }

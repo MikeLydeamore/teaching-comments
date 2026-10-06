@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { neonMock, queryMock } = vi.hoisted(() => ({
+const { neonMock, queryMock, transactionMock } = vi.hoisted(() => ({
   neonMock: vi.fn(),
   queryMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -71,7 +72,9 @@ beforeEach(() => {
   process.env.DATABASE_URL = "postgresql://test.invalid/test";
   neonMock.mockReset();
   queryMock.mockReset();
-  neonMock.mockReturnValue({ query: queryMock });
+  transactionMock.mockReset();
+  transactionMock.mockImplementation(async (callback) => Promise.all(callback({ query: queryMock })));
+  neonMock.mockReturnValue({ query: queryMock, transaction: transactionMock });
   queryMock.mockImplementation(async (statement: string, values: unknown[] = []) => {
     if (statement.startsWith("SELECT") && statement.includes("edie_sessions")) return [sessionRow];
     if (statement.startsWith("INSERT INTO edie_submissions")) return [submissionRow(values)];
@@ -103,6 +106,52 @@ describe("Neon session image embeds", () => {
     );
     expect(update?.[0]).toContain("image_embeds_enabled=$14");
     expect(update?.[1]?.[13]).toBe(false);
+  });
+});
+
+describe("Neon hosted-space management", () => {
+  it("renames using the validated display name", async () => {
+    queryMock.mockResolvedValueOnce([{
+      code: "stats-101",
+      name: "Applied statistics",
+      organization_id: "org-1",
+      created_at: new Date("2026-01-02T03:04:05.000Z"),
+    }]);
+
+    await expect(
+      neonStore.renameTeacherSpace("stats-101", "  Applied   statistics "),
+    ).resolves.toMatchObject({ name: "Applied statistics" });
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE edie_teacher_spaces SET name"),
+      ["stats-101", "Applied statistics"],
+    );
+  });
+
+  it("marks a non-default space for deletion and closes its sessions", async () => {
+    queryMock
+      .mockResolvedValueOnce([{
+        code: "stats-101",
+        name: "Statistics",
+        organization_id: "org-1",
+        created_at: new Date("2026-01-02T03:04:05.000Z"),
+        deleted_at: new Date("2026-02-01T00:00:00.000Z"),
+        purge_after: new Date("2026-03-03T00:00:00.000Z"),
+      }])
+      .mockResolvedValueOnce([]);
+    await expect(
+      neonStore.softDeleteTeacherSpace("stats-101", "2026-02-01T00:00:00.000Z"),
+    ).resolves.toMatchObject({
+      code: "stats-101",
+      purgeAfter: "2026-03-03T00:00:00.000Z",
+    });
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("SET deleted_at = $2"),
+      ["stats-101", "2026-02-01T00:00:00.000Z", "2026-03-03T00:00:00.000Z"],
+    );
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE edie_sessions SET is_open = false"),
+      ["stats-101", "2026-02-01T00:00:00.000Z"],
+    );
   });
 });
 

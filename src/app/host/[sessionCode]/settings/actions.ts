@@ -10,6 +10,8 @@ import {
   normalizeSpaceCode,
   removeSpaceMember,
   removeSpaceInvitation,
+  renameTeacherSpace,
+  softDeleteTeacherSpace,
   updateSpaceMemberRole,
 } from "@/lib/edie-store";
 import { EntitlementLimitError, assertCapacity, entitlementsForOrganization } from "@/lib/entitlements";
@@ -30,6 +32,12 @@ function settingsPath(spaceCode: string, status = "") {
 
   const query = params.toString();
   return `/host/${spaceCode}/settings${query ? `?${query}` : ""}`;
+}
+
+function managePath(spaceCode: string, status = "") {
+  return status
+    ? `/host/${spaceCode}/settings?space=${encodeURIComponent(status)}`
+    : `/host/${spaceCode}/settings`;
 }
 
 async function requireOwner(spaceCode: string) {
@@ -160,4 +168,46 @@ export async function evictSpaceMember(formData: FormData) {
   }
   revalidatePath(settingsPath(space.code));
   redirect(settingsPath(space.code, "removed"));
+}
+
+export async function renameHostedSpace(formData: FormData) {
+  const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
+  const space = await requireOwner(spaceCode);
+
+  try {
+    const renamed = await renameTeacherSpace(
+      space.code,
+      String(formData.get("spaceName") ?? ""),
+    );
+    if (!renamed) throw new Error("Space unavailable.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    redirect(managePath(space.code, message.startsWith("Space name") ? "invalid" : "unavailable"));
+  }
+
+  revalidatePath("/host");
+  revalidatePath(`/host/${space.code}`);
+  revalidatePath(managePath(space.code));
+  redirect(managePath(space.code, "renamed"));
+}
+
+export async function deleteHostedSpace(formData: FormData) {
+  const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
+  const space = await requireOwner(spaceCode);
+  const confirmation = String(formData.get("confirmation") ?? "");
+
+  if (confirmation !== space.code) {
+    redirect(managePath(space.code, "confirmation"));
+  }
+
+  try {
+    if (!(await softDeleteTeacherSpace(space.code))) {
+      throw new Error("Space unavailable.");
+    }
+  } catch {
+    redirect(managePath(space.code, "unavailable"));
+  }
+
+  revalidatePath("/host");
+  redirect("/host?space=deleted");
 }

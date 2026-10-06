@@ -59,6 +59,8 @@ export type TeacherSpace = {
   name: string;
   organizationId: string;
   createdAt: string;
+  deletedAt: string | null;
+  purgeAfter: string | null;
 };
 
 export type TeacherSpaceSummary = TeacherSpace;
@@ -426,6 +428,14 @@ export type EdieStore = {
     owner: { userId: string; name: string },
     ownedSpacesLimit?: CapacityLimit,
   ): Promise<TeacherSpace>;
+  renameTeacherSpace(code: string, name: string): Promise<TeacherSpace | null>;
+  softDeleteTeacherSpace(code: string, deletedAt?: string): Promise<TeacherSpace | null>;
+  restoreTeacherSpace(
+    code: string,
+    ownedSpacesLimit?: CapacityLimit,
+  ): Promise<TeacherSpace | null>;
+  listDeletedTeacherSpaces(): Promise<TeacherSpaceSummary[]>;
+  purgeDeletedTeacherSpaces(cutoff?: string): Promise<number>;
   getOrganizationMemberRole(
     organizationId: string,
     userId: string,
@@ -647,6 +657,17 @@ export function validateTeacherSpaceName(name: string) {
   }
 
   return normalized;
+}
+
+export const SPACE_DELETION_RETENTION_DAYS = 30;
+
+export function spacePurgeAt(deletedAt: string) {
+  const timestamp = new Date(deletedAt);
+  if (!Number.isFinite(timestamp.getTime())) {
+    throw new Error("Invalid space deletion time.");
+  }
+  timestamp.setUTCDate(timestamp.getUTCDate() + SPACE_DELETION_RETENTION_DAYS);
+  return timestamp.toISOString();
 }
 
 export function normalizeStudentName(name: string) {

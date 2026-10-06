@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getPoll, savePollResponse } from "@/lib/edie-store";
+import { getPoll, getSession, savePollResponse } from "@/lib/edie-store";
 import { studentConsentCookieName } from "@/lib/student-consent-cookie";
 
 export async function PUT(
@@ -9,7 +9,7 @@ export async function PUT(
   const { id } = await ctx.params;
   const poll = await getPoll(id);
 
-  if (!poll) {
+  if (!poll || !(await getSession(poll.sessionCode))) {
     return Response.json({ error: "Poll not found." }, { status: 404 });
   }
 

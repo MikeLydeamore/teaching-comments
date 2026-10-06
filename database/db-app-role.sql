@@ -6,7 +6,7 @@ grant usage on schema public to edie_app;
 grant select, insert, update on edie_organizations to edie_app;
 grant select, insert, update, delete on edie_organization_members to edie_app;
 grant select on edie_subscriptions to edie_app;
-grant select, insert, update on edie_teacher_spaces to edie_app;
+grant select, insert, update, delete on edie_teacher_spaces to edie_app;
 grant select, insert, update, delete on edie_space_members to edie_app;
 grant select, insert, update, delete on edie_space_invitations to edie_app;
 grant select, insert, update on edie_sessions to edie_app;

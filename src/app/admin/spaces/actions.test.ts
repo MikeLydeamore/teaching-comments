@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   isAdminAuthenticated: vi.fn(),
   isAdminTeacher: vi.fn(),
   listSpaceMembers: vi.fn(),
+  listDeletedTeacherSpaces: vi.fn(),
+  restoreTeacherSpace: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
@@ -36,7 +38,9 @@ vi.mock("@/lib/edie-store", () => ({
   ensurePersonalOrganization: mocks.ensurePersonalOrganization,
   getTeacherSpace: mocks.getTeacherSpace,
   listSpaceMembers: mocks.listSpaceMembers,
+  listDeletedTeacherSpaces: mocks.listDeletedTeacherSpaces,
   normalizeSpaceCode: (value: string) => value.trim().toLowerCase(),
+  restoreTeacherSpace: mocks.restoreTeacherSpace,
   updateSpaceMemberRole: mocks.updateSpaceMemberRole,
 }));
 vi.mock("@/lib/entitlements", () => ({
@@ -61,7 +65,7 @@ vi.mock("@/lib/space-member-identity", () => ({
   },
 }));
 
-import { createTeachingSpace, transferSpaceOwnership } from "./actions";
+import { createTeachingSpace, restoreDeletedSpace, transferSpaceOwnership } from "./actions";
 
 function createForm(name = "ETX1100/5900 Business Statistics") {
   const formData = new FormData();
@@ -119,6 +123,12 @@ describe("transferSpaceOwnership", () => {
         role: "owner",
       },
     ]);
+    mocks.listDeletedTeacherSpaces.mockResolvedValue([{
+      code: "deleted-space",
+      name: "Deleted space",
+      organizationId: "org-1",
+    }]);
+    mocks.restoreTeacherSpace.mockResolvedValue({ code: "deleted-space" });
     mocks.findUserProfileByUsername.mockResolvedValue({
       id: "user-2",
       email: "new-owner@example.com",
@@ -222,5 +232,19 @@ describe("transferSpaceOwnership", () => {
     );
     expect(mocks.updateSpaceMemberRole).not.toHaveBeenCalled();
     expect(mocks.addSpaceMember).not.toHaveBeenCalled();
+  });
+
+  it("restores a deleted space subject to the current space limit", async () => {
+    mocks.entitlementsForOrganization.mockResolvedValue({
+      plan: "free",
+      limits: { ownedSpaces: 2, teacherSeats: 5 },
+    });
+    const formData = new FormData();
+    formData.set("spaceCode", "deleted-space");
+
+    await expect(restoreDeletedSpace(formData)).rejects.toThrow(
+      "redirect:/admin/spaces?restore=restored&space=deleted-space",
+    );
+    expect(mocks.restoreTeacherSpace).toHaveBeenCalledWith("deleted-space", 2);
   });
 });

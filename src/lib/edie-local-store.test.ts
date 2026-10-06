@@ -97,6 +97,67 @@ describe("local question bank uniqueness", () => {
   });
 });
 
+describe("local hosted-space management", () => {
+  it("renames a space without changing its code", async () => {
+    await localStore.createTeacherSpaceForOwner(
+      "stats-101",
+      "Statistics",
+      { userId: "owner-1", name: "Owner" },
+    );
+
+    await expect(
+      localStore.renameTeacherSpace("stats-101", "Applied statistics"),
+    ).resolves.toMatchObject({
+      code: "stats-101",
+      name: "Applied statistics",
+    });
+  });
+
+  it("hides a deleted space, restores it, and only purges it after retention", async () => {
+    await localStore.createTeacherSpaceForOwner(
+      "stats-101",
+      "Statistics",
+      { userId: "owner-1", name: "Owner" },
+    );
+    const session = await localStore.getOrCreateSessionInSpace("stats-101", "week-1");
+    await localStore.addSubmission(session!.id, { text: "A response" });
+
+    await expect(
+      localStore.softDeleteTeacherSpace("stats-101", "2026-01-01T00:00:00.000Z"),
+    ).resolves.toMatchObject({
+      code: "stats-101",
+      deletedAt: "2026-01-01T00:00:00.000Z",
+      purgeAfter: "2026-01-31T00:00:00.000Z",
+    });
+    await expect(localStore.getTeacherSpace("stats-101")).resolves.toBeNull();
+    await expect(localStore.getSessionInSpace("stats-101", "week-1")).resolves.toBeNull();
+    await expect(localStore.listDeletedTeacherSpaces()).resolves.toHaveLength(1);
+
+    await expect(localStore.restoreTeacherSpace("stats-101")).resolves.toMatchObject({
+      deletedAt: null,
+      purgeAfter: null,
+    });
+    await expect(localStore.getTeacherSpace("stats-101")).resolves.not.toBeNull();
+    await expect(localStore.listSubmissions(session!.id)).resolves.toHaveLength(1);
+
+    await localStore.softDeleteTeacherSpace("stats-101", "2026-01-01T00:00:00.000Z");
+    await expect(
+      localStore.purgeDeletedTeacherSpaces("2026-01-30T23:59:59.000Z"),
+    ).resolves.toBe(0);
+    await expect(
+      localStore.purgeDeletedTeacherSpaces("2026-01-31T00:00:00.000Z"),
+    ).resolves.toBe(1);
+    await expect(localStore.listDeletedTeacherSpaces()).resolves.toEqual([]);
+    await expect(localStore.listSubmissions(session!.id)).resolves.toEqual([]);
+    await expect(localStore.listSpaceMembers("stats-101")).resolves.toEqual([]);
+  });
+
+  it("protects the built-in default space", async () => {
+    await expect(localStore.softDeleteTeacherSpace("default")).resolves.toBeNull();
+    await expect(localStore.getTeacherSpace("default")).resolves.not.toBeNull();
+  });
+});
+
 describe("local poll presentation lifecycle", () => {
   it("ends voting before closing the poll", async () => {
     const poll = await localStore.startPoll(

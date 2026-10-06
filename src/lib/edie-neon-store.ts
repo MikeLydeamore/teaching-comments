@@ -31,6 +31,7 @@ import {
   validateQuestionTitle,
   validateSubmissionContent,
   validateTeacherSpaceName,
+  spacePurgeAt,
   normalizeSpaceEmail,
   validateSpaceRole,
   type GroupQuestion,
@@ -222,7 +223,14 @@ function sessionFromRow(row: Row): Session {
 }
 
 function teacherSpaceFromRow(row: Row): TeacherSpace {
-  return { code: text(row, "code"), name: text(row, "name"), organizationId: text(row, "organization_id"), createdAt: text(row, "created_at") };
+  return {
+    code: text(row, "code"),
+    name: text(row, "name"),
+    organizationId: text(row, "organization_id"),
+    createdAt: text(row, "created_at"),
+    deletedAt: nullableText(row, "deleted_at"),
+    purgeAfter: nullableText(row, "purge_after"),
+  };
 }
 
 function submissionFromRow(row: Row): Submission {
@@ -271,6 +279,7 @@ function pollFromRow(row: Row): SessionPoll {
 }
 
 const SESSION_COLUMNS = "id, code, space_code, title, prompt, is_open, group_questions_screening_enabled, submissions_screening_enabled, text_input_enabled, gif_input_enabled, drawing_input_enabled, image_input_enabled, image_embeds_enabled, created_at, prompt_updated_at, timer_duration_seconds, timer_ends_at";
+const SPACE_COLUMNS = "code, name, organization_id, created_at, deleted_at, purge_after";
 const SUBMISSION_COLUMNS = "id, session_code, student_name, text, drawing_data, gif_data, image_data, status, version, archived_at, created_at, updated_at";
 const GROUP_QUESTION_COLUMNS = "id, session_code, student_name, text, is_answered, is_visible, archived_at, created_at, updated_at";
 const POLL_QUESTION_COLUMNS = "id, session_code, title, question, selection_mode, options, correct_option_indexes, created_at, updated_at";
@@ -280,13 +289,25 @@ const SUBMISSION_VIEW_SETTINGS_COLUMNS = "session_code, prompt_history_id, expan
 async function getSessionRow(code: string) {
   const normalized = normalizeSessionCode(code);
   if (!normalized) return null;
-  return (await query(`SELECT ${SESSION_COLUMNS} FROM edie_sessions WHERE id = $1 LIMIT 1`, [normalized]))[0] ?? null;
+  return (await query(
+    `SELECT ${SESSION_COLUMNS.split(", ").map((column) => `session.${column}`).join(", ")}
+     FROM edie_sessions session
+     JOIN edie_teacher_spaces space ON space.code = session.space_code
+     WHERE session.id = $1 AND space.deleted_at IS NULL LIMIT 1`,
+    [normalized],
+  ))[0] ?? null;
 }
 
 async function getSessionInSpaceRow(spaceCode: string, code: string) {
   const space = normalizeSpaceCode(spaceCode); const session = normalizeSessionCode(code);
   if (!space || !session) return null;
-  return (await query(`SELECT ${SESSION_COLUMNS} FROM edie_sessions WHERE space_code = $1 AND code = $2 LIMIT 1`, [space, session]))[0] ?? null;
+  return (await query(
+    `SELECT ${SESSION_COLUMNS.split(", ").map((column) => `session.${column}`).join(", ")}
+     FROM edie_sessions session
+     JOIN edie_teacher_spaces space ON space.code = session.space_code
+     WHERE session.space_code = $1 AND session.code = $2 AND space.deleted_at IS NULL LIMIT 1`,
+    [space, session],
+  ))[0] ?? null;
 }
 
 async function getPollRow(id: string) {
@@ -421,9 +442,9 @@ export const neonStore: EdieStore = {
            INSERT INTO edie_teacher_spaces (code, name, organization_id)
            SELECT $1, $2, id FROM organization
            WHERE $5::integer IS NULL OR (
-             SELECT count(*) FROM edie_teacher_spaces WHERE organization_id = organization.id
+             SELECT count(*) FROM edie_teacher_spaces WHERE organization_id = organization.id AND deleted_at IS NULL
            ) < $5
-           RETURNING code, name, organization_id, created_at
+           RETURNING ${SPACE_COLUMNS}
          ), membership AS (
            INSERT INTO edie_space_members (space_code, user_id, role)
            SELECT code, $4, 'owner' FROM created_space
@@ -442,18 +463,81 @@ export const neonStore: EdieStore = {
       throw error;
     }
   },
+  async renameTeacherSpace(code, name) {
+    const normalized = normalizeSpaceCode(code);
+    if (!normalized) return null;
+    const rows = await query(
+      `UPDATE edie_teacher_spaces SET name = $2 WHERE code = $1 AND deleted_at IS NULL RETURNING ${SPACE_COLUMNS}`,
+      [normalized, validateTeacherSpaceName(name)],
+    );
+    return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
+  },
+  async softDeleteTeacherSpace(code, deletedAt = now()) {
+    const normalized = normalizeSpaceCode(code);
+    if (!normalized || normalized === DEFAULT_SPACE_CODE) return null;
+    const timestamp = new Date(deletedAt).toISOString();
+    const results = await transaction([
+      {
+        text: `UPDATE edie_teacher_spaces
+          SET deleted_at = $2, purge_after = $3
+          WHERE code = $1 AND deleted_at IS NULL
+          RETURNING ${SPACE_COLUMNS}`,
+        values: [normalized, timestamp, spacePurgeAt(timestamp)],
+      },
+      {
+        text: `UPDATE edie_sessions SET is_open = false
+          WHERE space_code = $1 AND EXISTS (
+            SELECT 1 FROM edie_teacher_spaces WHERE code = $1 AND deleted_at = $2
+          )`,
+        values: [normalized, timestamp],
+      },
+    ]);
+    return results[0][0] ? teacherSpaceFromRow(results[0][0]) : null;
+  },
+  async restoreTeacherSpace(code, ownedSpacesLimit = null) {
+    const normalized = normalizeSpaceCode(code);
+    if (!normalized) return null;
+    const rows = await query(
+      `UPDATE edie_teacher_spaces target
+       SET deleted_at = NULL, purge_after = NULL
+       WHERE target.code = $1 AND target.deleted_at IS NOT NULL
+         AND ($2::integer IS NULL OR (
+           SELECT count(*) FROM edie_teacher_spaces active
+           WHERE active.organization_id = target.organization_id AND active.deleted_at IS NULL
+         ) < $2)
+       RETURNING ${SPACE_COLUMNS}`,
+      [normalized, ownedSpacesLimit],
+    );
+    if (!rows[0] && ownedSpacesLimit !== null) {
+      throw new EntitlementLimitError("ownedSpaces", ownedSpacesLimit);
+    }
+    return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
+  },
+  async listDeletedTeacherSpaces() {
+    const rows = await query(
+      `SELECT ${SPACE_COLUMNS} FROM edie_teacher_spaces WHERE deleted_at IS NOT NULL ORDER BY purge_after ASC`,
+    );
+    return rows.map(teacherSpaceFromRow);
+  },
+  async purgeDeletedTeacherSpaces(cutoff = now()) {
+    const rows = await query(
+      "DELETE FROM edie_teacher_spaces WHERE deleted_at IS NOT NULL AND purge_after <= $1 RETURNING code",
+      [new Date(cutoff).toISOString()],
+    );
+    return rows.length;
+  },
   async getTeacherSpace(code) {
     const normalized = normalizeSpaceCode(code); if (!normalized) return null;
-    const rows = await query("SELECT code, name, organization_id, created_at FROM edie_teacher_spaces WHERE code = $1 LIMIT 1", [normalized]);
+    const rows = await query(`SELECT ${SPACE_COLUMNS} FROM edie_teacher_spaces WHERE code = $1 AND deleted_at IS NULL LIMIT 1`, [normalized]);
     return rows[0] ? teacherSpaceFromRow(rows[0]) : null;
   },
   async listTeacherSpaces() {
-    const rows = await query("SELECT code, name, organization_id, created_at FROM edie_teacher_spaces ORDER BY name ASC");
+    const rows = await query(`SELECT ${SPACE_COLUMNS} FROM edie_teacher_spaces WHERE deleted_at IS NULL ORDER BY name ASC`);
     return rows.map(teacherSpaceFromRow);
   },
   async listTeacherSpacesForOrganization(organizationId) {
     const rows = await query(
-      "SELECT code, name, organization_id, created_at FROM edie_teacher_spaces WHERE organization_id = $1 ORDER BY name ASC",
+      `SELECT ${SPACE_COLUMNS} FROM edie_teacher_spaces WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY name ASC`,
       [organizationId],
     );
     return rows.map(teacherSpaceFromRow);
@@ -464,7 +548,7 @@ export const neonStore: EdieStore = {
        FROM edie_teacher_spaces s
        JOIN edie_space_members m ON m.space_code = s.code
        JOIN edie_organization_members om ON om.organization_id = s.organization_id AND om.user_id = m.user_id
-       WHERE m.user_id = $1 ORDER BY s.name ASC`,
+       WHERE m.user_id = $1 AND s.deleted_at IS NULL ORDER BY s.name ASC`,
       [userId],
     );
     return rows.map((row) => ({
@@ -472,12 +556,14 @@ export const neonStore: EdieStore = {
       name: text(row, "name"),
       organizationId: text(row, "organization_id"),
       createdAt: text(row, "created_at"),
+      deletedAt: null,
+      purgeAfter: null,
       role: validateSpaceRole(text(row, "role")),
     }));
   },
   async listPendingSpaceInvitationsForUser(userId, verifiedEmail) {
     const rows = await query(
-      "SELECT s.code, s.name, s.organization_id, s.created_at, i.role, i.created_at AS invited_at FROM edie_teacher_spaces s JOIN edie_space_invitations i ON i.space_code = s.code WHERE i.invitee_user_id = $1 OR i.email = $2 ORDER BY s.name ASC",
+      "SELECT s.code, s.name, s.organization_id, s.created_at, i.role, i.created_at AS invited_at FROM edie_teacher_spaces s JOIN edie_space_invitations i ON i.space_code = s.code WHERE s.deleted_at IS NULL AND (i.invitee_user_id = $1 OR i.email = $2) ORDER BY s.name ASC",
       [userId, verifiedEmail ? normalizeSpaceEmail(verifiedEmail) : null],
     );
     return rows.map((row) => ({
@@ -485,6 +571,8 @@ export const neonStore: EdieStore = {
       name: text(row, "name"),
       organizationId: text(row, "organization_id"),
       createdAt: text(row, "created_at"),
+      deletedAt: null,
+      purgeAfter: null,
       role: validateSpaceRole(text(row, "role")),
       invitedAt: text(row, "invited_at"),
     }));
@@ -497,7 +585,7 @@ export const neonStore: EdieStore = {
        JOIN edie_organization_members organization_member
          ON organization_member.organization_id = space.organization_id
         AND organization_member.user_id = member.user_id
-       WHERE member.space_code = $1 AND member.user_id = $2 LIMIT 1`,
+       WHERE member.space_code = $1 AND member.user_id = $2 AND space.deleted_at IS NULL LIMIT 1`,
       [normalized, userId],
     );
     return rows[0] ? validateSpaceRole(text(rows[0], "role")) : null;
@@ -719,7 +807,7 @@ export const neonStore: EdieStore = {
   async getOrCreateSessionInSpace(spaceCode, code) {
     const spaceCodeNormalized = normalizeSpaceCode(spaceCode) || DEFAULT_SPACE_CODE;
     const codeNormalized = normalizeSessionCode(code) || "demo-lecture";
-    const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1", [spaceCodeNormalized]);
+    const space = await query("SELECT 1 FROM edie_teacher_spaces WHERE code = $1 AND deleted_at IS NULL", [spaceCodeNormalized]);
     if (!space.length) return null;
     const timestamp = now(); const id = randomUUID();
     const rows = await query(
@@ -732,7 +820,10 @@ export const neonStore: EdieStore = {
   },
   async listSessions(spaceCode) {
     const normalized = spaceCode ? normalizeSpaceCode(spaceCode) : "";
-    const rows = normalized ? await query(`SELECT ${SESSION_COLUMNS} FROM edie_sessions WHERE space_code = $1 ORDER BY created_at DESC`, [normalized]) : await query(`SELECT ${SESSION_COLUMNS} FROM edie_sessions ORDER BY created_at DESC`);
+    const qualified = SESSION_COLUMNS.split(", ").map((column) => `session.${column}`).join(", ");
+    const rows = normalized
+      ? await query(`SELECT ${qualified} FROM edie_sessions session JOIN edie_teacher_spaces space ON space.code = session.space_code WHERE session.space_code = $1 AND space.deleted_at IS NULL ORDER BY session.created_at DESC`, [normalized])
+      : await query(`SELECT ${qualified} FROM edie_sessions session JOIN edie_teacher_spaces space ON space.code = session.space_code WHERE space.deleted_at IS NULL ORDER BY session.created_at DESC`);
     return rows.map(sessionFromRow);
   },
   async updateSession(code, patch) {

@@ -4,12 +4,14 @@ import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { AccountMenu } from "@/components/AccountMenu";
 import { getCurrentTeacher, isAdminAuthenticated, isAdminTeacher } from "@/lib/auth-server";
 import { findUserProfilesById } from "@/lib/auth-users";
-import { listSpaceMembers, listTeacherSpaces } from "@/lib/edie-store";
+import { listDeletedTeacherSpaces, listSpaceMembers, listTeacherSpaces } from "@/lib/edie-store";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
+import { SPACE_DELETION_RETENTION_DAYS } from "@/lib/edie-store-model";
 import {
   claimTeacherSpace,
   createTeachingSpace,
   transferSpaceOwnership,
+  restoreDeletedSpace,
 } from "./actions";
 
 type AdminSpacesPageProps = {
@@ -18,6 +20,7 @@ type AdminSpacesPageProps = {
     spaceCreate?: string;
     claim?: string;
     transfer?: string;
+    restore?: string;
   }>;
 };
 
@@ -25,6 +28,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-AU", {
   day: "numeric",
   month: "short",
   year: "numeric",
+  timeZone: "Australia/Sydney",
 });
 
 const createMessages: Record<string, string> = {
@@ -58,6 +62,13 @@ const transferMessages: Record<string, string> = {
   "seat-limit": "This organisation has no teacher seats available for the new owner.",
 };
 
+const restoreMessages: Record<string, string> = {
+  restored: "Space restored. Its sessions remain closed until an owner reopens them.",
+  "space-limit": "The owner’s organisation has no hosted-space capacity available for this restore.",
+  "not-found": "That deleted space is no longer available to restore.",
+  unavailable: "The space could not be restored. Please try again.",
+};
+
 export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageProps) {
   const teacher = await getCurrentTeacher();
 
@@ -67,7 +78,9 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
 
   const query = await searchParams;
   const isAdmin = isAdminTeacher(teacher) && (await isAdminAuthenticated());
-  const spaces = isAdmin ? await listTeacherSpaces() : [];
+  const [spaces, deletedSpaces] = isAdmin
+    ? await Promise.all([listTeacherSpaces(), listDeletedTeacherSpaces()])
+    : [[], []];
   const ownerIdsBySpace = new Map<string, string[]>();
   const memberCounts = new Map<string, number>();
   const ownerless = new Set<string>();
@@ -101,6 +114,8 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
     ? transferMessages[query.transfer] ?? ""
     : "";
   const transferSucceeded = query.transfer === "ok";
+  const restoreMessage = query.restore ? restoreMessages[query.restore] ?? "" : "";
+  const restoreSucceeded = query.restore === "restored";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -359,6 +374,55 @@ export default async function AdminSpacesPage({ searchParams }: AdminSpacesPageP
                   }`}
                 >
                   {transferMessage}
+                </p>
+              ) : null}
+            </section>
+
+            <section className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-950">Recently deleted</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Deleted spaces are hidden from hosts and students. Restore them before their {SPACE_DELETION_RETENTION_DAYS}-day retention period ends.
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-500">{deletedSpaces.length} recoverable</span>
+              </div>
+              {deletedSpaces.length ? (
+                <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+                  {deletedSpaces.map((space) => (
+                    <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={space.code}>
+                      <div>
+                        <p className="font-semibold text-slate-950">{space.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          <span className="font-mono">{space.code}</span>
+                          {space.purgeAfter ? ` · permanently deletes ${dateFormatter.format(new Date(space.purgeAfter))}` : ""}
+                        </p>
+                      </div>
+                      <form action={restoreDeletedSpace}>
+                        <input name="spaceCode" type="hidden" value={space.code} />
+                        <PendingSubmitButton
+                          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-500 hover:text-teal-800"
+                          pendingChildren="Restoring..."
+                        >
+                          Restore space
+                        </PendingSubmitButton>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  No spaces are waiting for permanent deletion.
+                </p>
+              )}
+              {restoreMessage ? (
+                <p className={`mt-4 rounded-md border px-3 py-2 text-sm font-medium ${
+                  restoreSucceeded
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-red-200 bg-red-50 text-red-800"
+                }`} role="status">
+                  {restoreMessage}
                 </p>
               ) : null}
             </section>

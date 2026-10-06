@@ -116,6 +116,29 @@ export async function createTeacherSpaceForOwner(
   return getStore().createTeacherSpaceForOwner(code, name, owner, ownedSpacesLimit);
 }
 
+export async function renameTeacherSpace(code: string, name: string) {
+  return getStore().renameTeacherSpace(code, name);
+}
+
+export async function softDeleteTeacherSpace(code: string, deletedAt?: string) {
+  return getStore().softDeleteTeacherSpace(code, deletedAt);
+}
+
+export async function restoreTeacherSpace(
+  code: string,
+  ownedSpacesLimit?: CapacityLimit,
+) {
+  return getStore().restoreTeacherSpace(code, ownedSpacesLimit);
+}
+
+export async function listDeletedTeacherSpaces() {
+  return getStore().listDeletedTeacherSpaces();
+}
+
+export async function purgeDeletedTeacherSpaces(cutoff?: string) {
+  return getStore().purgeDeletedTeacherSpaces(cutoff);
+}
+
 export async function getOrganizationMemberRole(organizationId: string, userId: string) {
   return getStore().getOrganizationMemberRole(organizationId, userId);
 }

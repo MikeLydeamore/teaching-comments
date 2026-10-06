@@ -1,10 +1,18 @@
-import { unvoteGroupQuestion, upvoteGroupQuestion } from "@/lib/edie-store";
+import { getGroupQuestion, getSession, unvoteGroupQuestion, upvoteGroupQuestion } from "@/lib/edie-store";
+
+async function questionIsAvailable(id: string) {
+  const question = await getGroupQuestion(id);
+  return Boolean(question && await getSession(question.sessionCode));
+}
 
 export async function POST(
   request: Request,
   ctx: RouteContext<"/api/group-questions/[id]/vote">,
 ) {
   const { id } = await ctx.params;
+  if (!(await questionIsAvailable(id))) {
+    return Response.json({ error: "Question not found." }, { status: 404 });
+  }
   const body = (await request.json().catch(() => ({}))) as { voterId?: string };
 
   try {
@@ -28,6 +36,9 @@ export async function DELETE(
   ctx: RouteContext<"/api/group-questions/[id]/vote">,
 ) {
   const { id } = await ctx.params;
+  if (!(await questionIsAvailable(id))) {
+    return Response.json({ error: "Question not found." }, { status: 404 });
+  }
   const body = (await request.json().catch(() => ({}))) as { voterId?: string };
 
   try {

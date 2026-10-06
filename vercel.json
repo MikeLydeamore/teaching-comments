@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
-  "regions": ["syd1"]
+  "regions": ["syd1"],
+  "crons": [
+    {
+      "path": "/api/maintenance/purge-deleted-spaces",
+      "schedule": "17 3 * * *"
+    }
+  ]
 }

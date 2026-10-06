@@ -279,6 +279,10 @@ html[data-edie-theme] .text-white {
   color: var(--edie-action-text) !important;
 }
 
+html[data-edie-theme] .edie-danger-button {
+  color: #ffffff !important;
+}
+
 html[data-edie-theme] .text-slate-950,
 html[data-edie-theme] .text-slate-900,
 html[data-edie-theme] .text-slate-800 {

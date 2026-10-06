@@ -40,7 +40,11 @@ create table if not exists edie_teacher_spaces (
   code text primary key check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   name text not null check (char_length(name) between 1 and 120),
   organization_id uuid not null references edie_organizations(id) on delete restrict,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  purge_after timestamptz,
+  check ((deleted_at is null) = (purge_after is null)),
+  check (purge_after is null or purge_after > deleted_at)
 );
 create table if not exists edie_space_members (
   space_code text not null references edie_teacher_spaces(code) on delete cascade,
@@ -65,7 +69,7 @@ create index if not exists edie_space_invitations_email_idx
 create table if not exists edie_sessions (
   id text primary key default gen_random_uuid()::text,
   code text not null check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
-  space_code text not null default 'default' references edie_teacher_spaces(code) on delete restrict,
+  space_code text not null default 'default' references edie_teacher_spaces(code) on delete cascade,
   title text not null check (char_length(title) between 1 and 120), prompt text not null check (char_length(prompt) = 0 or char_length(prompt) between 5 and 1200),
   is_open boolean not null default true, group_questions_screening_enabled boolean not null default false, submissions_screening_enabled boolean not null default false,
   text_input_enabled boolean not null default true, gif_input_enabled boolean not null default true, drawing_input_enabled boolean not null default true, image_input_enabled boolean not null default true, image_embeds_enabled boolean not null default true,

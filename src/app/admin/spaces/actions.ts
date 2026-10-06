@@ -8,7 +8,9 @@ import {
   ensurePersonalOrganization,
   getTeacherSpace,
   listSpaceMembers,
+  listDeletedTeacherSpaces,
   normalizeSpaceCode,
+  restoreTeacherSpace,
   updateSpaceMemberRole,
 } from "@/lib/edie-store";
 import { EntitlementLimitError, entitlementsForOrganization } from "@/lib/entitlements";
@@ -42,6 +44,11 @@ function claimPath(status: string, spaceCode: string) {
 
 function transferPath(status: string, spaceCode: string) {
   const params = new URLSearchParams({ transfer: status, space: spaceCode });
+  return `/admin/spaces?${params.toString()}`;
+}
+
+function restorePath(status: string, spaceCode: string) {
+  const params = new URLSearchParams({ restore: status, space: spaceCode });
   return `/admin/spaces?${params.toString()}`;
 }
 
@@ -223,4 +230,33 @@ export async function transferSpaceOwnership(formData: FormData) {
 
   revalidatePath("/admin/spaces");
   redirect(transferPath("ok", space.code));
+}
+
+export async function restoreDeletedSpace(formData: FormData) {
+  await requireAdmin();
+  const spaceCode = normalizeSpaceCode(String(formData.get("spaceCode") ?? ""));
+  const deletedSpaces = await listDeletedTeacherSpaces();
+  const space = deletedSpaces.find((item) => item.code === spaceCode);
+
+  if (!space) redirect(restorePath("not-found", spaceCode));
+
+  let restored;
+  try {
+    const entitlements = await entitlementsForOrganization(space.organizationId);
+    restored = await restoreTeacherSpace(
+      space.code,
+      entitlements.limits.ownedSpaces,
+    );
+  } catch (error) {
+    if (error instanceof EntitlementLimitError) {
+      redirect(restorePath("space-limit", space.code));
+    }
+    redirect(restorePath("unavailable", space.code));
+  }
+
+  if (!restored) redirect(restorePath("not-found", space.code));
+
+  revalidatePath("/host");
+  revalidatePath("/admin/spaces");
+  redirect(restorePath("restored", space.code));
 }

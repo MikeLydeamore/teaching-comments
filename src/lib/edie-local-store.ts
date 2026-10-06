@@ -30,6 +30,7 @@ import {
   normalizeSubmissionImageData,
   validateQuestionText,
   validateTeacherSpaceName,
+  spacePurgeAt,
   normalizeSpaceEmail,
   validateSpaceRole,
   type GroupQuestion,
@@ -119,6 +120,8 @@ function defaultStore(): StoreData {
         name: "Default Space",
         organizationId: DEFAULT_ORGANIZATION_ID,
         createdAt,
+        deletedAt: null,
+        purgeAfter: null,
       },
     ],
     sessions: [
@@ -230,6 +233,8 @@ async function readStore(): Promise<StoreData> {
         name: space.name ?? (titleFromCode(space.code) || "Hosted Space"),
         organizationId: space.organizationId ?? DEFAULT_ORGANIZATION_ID,
         createdAt: space.createdAt ?? createdAt,
+        deletedAt: space.deletedAt ?? null,
+        purgeAfter: space.purgeAfter ?? null,
       }))
     : [
         {
@@ -237,6 +242,8 @@ async function readStore(): Promise<StoreData> {
           name: "Default Space",
           organizationId: DEFAULT_ORGANIZATION_ID,
           createdAt,
+          deletedAt: null,
+          purgeAfter: null,
         },
       ];
   const spaceMembers = (data.spaceMembers ?? []).map((member) => {
@@ -453,6 +460,32 @@ function ensurePersonalOrganizationInData(
   return organization;
 }
 
+function permanentlyRemoveSpace(data: StoreData, spaceCode: string) {
+  const sessionIds = new Set(
+    data.sessions
+      .filter((session) => session.spaceCode === spaceCode)
+      .map((session) => session.id),
+  );
+  const pollIds = new Set(
+    data.polls
+      .filter((poll) => sessionIds.has(poll.sessionCode))
+      .map((poll) => poll.id),
+  );
+
+  data.groupQuestions = data.groupQuestions.filter((item) => !sessionIds.has(item.sessionCode));
+  data.pollResponses = data.pollResponses.filter((item) => !pollIds.has(item.pollId));
+  data.pollQuestionBank = data.pollQuestionBank.filter((item) => !sessionIds.has(item.sessionCode));
+  data.polls = data.polls.filter((item) => !sessionIds.has(item.sessionCode));
+  data.promptHistory = data.promptHistory.filter((item) => !sessionIds.has(item.sessionCode));
+  data.questionBank = data.questionBank.filter((item) => !sessionIds.has(item.sessionCode));
+  data.submissionViewSettings = data.submissionViewSettings.filter((item) => !sessionIds.has(item.sessionCode));
+  data.submissions = data.submissions.filter((item) => !sessionIds.has(item.sessionCode));
+  data.sessions = data.sessions.filter((session) => session.spaceCode !== spaceCode);
+  data.spaceInvitations = data.spaceInvitations.filter((item) => item.spaceCode !== spaceCode);
+  data.spaceMembers = data.spaceMembers.filter((item) => item.spaceCode !== spaceCode);
+  data.teacherSpaces = data.teacherSpaces.filter((space) => space.code !== spaceCode);
+}
+
 function organizationForSpace(data: StoreData, spaceCode: string) {
   const space = data.teacherSpaces.find((item) => item.code === spaceCode);
   return space?.organizationId ?? null;
@@ -640,7 +673,9 @@ export const localStore: EdieStore = {
       assertCapacity(
         "ownedSpaces",
         ownedSpacesLimit,
-        data.teacherSpaces.filter((space) => space.organizationId === organization.id).length,
+        data.teacherSpaces.filter(
+          (space) => space.organizationId === organization.id && !space.deletedAt,
+        ).length,
       );
       const createdAt = now();
       const space: TeacherSpace = {
@@ -648,6 +683,8 @@ export const localStore: EdieStore = {
         name: validateTeacherSpaceName(name),
         organizationId: organization.id,
         createdAt,
+        deletedAt: null,
+        purgeAfter: null,
       };
       data.teacherSpaces.push(space);
       data.spaceMembers.push({
@@ -661,6 +698,80 @@ export const localStore: EdieStore = {
     });
   },
 
+  async renameTeacherSpace(code, name) {
+    const spaceCode = normalizeSpaceCode(code);
+    if (!spaceCode) return null;
+    const nextName = validateTeacherSpaceName(name);
+
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const space = data.teacherSpaces.find((item) => item.code === spaceCode && !item.deletedAt);
+      if (!space) return null;
+      space.name = nextName;
+      await writeStore(data);
+      return { ...space };
+    });
+  },
+
+  async softDeleteTeacherSpace(code, deletedAt = now()) {
+    const spaceCode = normalizeSpaceCode(code);
+    if (!spaceCode || spaceCode === DEFAULT_SPACE_CODE) return null;
+
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const space = data.teacherSpaces.find((item) => item.code === spaceCode && !item.deletedAt);
+      if (!space) return null;
+      space.deletedAt = new Date(deletedAt).toISOString();
+      space.purgeAfter = spacePurgeAt(space.deletedAt);
+      for (const session of data.sessions) {
+        if (session.spaceCode === spaceCode) session.isOpen = false;
+      }
+      await writeStore(data);
+      return { ...space };
+    });
+  },
+
+  async restoreTeacherSpace(code, ownedSpacesLimit = null) {
+    const spaceCode = normalizeSpaceCode(code);
+    if (!spaceCode) return null;
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const space = data.teacherSpaces.find((item) => item.code === spaceCode && item.deletedAt);
+      if (!space) return null;
+      assertCapacity(
+        "ownedSpaces",
+        ownedSpacesLimit,
+        data.teacherSpaces.filter(
+          (item) => item.organizationId === space.organizationId && !item.deletedAt,
+        ).length,
+      );
+      space.deletedAt = null;
+      space.purgeAfter = null;
+      await writeStore(data);
+      return { ...space };
+    });
+  },
+
+  async listDeletedTeacherSpaces() {
+    const data = await readStore();
+    return data.teacherSpaces
+      .filter((space) => Boolean(space.deletedAt))
+      .map((space) => ({ ...space }))
+      .sort((left, right) => (left.purgeAfter ?? "").localeCompare(right.purgeAfter ?? ""));
+  },
+
+  async purgeDeletedTeacherSpaces(cutoff = now()) {
+    return serializeStoreMutation(async () => {
+      const data = await readStore();
+      const expired = data.teacherSpaces.filter(
+        (space) => space.purgeAfter && space.purgeAfter <= cutoff && space.code !== DEFAULT_SPACE_CODE,
+      );
+      for (const space of expired) permanentlyRemoveSpace(data, space.code);
+      if (expired.length) await writeStore(data);
+      return expired.length;
+    });
+  },
+
   async getTeacherSpace(code) {
     const spaceCode = normalizeSpaceCode(code);
 
@@ -669,27 +780,23 @@ export const localStore: EdieStore = {
     }
 
     const data = await readStore();
-    return data.teacherSpaces.find((space) => space.code === spaceCode) ?? null;
+    return data.teacherSpaces.find((space) => space.code === spaceCode && !space.deletedAt) ?? null;
   },
 
   async listTeacherSpaces() {
     const data = await readStore();
 
     return data.teacherSpaces
-      .map(({ code, name, organizationId, createdAt }) => ({ code, name, organizationId, createdAt }))
+      .filter((space) => !space.deletedAt)
+      .map((space) => ({ ...space }))
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
   async listTeacherSpacesForOrganization(organizationId) {
     const data = await readStore();
     return data.teacherSpaces
-      .filter((space) => space.organizationId === organizationId)
-      .map(({ code, name, organizationId: id, createdAt }) => ({
-        code,
-        name,
-        organizationId: id,
-        createdAt,
-      }))
+      .filter((space) => space.organizationId === organizationId && !space.deletedAt)
+      .map((space) => ({ ...space }))
       .sort((left, right) => left.name.localeCompare(right.name));
   },
 
@@ -697,6 +804,7 @@ export const localStore: EdieStore = {
     const data = await readStore();
 
     return data.teacherSpaces
+      .filter((summary) => !summary.deletedAt)
       .map((summary) => {
         const organizationMember = data.organizationMembers.find(
           (item) => item.organizationId === summary.organizationId && item.userId === userId,
@@ -733,7 +841,7 @@ export const localStore: EdieStore = {
           (item) => item.code === member.spaceCode,
         );
 
-        if (!space) {
+        if (!space || space.deletedAt) {
           return null;
         }
 
@@ -761,7 +869,7 @@ export const localStore: EdieStore = {
       (item) =>
         item.spaceCode === normalizedSpaceCode && item.userId === userId,
     );
-    const space = data.teacherSpaces.find((item) => item.code === normalizedSpaceCode);
+    const space = data.teacherSpaces.find((item) => item.code === normalizedSpaceCode && !item.deletedAt);
     const organizationMember = data.organizationMembers.find(
       (item) => item.organizationId === space?.organizationId && item.userId === userId,
     );
@@ -1013,7 +1121,12 @@ export const localStore: EdieStore = {
     }
 
     const data = await readStore();
-    return data.sessions.find((session) => session.id === sessionCode) ?? null;
+    const activeSpaceCodes = new Set(
+      data.teacherSpaces.filter((space) => !space.deletedAt).map((space) => space.code),
+    );
+    return data.sessions.find(
+      (session) => session.id === sessionCode && activeSpaceCodes.has(session.spaceCode),
+    ) ?? null;
   },
 
   async getSessionInSpace(spaceCode, code) {
@@ -1025,6 +1138,9 @@ export const localStore: EdieStore = {
     }
 
     const data = await readStore();
+    if (!data.teacherSpaces.some(
+      (space) => space.code === normalizedSpaceCode && !space.deletedAt,
+    )) return null;
     return (
       data.sessions.find(
         (session) =>
@@ -1052,7 +1168,7 @@ export const localStore: EdieStore = {
     const sessionCode = normalizeSessionCode(code) || "demo-lecture";
     const data = await readStore();
     const space = data.teacherSpaces.find(
-      (teacherSpace) => teacherSpace.code === normalizedSpaceCode,
+      (teacherSpace) => teacherSpace.code === normalizedSpaceCode && !teacherSpace.deletedAt,
     );
 
     if (!space) {
@@ -1104,10 +1220,14 @@ export const localStore: EdieStore = {
   async listSessions(spaceCode) {
     const normalizedSpaceCode = spaceCode ? normalizeSpaceCode(spaceCode) : "";
     const data = await readStore();
+    const activeSpaceCodes = new Set(
+      data.teacherSpaces.filter((space) => !space.deletedAt).map((space) => space.code),
+    );
 
     return [...data.sessions]
       .filter((session) =>
-        normalizedSpaceCode ? session.spaceCode === normalizedSpaceCode : true,
+        activeSpaceCodes.has(session.spaceCode)
+          && (normalizedSpaceCode ? session.spaceCode === normalizedSpaceCode : true),
       )
       .sort(
         (a, b) =>
@@ -1118,7 +1238,12 @@ export const localStore: EdieStore = {
   async updateSession(code, patch) {
     const sessionCode = normalizeSessionCode(code);
     const data = await readStore();
-    const index = data.sessions.findIndex((session) => session.id === sessionCode);
+    const activeSpaceCodes = new Set(
+      data.teacherSpaces.filter((space) => !space.deletedAt).map((space) => space.code),
+    );
+    const index = data.sessions.findIndex(
+      (session) => session.id === sessionCode && activeSpaceCodes.has(session.spaceCode),
+    );
 
     if (index === -1) {
       return null;

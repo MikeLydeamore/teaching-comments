@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/AccountMenu";
 import { HostWelcome } from "@/components/HostWelcome";
+import { CreateSpaceDialog } from "@/components/CreateSpaceDialog";
 import { SpaceCardMenu } from "@/components/SpaceCardMenu";
 import { getCurrentTeacher } from "@/lib/auth-server";
 import {
@@ -9,6 +10,7 @@ import {
   listTeacherSpacesForUser,
 } from "@/lib/edie-store";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
+import { SPACE_DELETION_RETENTION_DAYS } from "@/lib/edie-store-model";
 
 type SpaceStats = {
   openSessions: number;
@@ -51,10 +53,17 @@ const membershipMessages: Record<string, string> = {
   "membership-unavailable": "That membership is no longer available.",
 };
 
+const spaceCreateMessages: Record<string, string> = {
+  exists: "That space code is already in use. Choose a different code.",
+  invalid: "Enter a valid space name and code.",
+  "space-limit": "Your organisation has reached its hosted-space limit. Existing spaces remain available.",
+  unavailable: "The space could not be created. Please try again.",
+};
+
 export default async function TeacherHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ membership?: string }>;
+  searchParams: Promise<{ membership?: string; spaceCreate?: string; space?: string }>;
 }) {
   const teacher = await getCurrentTeacher();
 
@@ -71,6 +80,12 @@ export default async function TeacherHomePage({
     ? membershipMessages[query.membership] ?? ""
     : "";
   const membershipSucceeded = query.membership === "left";
+  const spaceCreateMessage = query.spaceCreate
+    ? spaceCreateMessages[query.spaceCreate] ?? ""
+    : "";
+  const deletedMessage = query.space === "deleted"
+    ? `The hosted space was deleted. An Ed.ie admin can restore it for the next ${SPACE_DELETION_RETENTION_DAYS} days.`
+    : "";
 
   for (const space of spaces) {
     const sessions = await listSessions(space.code);
@@ -106,9 +121,12 @@ export default async function TeacherHomePage({
                 Choose a hosted space to run sessions and see live responses.
               </p>
             </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-800 ring-1 ring-teal-200">
-              {spaces.length} {spaces.length === 1 ? "space" : "spaces"}
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-800 ring-1 ring-teal-200">
+                {spaces.length} {spaces.length === 1 ? "space" : "spaces"}
+              </span>
+              <CreateSpaceDialog />
+            </div>
           </div>
         </header>
 
@@ -127,6 +145,19 @@ export default async function TeacherHomePage({
             role="status"
           >
             {membershipMessage}
+          </p>
+        ) : null}
+
+        {spaceCreateMessage || deletedMessage ? (
+          <p
+            className={`mt-4 rounded-md border px-4 py-3 text-sm font-medium ${
+              deletedMessage
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+            role="status"
+          >
+            {deletedMessage || spaceCreateMessage}
           </p>
         ) : null}
 
@@ -216,8 +247,8 @@ export default async function TeacherHomePage({
               </div>
               <h3 className="mt-4 font-semibold text-slate-950">No spaces yet</h3>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-600">
-                Ask an Ed.ie admin to create a space for you, or ask a space
-                owner to share an existing one with your username or sign-in email.
+                Create your first hosted space, or ask a space owner to share an
+                existing one with your username or sign-in email.
               </p>
             </div>
           )}

@@ -135,6 +135,7 @@ MICROSOFT_TENANT_ID=organizations
 
 # Optional comma-separated allow-list for /admin/spaces.
 ADMIN_EMAILS=you@example.com
+CRON_SECRET=generate-a-random-secret-at-least-16-characters-long
 ```
 
 Keep `DATABASE_URL`, `BETTER_AUTH_SECRET`, OAuth client secrets, and all image

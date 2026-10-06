@@ -2,15 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountMenu } from "@/components/AccountMenu";
 import { PendingSubmitButton } from "@/components/PendingSubmitButton";
+import { DeleteSpaceDialog } from "@/components/DeleteSpaceDialog";
 import { getCurrentTeacher, getSpaceRoleForUser } from "@/lib/auth-server";
 import { findUserProfilesById } from "@/lib/auth-users";
 import { getTeacherSpace, listSpaceInvitations, listSpaceMembers } from "@/lib/edie-store";
 import { buildSpaceMemberView } from "@/lib/space-member-view";
+import { SPACE_DELETION_RETENTION_DAYS } from "@/lib/edie-store-model";
 import { loginRedirectPath } from "@/lib/teacher-session-auth";
 import {
   changeSpaceMemberRole,
   evictSpaceMember,
   inviteSpaceMember,
+  renameHostedSpace,
 } from "./actions";
 
 const memberMessages: Record<string, string> = {
@@ -23,12 +26,19 @@ const memberMessages: Record<string, string> = {
   "seat-limit": "This organisation has no teacher seats available. Existing members keep their access.",
 };
 
+const spaceMessages: Record<string, string> = {
+  renamed: "Space name updated.",
+  invalid: "Enter a space name between 1 and 120 characters.",
+  confirmation: "The confirmation did not exactly match the space code.",
+  unavailable: "The space could not be updated. Please try again.",
+};
+
 export default async function SpaceSettingsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ sessionCode: string }>;
-  searchParams: Promise<{ member?: string }>;
+  searchParams: Promise<{ member?: string; space?: string }>;
 }) {
   const { sessionCode: spaceCodeParam } = await params;
   const teacher = await getCurrentTeacher();
@@ -59,6 +69,8 @@ export default async function SpaceSettingsPage({
   const pendingInviteCount = invitations.length;
   const message = query.member ? memberMessages[query.member] ?? "" : "";
   const succeeded = query.member === "added" || query.member === "removed";
+  const spaceMessage = query.space ? spaceMessages[query.space] ?? "" : "";
+  const spaceSucceeded = query.space === "renamed";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
@@ -86,7 +98,7 @@ export default async function SpaceSettingsPage({
           <svg aria-hidden="true" className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
           </svg>
-          <span className="text-slate-700">Manage access</span>
+          <span className="text-slate-700">Manage</span>
         </nav>
         <header className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -95,10 +107,10 @@ export default async function SpaceSettingsPage({
                 {space.name}
               </p>
               <h1 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950">
-                Manage access
+                Manage
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Invite co-hosts by username without sharing sign-in email addresses.
+                Update this hosted space and control who can access it.
               </p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
@@ -107,6 +119,45 @@ export default async function SpaceSettingsPage({
             </span>
           </div>
         </header>
+
+        {spaceMessage ? (
+          <p className={`mt-4 rounded-md border px-4 py-3 text-sm font-medium ${
+            spaceSucceeded
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-red-200 bg-red-50 text-red-800"
+          }`} role="status">
+            {spaceMessage}
+          </p>
+        ) : null}
+
+        {isOwner ? (
+          <section className="mt-4 rounded-md border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-semibold text-slate-950">Space details</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Rename the space at any time. Its permanent join code remains <span className="font-mono">{space.code}</span>.
+            </p>
+            <form action={renameHostedSpace} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+              <input name="spaceCode" type="hidden" value={space.code} />
+              <div className="min-w-0 flex-1">
+                <label className="text-sm font-semibold text-slate-700" htmlFor="space-name">Space name</label>
+                <input
+                  className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-slate-950 outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                  defaultValue={space.name}
+                  id="space-name"
+                  maxLength={120}
+                  name="spaceName"
+                  required
+                />
+              </div>
+              <PendingSubmitButton
+                className="h-11 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+                pendingChildren="Saving..."
+              >
+                Save name
+              </PendingSubmitButton>
+            </form>
+          </section>
+        ) : null}
 
         {!isOwner ? (
           <div className="mt-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
@@ -295,6 +346,24 @@ export default async function SpaceSettingsPage({
             </p>
           )}
         </section>
+
+        {isOwner ? (
+          <section className="mt-5 rounded-md border border-red-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Danger zone</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                  Deleting hides the space immediately. An Ed.ie admin can restore it for {SPACE_DELETION_RETENTION_DAYS} days before it and all its data are permanently removed.
+                </p>
+              </div>
+              <DeleteSpaceDialog
+                retentionDays={SPACE_DELETION_RETENTION_DAYS}
+                spaceCode={space.code}
+                spaceName={space.name}
+              />
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

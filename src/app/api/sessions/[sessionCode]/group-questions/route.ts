@@ -1,4 +1,4 @@
-import { addGroupQuestion, listGroupQuestions } from "@/lib/edie-store";
+import { addGroupQuestion, getSession, listGroupQuestions } from "@/lib/edie-store";
 import { getAuthorizedTeacherSession } from "@/lib/teacher-session-auth";
 
 export async function GET(
@@ -6,6 +6,9 @@ export async function GET(
   ctx: RouteContext<"/api/sessions/[sessionCode]/group-questions">,
 ) {
   const { sessionCode } = await ctx.params;
+  if (!(await getSession(sessionCode))) {
+    return Response.json({ error: "Session not found." }, { status: 404 });
+  }
   const url = new URL(request.url);
   const voterId = url.searchParams.get("voterId") ?? undefined;
   const wantsAnswered = url.searchParams.get("includeAnswered") === "true";
@@ -35,6 +38,9 @@ export async function POST(
   ctx: RouteContext<"/api/sessions/[sessionCode]/group-questions">,
 ) {
   const { sessionCode } = await ctx.params;
+  if (!(await getSession(sessionCode))) {
+    return Response.json({ error: "Session not found." }, { status: 404 });
+  }
   const body = (await request.json().catch(() => ({}))) as {
     studentName?: string;
     text?: string;

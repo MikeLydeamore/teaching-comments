@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  softDeleteTeacherSpace: vi.fn(),
   inviteSpaceMember: vi.fn(),
   findUserProfileByEmail: vi.fn(),
   findUserProfileByUsername: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   }),
   removeSpaceMember: vi.fn(),
   removeSpaceInvitation: vi.fn(),
+  renameTeacherSpace: vi.fn(),
   revalidatePath: vi.fn(),
   updateSpaceMemberRole: vi.fn(),
 }));
@@ -41,6 +43,7 @@ vi.mock("@/lib/space-member-identity", () => ({
   },
 }));
 vi.mock("@/lib/edie-store", () => ({
+  softDeleteTeacherSpace: mocks.softDeleteTeacherSpace,
   inviteSpaceMember: mocks.inviteSpaceMember,
   getTeacherSpace: mocks.getTeacherSpace,
   getOrganizationMemberRole: mocks.getOrganizationMemberRole,
@@ -48,6 +51,7 @@ vi.mock("@/lib/edie-store", () => ({
   normalizeSpaceCode: (value: string) => value.trim().toLowerCase(),
   removeSpaceMember: mocks.removeSpaceMember,
   removeSpaceInvitation: mocks.removeSpaceInvitation,
+  renameTeacherSpace: mocks.renameTeacherSpace,
   updateSpaceMemberRole: mocks.updateSpaceMemberRole,
 }));
 vi.mock("@/lib/entitlements", () => ({
@@ -58,8 +62,10 @@ vi.mock("@/lib/entitlements", () => ({
 
 import {
   changeSpaceMemberRole,
+  deleteHostedSpace,
   evictSpaceMember,
   inviteSpaceMember,
+  renameHostedSpace,
 } from "./actions";
 
 const profile = {
@@ -90,6 +96,8 @@ describe("space member settings actions", () => {
     mocks.inviteSpaceMember.mockResolvedValue({});
     mocks.updateSpaceMemberRole.mockResolvedValue({});
     mocks.removeSpaceMember.mockResolvedValue(true);
+    mocks.renameTeacherSpace.mockResolvedValue({ code: "stats-101", name: "New name" });
+    mocks.softDeleteTeacherSpace.mockResolvedValue({ code: "stats-101" });
   });
 
   it("resolves an exact username to the private membership email", async () => {
@@ -187,5 +195,32 @@ describe("space member settings actions", () => {
       "stats-101",
       "user-2",
     );
+  });
+
+  it("allows an owner to rename a space without changing its code", async () => {
+    await expect(renameHostedSpace(form({
+      spaceCode: "stats-101",
+      spaceName: "New name",
+    }))).rejects.toThrow("redirect:/host/stats-101/settings?space=renamed");
+
+    expect(mocks.renameTeacherSpace).toHaveBeenCalledWith("stats-101", "New name");
+  });
+
+  it("requires the exact space code before deleting", async () => {
+    await expect(deleteHostedSpace(form({
+      spaceCode: "stats-101",
+      confirmation: "STATS-101",
+    }))).rejects.toThrow("redirect:/host/stats-101/settings?space=confirmation");
+
+    expect(mocks.softDeleteTeacherSpace).not.toHaveBeenCalled();
+  });
+
+  it("deletes after exact confirmation", async () => {
+    await expect(deleteHostedSpace(form({
+      spaceCode: "stats-101",
+      confirmation: "stats-101",
+    }))).rejects.toThrow("redirect:/host?space=deleted");
+
+    expect(mocks.softDeleteTeacherSpace).toHaveBeenCalledWith("stats-101");
   });
 });
