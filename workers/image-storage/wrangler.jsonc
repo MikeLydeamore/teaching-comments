@@ -7,11 +7,6 @@
 		{
 			"binding": "IMAGES",
 			"bucket_name": "edie-submission-images"
-		},
-		{
-			"bucket_name": "edie-submission-images",
-			"binding": "edie_submission_images",
-			"remote": true
 		}
 	],
 	"ratelimits": [

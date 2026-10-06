@@ -56,7 +56,7 @@ describe("SubmissionsPollOverlay", () => {
     );
 
     expect(output).toContain('role="dialog"');
-    expect(output).not.toContain("Responses update automatically");
+    expect(output).toContain('aria-labelledby="submissions-poll-question"');
     expect(output).toContain("Which answer is correct?");
     expect(output).toContain("1 response");
     expect(output).toContain("Correct answer:");

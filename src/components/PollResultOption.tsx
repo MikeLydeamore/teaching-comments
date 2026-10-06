@@ -64,11 +64,16 @@ export function PollResultOption({
         </p>
       </div>
       <div
+        aria-label={`${responseCount} response${responseCount === 1 ? "" : "s"} for ${label}`}
+        aria-valuemax={maxResponseCount}
+        aria-valuemin={0}
+        aria-valuenow={responseCount}
         className={
           isLarge
             ? "mt-3 h-8 overflow-hidden rounded bg-white shadow-inner sm:h-10"
             : "mt-1 h-4 overflow-hidden rounded bg-slate-100"
         }
+        role="progressbar"
       >
         <div
           className={`h-full rounded bg-teal-600${

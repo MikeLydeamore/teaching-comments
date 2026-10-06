@@ -41,7 +41,24 @@ describe("reconciliation fail-closed pagination", () => {
     const result = await collectWorkerObjects(async () => new Response(JSON.stringify(pages[index++])), "https://worker.test", "token");
     expect(result).toHaveLength(1);
     await expect(collectWorkerObjects(async () => new Response(JSON.stringify({ objects: [], cursor: "same", truncated: true })), "https://worker.test", "token")).rejects.toThrow("pagination");
-    expect(() => validateReference({ version: 1, objectKey: `committed/${"A".repeat(43)}/${submissionId}.png`, contentType: "image/png", byteSize: 1, etag: "e" })).not.toThrow();
+  });
+
+  it("validates the identity and MIME type encoded in database references", () => {
+    const reference = {
+      version: 1,
+      objectKey: `committed/${"A".repeat(43)}/${submissionId}.png`,
+      contentType: "image/png",
+      byteSize: 1,
+      etag: "e",
+    };
+
+    expect(validateReference(reference)).toMatchObject({
+      sessionHash: "A".repeat(43),
+      submissionId,
+    });
+    expect(() =>
+      validateReference({ ...reference, contentType: "image/jpeg" }),
+    ).toThrow("Invalid committed image key");
   });
 });
 

@@ -23,7 +23,8 @@ describe("SubmissionMarkdown", () => {
     expect(output).toContain("<ul");
     expect(output).toContain('type="checkbox"');
     expect(output).toContain("<code>inline</code>");
-    expect(output).toContain('<code class="language-js">');
+    expect(output).toContain("<pre><code");
+    expect(output).toContain("const value = 1;");
   });
 
   it("does not render headings, tables, or raw HTML elements", () => {

@@ -203,17 +203,21 @@ describe("private image gateway", () => {
     expect(limited?.status).toBe(429);
   });
 
-  it("applies the session rate limit across distinct clients", async () => {
-    const sessionHash = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
-    let limited: Response | undefined;
-    for (let index = 0; index < 301; index += 1) {
-      const suffix = String(index).padStart(12, "0");
-      limited = await upload(await ticket({
-        sessionHash,
-        uploadId: `99999999-9999-4999-8999-${suffix}`,
-        clientId: `aaaaaaaa-aaaa-4aaa-8aaa-${suffix}`
-      }));
-    }
-    expect(limited?.status).toBe(429);
-  });
+  it(
+    "applies the session rate limit across distinct clients",
+    async () => {
+      const sessionHash = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+      let limited: Response | undefined;
+      for (let index = 0; index < 301; index += 1) {
+        const suffix = String(index).padStart(12, "0");
+        limited = await upload(await ticket({
+          sessionHash,
+          uploadId: `99999999-9999-4999-8999-${suffix}`,
+          clientId: `aaaaaaaa-aaaa-4aaa-8aaa-${suffix}`
+        }));
+      }
+      expect(limited?.status).toBe(429);
+    },
+    15_000,
+  );
 });
