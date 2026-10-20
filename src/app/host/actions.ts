@@ -154,6 +154,7 @@ export async function createHostedSpace(formData: FormData) {
       entitlements.limits.ownedSpaces,
     );
   } catch (error) {
+    console.error("[create-hosted-space] failed", error);
     if (error instanceof EntitlementLimitError) {
       redirect("/host?spaceCreate=space-limit");
     }
