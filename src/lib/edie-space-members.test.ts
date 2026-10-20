@@ -79,7 +79,14 @@ describe("space membership (Neon backend)", () => {
     expect(call?.[0]).toContain("membership AS");
     expect(call?.[0]).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");
     expect(call?.[0]).not.toContain("email, role, status");
-    expect(call?.[1]).toEqual(["new-space", "New Space", "Owner's organisation", "user-owner", null]);
+    expect(call?.[1]).toEqual(["new-space", "New Space", "user-owner", null]);
+    for (const [sql, values] of queryMock.mock.calls) {
+      const placeholders = [...String(sql).matchAll(/\$(\d+)/g)].map((match) => Number(match[1]));
+      if (!placeholders.length) continue;
+      expect([...new Set(placeholders)].sort((left, right) => left - right)).toEqual(
+        Array.from({ length: values.length }, (_, index) => index + 1),
+      );
+    }
   });
 
   it("keeps pending invitations out of the membership table", async () => {

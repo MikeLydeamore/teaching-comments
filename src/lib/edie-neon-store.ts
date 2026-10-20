@@ -437,21 +437,21 @@ export const neonStore: EdieStore = {
          ) SELECT * FROM organization`, values: [organizationName, owner.userId] },
         { text: "SELECT id FROM edie_organizations WHERE personal_owner_user_id = $1 FOR UPDATE", values: [owner.userId] },
         { text: `WITH organization AS (
-           SELECT id FROM edie_organizations WHERE personal_owner_user_id = $4
+           SELECT id FROM edie_organizations WHERE personal_owner_user_id = $3
          ), created_space AS (
            INSERT INTO edie_teacher_spaces (code, name, organization_id)
            SELECT $1, $2, id FROM organization
-           WHERE $5::integer IS NULL OR (
+           WHERE $4::integer IS NULL OR (
              SELECT count(*) FROM edie_teacher_spaces WHERE organization_id = organization.id AND deleted_at IS NULL
-           ) < $5
+           ) < $4
            RETURNING ${SPACE_COLUMNS}
          ), membership AS (
            INSERT INTO edie_space_members (space_code, user_id, role)
-           SELECT code, $4, 'owner' FROM created_space
+           SELECT code, $3, 'owner' FROM created_space
            RETURNING space_code
          )
          SELECT created_space.* FROM created_space JOIN membership ON membership.space_code = created_space.code`,
-          values: [normalized, validateTeacherSpaceName(name), organizationName, owner.userId, ownedSpacesLimit] },
+          values: [normalized, validateTeacherSpaceName(name), owner.userId, ownedSpacesLimit] },
       ]);
       const row = results[2][0];
       if (!row && ownedSpacesLimit !== null) {
