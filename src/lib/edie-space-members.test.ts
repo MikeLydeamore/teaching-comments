@@ -71,6 +71,10 @@ describe("space membership (Neon backend)", () => {
   it("creates a personal organisation, space, and owner in one statement", async () => {
     const space = await neonStore.createTeacherSpaceForOwner("new-space", "New Space", { userId: "user-owner", name: "Owner" });
     expect(space.organizationId).toBe(organizationId);
+    const organizationCall = queryMock.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO edie_organizations") && !String(sql).includes("created_space"));
+    expect(organizationCall?.[0]).toContain("VALUES ($1, 'personal', $2)");
+    expect(organizationCall?.[0]).toContain("SELECT id, $2, 'owner' FROM organization");
+    expect(organizationCall?.[1]).toEqual(["Owner's organisation", "user-owner"]);
     const call = queryMock.mock.calls.find(([sql]) => String(sql).includes("created_space"));
     expect(call?.[0]).toContain("membership AS");
     expect(call?.[0]).toContain("INSERT INTO edie_space_members (space_code, user_id, role)");

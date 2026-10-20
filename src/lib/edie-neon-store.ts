@@ -426,15 +426,15 @@ export const neonStore: EdieStore = {
       const results = await transaction([
         { text: `WITH organization AS (
            INSERT INTO edie_organizations (name, kind, personal_owner_user_id)
-           VALUES ($3, 'personal', $4)
+           VALUES ($1, 'personal', $2)
            ON CONFLICT (personal_owner_user_id) WHERE personal_owner_user_id IS NOT NULL
            DO UPDATE SET personal_owner_user_id = EXCLUDED.personal_owner_user_id
            RETURNING id, name, kind, personal_owner_user_id, created_at
          ), membership AS (
            INSERT INTO edie_organization_members (organization_id, user_id, role)
-           SELECT id, $4, 'owner' FROM organization
+           SELECT id, $2, 'owner' FROM organization
            ON CONFLICT (organization_id, user_id) DO UPDATE SET role = 'owner'
-         ) SELECT * FROM organization`, values: [normalized, validateTeacherSpaceName(name), organizationName, owner.userId] },
+         ) SELECT * FROM organization`, values: [organizationName, owner.userId] },
         { text: "SELECT id FROM edie_organizations WHERE personal_owner_user_id = $1 FOR UPDATE", values: [owner.userId] },
         { text: `WITH organization AS (
            SELECT id FROM edie_organizations WHERE personal_owner_user_id = $4
