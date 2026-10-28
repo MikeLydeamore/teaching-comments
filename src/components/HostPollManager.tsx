@@ -24,6 +24,7 @@ import {
   POLL_TIMER_MIN_SECONDS,
   QUICK_TIMER_ADJUSTMENTS,
 } from "@/lib/timer-duration";
+import { useHasHydrated } from "@/lib/use-has-hydrated";
 
 type HostPollManagerProps = {
   dashboardUrl: string;
@@ -94,12 +95,17 @@ function questionBankTextKey(text: string) {
   return text.trim().toLowerCase();
 }
 
+function pollStartedAtLabel(value: string, hasHydrated: boolean) {
+  return hasHydrated ? new Date(value).toLocaleString() : "Past poll";
+}
+
 export function HostPollManager({
   dashboardUrl,
   pollTutorial,
   sessionIsOpen,
   sessionCode,
 }: HostPollManagerProps) {
+  const hasHydrated = useHasHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<"current" | "history" | "new">("new");
   const [poll, setPoll] = useState<SessionPoll | null>(null);
@@ -991,7 +997,10 @@ export function HostPollManager({
                         ) : null}
                         {pastPollResults.map((item) => (
                           <option key={item.poll.id} value={item.poll.id}>
-                            {new Date(item.poll.startedAt).toLocaleString()} — {item.poll.question}
+                            {pollStartedAtLabel(
+                              item.poll.startedAt,
+                              hasHydrated,
+                            )} — {item.poll.question}
                           </option>
                         ))}
                       </select>
@@ -1019,9 +1028,10 @@ export function HostPollManager({
                             </span>
                             <span aria-hidden="true">•</span>
                             <time dateTime={selectedHistoryResults.poll.startedAt}>
-                              {new Date(
+                              {pollStartedAtLabel(
                                 selectedHistoryResults.poll.startedAt,
-                              ).toLocaleString()}
+                                hasHydrated,
+                              )}
                             </time>
                           </div>
                           <div

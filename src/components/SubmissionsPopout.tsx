@@ -5,7 +5,6 @@ import {
   useCallback,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { ConnectedParticipantBadge } from "@/components/ConnectedParticipantBadge";
 import { DrawingPreview } from "@/components/DrawingPreview";
@@ -22,6 +21,7 @@ import type {
   SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { submissionTimeRangeLabel } from "@/lib/submission-time-range";
+import { useHasHydrated } from "@/lib/use-has-hydrated";
 import { useSubmissionViewRealtime } from "@/lib/use-submission-view-realtime";
 import { runViewTransition } from "@/lib/view-transition";
 
@@ -42,18 +42,6 @@ type SubmissionView = {
   submissions: SubmissionDto[];
   viewSettings: SubmissionViewSettings;
 };
-
-function subscribeToHydration() {
-  return () => {};
-}
-
-function useHasHydrated() {
-  return useSyncExternalStore(
-    subscribeToHydration,
-    () => true,
-    () => false,
-  );
-}
 
 function responseTime(value: string, hasHydrated: boolean) {
   if (!hasHydrated) {

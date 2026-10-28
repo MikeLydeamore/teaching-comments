@@ -27,6 +27,24 @@ describe("SubmissionMarkdown", () => {
     expect(output).toContain("const value = 1;");
   });
 
+  it("renders inline and display LaTeX equations", () => {
+    const output = render(
+      "The answer is $x^2$.\n\n$$\n\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}\n$$",
+    );
+
+    expect(output).toContain('class="katex"');
+    expect(output).toContain('class="katex-display"');
+    expect(output).toContain("x^2");
+    expect(output).toContain("annotation encoding=\"application/x-tex\"");
+  });
+
+  it("shows invalid LaTeX as an error without throwing", () => {
+    const output = render("$\\notARealCommand{x}$");
+
+    expect(output).toContain('class="katex"');
+    expect(output).toContain("notARealCommand");
+  });
+
   it("does not render headings, tables, or raw HTML elements", () => {
     const output = render(
       "# Heading\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\n<script>alert(1)</script>",

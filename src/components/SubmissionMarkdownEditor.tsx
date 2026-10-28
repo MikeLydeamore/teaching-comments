@@ -46,6 +46,7 @@ type SubmissionMarkdownEditorProps = {
 };
 
 function createEditorCommands(
+  equationCommand: ICommand,
   emojiCommand: ICommand,
   imageEmbedsEnabled: boolean,
 ): ICommand[] {
@@ -61,6 +62,7 @@ function createEditorCommands(
     divider,
     code,
     codeBlock,
+    equationCommand,
     link,
     ...(imageEmbedsEnabled ? [image] : []),
     emojiCommand,
@@ -81,6 +83,40 @@ export function SubmissionMarkdownEditor({
   const [mode, setMode] = useState<EditorMode>("write");
   const [emojiOpen, setEmojiOpen] = useState(false);
   const editorRef = useRef<RefMDEditor>(null);
+  const equationCommand: ICommand = {
+    name: "equation",
+    keyCommand: "equation",
+    render: (command, commandDisabled, executeCommand) => (
+      <button
+        aria-label="Insert equation"
+        disabled={disabled || commandDisabled}
+        title="Insert equation"
+        type="button"
+        onClick={() => executeCommand(command)}
+      >
+        <span className="text-sm font-semibold leading-none">∑</span>
+      </button>
+    ),
+    execute: (state, api) => {
+      const equation = `$${state.selectedText || "x"}$`;
+
+      if (
+        canReplaceMarkdownSelection(
+          state.text,
+          state.selectedText,
+          equation,
+          maxLength,
+        )
+      ) {
+        const selectionStart = state.selection.start + 1;
+        api.replaceSelection(equation);
+        api.setSelectionRange({
+          start: selectionStart,
+          end: selectionStart + (state.selectedText || "x").length,
+        });
+      }
+    },
+  };
   const emojiCommand: ICommand = {
     name: "emoji",
     keyCommand: "emoji",
@@ -137,7 +173,11 @@ export function SubmissionMarkdownEditor({
           <MarkdownEditor
             autoFocus={false}
             className="edie-submission-editor"
-            commands={createEditorCommands(emojiCommand, imageEmbedsEnabled)}
+            commands={createEditorCommands(
+              equationCommand,
+              emojiCommand,
+              imageEmbedsEnabled,
+            )}
             data-color-mode="light"
             extraCommands={[]}
             height={240}

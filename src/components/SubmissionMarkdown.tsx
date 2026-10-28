@@ -1,8 +1,10 @@
 import type { ComponentProps } from "react";
 import Markdown from "react-markdown";
-import rehypeSanitize from "rehype-sanitize";
+import rehypeKatex from "rehype-katex";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 type SubmissionMarkdownProps = {
   children: string;
@@ -26,6 +28,18 @@ const allowedElements = [
   "strong",
   "ul",
 ];
+
+const markdownSanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [
+      ...(defaultSchema.attributes?.code ?? []),
+      ["className", "math-inline", "math-display"],
+    ],
+  },
+  tagNames: allowedElements,
+};
 
 function safeMarkdownUrl(url: string, key: string) {
   try {
@@ -99,15 +113,20 @@ export function SubmissionMarkdown({
   return (
     <div className={`edie-markdown ${className}`}>
       <Markdown
-        allowedElements={allowedElements}
         components={{
           a: MarkdownLink,
           img: imageEmbedsEnabled ? MarkdownImage : MarkdownImageLink,
         }}
-        rehypePlugins={[rehypeSanitize]}
-        remarkPlugins={[[remarkGfm, { singleTilde: false }], remarkBreaks]}
+        rehypePlugins={[
+          [rehypeSanitize, markdownSanitizeSchema],
+          [rehypeKatex, { strict: false }],
+        ]}
+        remarkPlugins={[
+          [remarkGfm, { singleTilde: false }],
+          remarkMath,
+          remarkBreaks,
+        ]}
         skipHtml
-        unwrapDisallowed
         urlTransform={safeMarkdownUrl}
       >
         {children}

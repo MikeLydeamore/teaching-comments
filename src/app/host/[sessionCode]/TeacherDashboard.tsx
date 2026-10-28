@@ -55,6 +55,7 @@ import type {
   SubmissionViewSettingsPatch,
 } from "@/lib/edie-store";
 import { runViewTransition } from "@/lib/view-transition";
+import { useHasHydrated } from "@/lib/use-has-hydrated";
 import { useSubmissionViewRealtime } from "@/lib/use-submission-view-realtime";
 
 type Session = {
@@ -423,13 +424,21 @@ function questionBankTextKey(text: string) {
   return text.trim().toLowerCase();
 }
 
-function promptHistoryOptionLabel(item: PromptHistoryItem) {
+function promptHistoryOptionLabel(
+  item: PromptHistoryItem,
+  hasHydrated: boolean,
+) {
+  const prompt =
+    item.prompt.length > 80 ? `${item.prompt.slice(0, 77).trim()}...` : item.prompt;
+
+  if (!hasHydrated) {
+    return prompt;
+  }
+
   const startedAt = new Date(item.startedAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const prompt =
-    item.prompt.length > 80 ? `${item.prompt.slice(0, 77).trim()}...` : item.prompt;
 
   return `${startedAt} - ${prompt}`;
 }
@@ -458,6 +467,7 @@ function TeacherDashboardContent({
   spaceCode,
   spaceName,
 }: TeacherDashboardProps) {
+  const hasHydrated = useHasHydrated();
   const [sessionDetails, setSessionDetails] = useState(session);
   const [promptDraft, setPromptDraft] = useState(session.prompt);
   const [promptStatus, setPromptStatus] = useState("");
@@ -2158,7 +2168,7 @@ function TeacherDashboardContent({
                             <option value="">All prompts</option>
                             {promptHistory.map((item) => (
                               <option key={item.id} value={item.id}>
-                                {promptHistoryOptionLabel(item)}
+                                {promptHistoryOptionLabel(item, hasHydrated)}
                               </option>
                             ))}
                           </select>

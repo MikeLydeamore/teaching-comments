@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@uiw/react-md-editor/markdown-editor.css";
+@import "katex/dist/katex.min.css";
 
 :root {
   --background: #f1f5f9;
@@ -492,6 +493,13 @@ html[data-edie-theme] .edie-theme-selector {
   max-height: 32rem;
   max-width: 100%;
   object-fit: contain;
+}
+
+.edie-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
 }
 
 .edie-submission-editor.w-md-editor {
